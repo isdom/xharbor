@@ -26,7 +26,8 @@ case $1 in
 start)
     echo  "Starting $SERVER_NAME ... "
 
-    JAVA_OPTS="-server -Djava.nio.channels.spi.SelectorProvider=sun.nio.ch.EPollSelectorProvider -XX:+HeapDumpOnOutOfMemoryError -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
+    # -Djava.nio.channels.spi.SelectorProvider=sun.nio.ch.EPollSelectorProvider remove this flag for jdk 1.7 & mac
+    JAVA_OPTS="-server -XX:+HeapDumpOnOutOfMemoryError -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
     
     shift
     ARGS=($*)
