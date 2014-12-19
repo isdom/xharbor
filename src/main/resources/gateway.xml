@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd">
+    <bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+        <property name="locations">
+            <list>
+                <value>classpath:gateway.properties</value>
+            </list>
+        </property>
+        <property name="fileEncoding" value="UTF-8"/>
+    </bean>
+    
+    <bean id="httpServer" class="org.jocean.httpgateway.HttpGatewayServer"
+        init-method="start" destroy-method="stop">
+        <property name="acceptPort" value="${gateway.port:8080}" />
+        <property name="acceptIp" value="${gateway.ip:0.0.0.0}" />
+        <property name="logByteStream" value="${gateway.log.byteStream:false}"/>
+        <property name="idleTimeSeconds" value="${gateway.idleTimeSeconds:200}"/>
+        <property name="destUri" value="${proxy.uri}"/>
+     </bean>
+    
+</beans>
