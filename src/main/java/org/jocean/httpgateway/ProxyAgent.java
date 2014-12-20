@@ -4,7 +4,8 @@
 package org.jocean.httpgateway;
 
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpRequest;
 
 import java.net.URI;
 
@@ -15,7 +16,11 @@ import org.jocean.idiom.Detachable;
  *
  */
 public interface ProxyAgent {
-    public Detachable createProxyTask(final URI uri, 
-            final FullHttpRequest httpRequest, 
-            final ChannelHandlerContext ctx);
+    public interface ProxyTask extends Detachable {
+        public void sendHttpRequest(final HttpRequest httpRequest);
+        
+        public void sendHttpContent(final HttpContent httpContent);
+    }
+    
+    public ProxyTask createProxyTask(final URI uri, final ChannelHandlerContext ctx);
 }

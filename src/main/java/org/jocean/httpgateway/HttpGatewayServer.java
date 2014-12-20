@@ -14,9 +14,9 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpContentCompressor;
-import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpRequestDecoder;
 import io.netty.handler.codec.http.HttpResponseEncoder;
 import io.netty.handler.traffic.TrafficCounterExt;
@@ -26,7 +26,7 @@ import java.io.IOException;
 import java.net.URI;
 
 import org.jocean.ext.netty.initializer.BaseInitializer;
-import org.jocean.idiom.Detachable;
+import org.jocean.httpgateway.ProxyAgent.ProxyTask;
 import org.jocean.idiom.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,7 +40,7 @@ public class HttpGatewayServer {
     private static final Logger LOG = LoggerFactory
             .getLogger(HttpGatewayServer.class);
 
-    public static final AttributeKey<Detachable> PROXY = AttributeKey.valueOf("Proxy");
+    public static final AttributeKey<ProxyTask> PROXY = AttributeKey.valueOf("Proxy");
     
     private static final int MAX_RETRY = 20;
     private static final long RETRY_TIMEOUT = 30 * 1000; // 30s
@@ -80,16 +80,49 @@ public class HttpGatewayServer {
             ctx.flush();
         }
         
+        private ProxyTask getProxyTaskOf(final ChannelHandlerContext ctx) {
+            return ctx.attr(PROXY).get();
+        }
+        
+        private void setProxyTaskOf(final ChannelHandlerContext ctx, final ProxyTask task) {
+            ctx.attr(PROXY).set(task);
+        }
+        
+        /**
+         * @param ctx
+         * @throws Exception
+         */
+        private void detachCurrentTaskOf(ChannelHandlerContext ctx)
+                throws Exception {
+            final ProxyTask task = getProxyTaskOf(ctx);
+            if ( null != task ) {
+                task.detach();
+            }
+        }
+
         @Override
         public void channelRead(final ChannelHandlerContext ctx, final Object msg) throws Exception {
             
-            if (msg instanceof FullHttpRequest) {
+            if (msg instanceof HttpRequest) {
+                detachCurrentTaskOf(ctx);
+                
                 if ( LOG.isDebugEnabled()) {
                     LOG.debug("messageReceived:{} default http request\n[{}]",ctx.channel(),msg);
-                    final Detachable task = _proxyAgent.createProxyTask(new URI(_destUri), (FullHttpRequest)msg, ctx);
-                    ctx.attr(PROXY).set(task);
                 }
-            }else{
+                final ProxyTask newTask = _proxyAgent.createProxyTask(new URI(_destUri), ctx);
+                newTask.sendHttpRequest((HttpRequest)msg);
+                setProxyTaskOf(ctx, newTask);
+            }
+            else if (msg instanceof HttpContent) {
+                final ProxyTask task = getProxyTaskOf(ctx);
+                if ( null != task ) {
+                    task.sendHttpContent((HttpContent)msg);
+                }
+                else {
+                    LOG.warn("NO PROXY TASK, messageReceived:{} unhandled msg [{}]",ctx.channel(),msg);
+                }
+            }
+            else {
                 LOG.warn("messageReceived:{} unhandled msg [{}]",ctx.channel(),msg);
                 return;
             }
@@ -97,10 +130,7 @@ public class HttpGatewayServer {
         
         @Override
         public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-            final Detachable task = ctx.attr(PROXY).get();
-            if ( null != task ) {
-                task.detach();
-            }
+            detachCurrentTaskOf(ctx);
         }
 
         @Override
@@ -168,7 +198,7 @@ public class HttpGatewayServer {
                 //IN decoder
                 pipeline.addLast("decoder",new HttpRequestDecoder());
                 //IN aggregator
-                pipeline.addLast("aggregator", new HttpObjectAggregator(_chunkDataSzie));
+//                pipeline.addLast("aggregator", new HttpObjectAggregator(_chunkDataSzie));
                 //OUT 统计数据流大小 这个handler需要放在HttpResponseToByteEncoder前面处理
 //                pipeline.addLast("statistics",new StatisticsResponseHandler()); 
                 //OUT encoder

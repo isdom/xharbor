@@ -7,6 +7,7 @@ import org.jocean.event.api.EventReceiverSource;
 import org.jocean.event.extend.Runners;
 import org.jocean.event.extend.Services;
 import org.jocean.httpclient.HttpStack;
+import org.jocean.httpclient.impl.HttpUtils;
 import org.jocean.httpgateway.impl.ProxyAgentImpl;
 import org.jocean.idiom.pool.Pools;
 import org.jocean.netty.NettyClient;
@@ -23,6 +24,9 @@ public class Main {
      * @param args
      */
     public static void main(String[] args) {
+        
+        HttpUtils.enableHttpTransportLog(true);
+        
         final AbstractApplicationContext ctx =
                 new ClassPathXmlApplicationContext(
                         new String[]{"gateway.xml"});

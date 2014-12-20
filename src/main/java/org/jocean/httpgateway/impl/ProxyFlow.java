@@ -9,11 +9,16 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.LastHttpContent;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.jocean.event.api.AbstractFlow;
 import org.jocean.event.api.BizStep;
@@ -41,8 +46,10 @@ public class ProxyFlow extends AbstractFlow<ProxyFlow> {
     private static final Logger LOG = LoggerFactory
             .getLogger(ProxyFlow.class);
 
-    public ProxyFlow(final HttpStack stack) {
+    public ProxyFlow(final HttpStack stack, final URI uri, final ChannelHandlerContext ctx) {
         this._stack = stack;
+        this._uri = uri;
+        this._channelCtx = ctx;
 
         addFlowLifecycleListener(new FlowLifecycleListener<ProxyFlow>() {
 
@@ -59,6 +66,7 @@ public class ProxyFlow extends AbstractFlow<ProxyFlow> {
                     ProxyFlow.this._forceFinishedTimer.detach();
                     ProxyFlow.this._forceFinishedTimer = null;
                 }
+                _contents.clear();
             }
         });
         
@@ -91,15 +99,11 @@ public class ProxyFlow extends AbstractFlow<ProxyFlow> {
 
     public final BizStep WAIT = new BizStep("proxy.WAIT") {
 
-        @OnEvent(event = "start")
-        private BizStep onProxyStart(
-                final URI uri, 
-                final FullHttpRequest httpRequest, 
-                final ChannelHandlerContext channelCtx) {
+        @OnEvent(event = "sendHttpRequest")
+        private BizStep sendHttpRequest(final HttpRequest httpRequest) {
 
-            _uri = uri;
             _httpRequest = httpRequest;
-            _channelCtx = channelCtx;
+            updateTransferHttpRequestState(_httpRequest);
             
             startObtainHttpClient();
             return OBTAINING;
@@ -109,6 +113,15 @@ public class ProxyFlow extends AbstractFlow<ProxyFlow> {
     .freeze();
 
     private final BizStep OBTAINING = new BizStep("proxy.OBTAINING") {
+        @OnEvent(event = "sendHttpContent")
+        private BizStep sendHttpContent(final HttpContent httpContent) {
+
+            _contents.add(httpContent);
+            updateTransferHttpRequestState(httpContent);
+            
+            return currentEventHandler();
+        }
+        
         @OnEvent(event = "onHttpClientObtained")
         private BizStep onHttpObtained(final int guideId,
                 final HttpClient httpclient) {
@@ -117,8 +130,11 @@ public class ProxyFlow extends AbstractFlow<ProxyFlow> {
             }
 
             if (LOG.isDebugEnabled()) {
-                LOG.debug("send http request {}", _httpRequest);
+                LOG.debug("send http request {} & contents size: {}", _httpRequest, _contents.size());
             }
+            
+            _httpClient = httpclient;
+            
             try {
                 httpclient.sendHttpRequest(_httpClientId.updateIdAndGet(),
                         _httpRequest, genHttpReactor());
@@ -129,14 +145,60 @@ public class ProxyFlow extends AbstractFlow<ProxyFlow> {
                         currentEventHandler().getName(), currentEvent(),
                         ExceptionUtils.exception2detail(e));
             }
-            tryStartForceFinishedTimer();
-            return RECVRESP;
+            for ( HttpContent content : _contents) {
+                try {
+                    httpclient.sendHttpContent(content);
+                }
+                catch (Exception e) {
+                    LOG.error(
+                            "state({})/{}: exception when sendHttpContent, detail:{}",
+                            currentEventHandler().getName(), currentEvent(),
+                            ExceptionUtils.exception2detail(e));
+                }
+            }
+            _contents.clear();
+            
+            if ( !_transferHttpRequestComplete ) {
+                return TRANSFERCONTENT;
+            }
+            else {
+                tryStartForceFinishedTimer();
+                return RECVRESP;
+            }
         }
     }
     .handler(handlersOf(ON_HTTPLOST))
     .handler(handlersOf(ON_DETACH))
     .freeze();
 
+    private final BizStep TRANSFERCONTENT = new BizStep("proxy.TRANSFERCONTENT") {
+        @OnEvent(event = "sendHttpContent")
+        private BizStep sendHttpContent(final HttpContent httpContent) {
+
+            try {
+                _httpClient.sendHttpContent(httpContent);
+            }
+            catch (Exception e) {
+                LOG.error(
+                        "state({})/{}: exception when sendHttpContent, detail:{}",
+                        currentEventHandler().getName(), currentEvent(),
+                        ExceptionUtils.exception2detail(e));
+            }
+            updateTransferHttpRequestState(httpContent);
+            
+            if ( !_transferHttpRequestComplete ) {
+                return currentEventHandler();
+            }
+            else {
+                tryStartForceFinishedTimer();
+                return RECVRESP;
+            }
+        }
+    }
+    .handler(handlersOf(ON_HTTPLOST))
+    .handler(handlersOf(ON_DETACH))
+    .freeze();
+        
     private final BizStep RECVRESP = new BizStep("proxy.RECVRESP") {
         @OnEvent(event = "onHttpResponseReceived")
         private BizStep responseReceived(final int httpClientId,
@@ -289,11 +351,27 @@ public class ProxyFlow extends AbstractFlow<ProxyFlow> {
         return ret;
     }
 
-    private final HttpStack _stack;
+    private void updateTransferHttpRequestState(final HttpRequest httpRequest) {
+        if ( httpRequest instanceof FullHttpRequest ) {
+            this._transferHttpRequestComplete = true;
+        }
+    }
     
-    private URI _uri;
-    private FullHttpRequest _httpRequest;
-    private ChannelHandlerContext _channelCtx;
+    private void updateTransferHttpRequestState(final HttpContent content) {
+        if ( content instanceof LastHttpContent ) {
+            this._transferHttpRequestComplete = true;
+        }
+    }
+    
+    private final HttpStack _stack;
+    private final URI _uri;
+    private final ChannelHandlerContext _channelCtx;
+    
+    private HttpClient _httpClient;
+    private HttpRequest _httpRequest;
+    private final List<HttpContent> _contents = new ArrayList<HttpContent>();
+    private boolean _transferHttpRequestComplete = false;
+    
     private Guide _guide;
     private final ValidationId _guideId = new ValidationId();
     private final ValidationId _httpClientId = new ValidationId();
