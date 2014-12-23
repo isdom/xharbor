@@ -3,11 +3,17 @@
  */
 package org.jocean.httpgateway;
 
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.regex.Pattern;
+
 import org.jocean.event.api.EventReceiverSource;
 import org.jocean.event.extend.Runners;
 import org.jocean.event.extend.Services;
 import org.jocean.httpclient.HttpStack;
 import org.jocean.httpclient.impl.HttpUtils;
+import org.jocean.httpgateway.biz.DefaultDispatcher;
+import org.jocean.httpgateway.biz.DefaultDispatcher.RuleSet;
 import org.jocean.httpgateway.impl.ProxyAgentImpl;
 import org.jocean.idiom.pool.Pools;
 import org.jocean.netty.NettyClient;
@@ -22,8 +28,9 @@ public class Main {
 
     /**
      * @param args
+     * @throws Exception 
      */
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         
         HttpUtils.enableHttpTransportLog(true);
         
@@ -45,6 +52,19 @@ public class Main {
         final HttpGatewayServer server = ctx.getBean(HttpGatewayServer.class);
         
         server.setProxyAgent(agent);
+        
+        // construct dispatch
+        final DefaultDispatcher dispatcher = new DefaultDispatcher();
+        
+        dispatcher.addRuleSet(new RuleSet(100) {{
+            this.addTarget(new URI("http://121.41.100.24"), new Pattern[]{Pattern.compile("/ydd[/|\\w]*")});
+        }} );
+        
+        dispatcher.addRuleSet(new RuleSet(0) {{
+            this.addTarget(new URI("http://api.huaban.com"), new Pattern[]{Pattern.compile("/\\w*")});
+        }} );
+        
+        server.setDispatcher(dispatcher);
     }
 
 }

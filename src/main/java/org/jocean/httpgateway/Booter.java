@@ -11,7 +11,11 @@ public class Booter {
             System.out.println("add path [" + jarName + "]");
         }
 
-        Main.main(args);
+        try {
+            Main.main(args);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
 }

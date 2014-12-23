@@ -27,6 +27,7 @@ import java.net.URI;
 
 import org.jocean.ext.netty.initializer.BaseInitializer;
 import org.jocean.httpgateway.ProxyAgent.ProxyTask;
+import org.jocean.httpgateway.biz.HttpRequestDispatcher;
 import org.jocean.idiom.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,10 +57,11 @@ public class HttpGatewayServer {
     private TrafficCounterExt _trafficCounterExt;
     private boolean _logByteStream = false;
     private int _idleTimeSeconds = 180; //seconds  为了避免建立了过多的闲置连接 闲置180秒的连接主动关闭
-    private int _chunkDataSzie = 1048576; //1024 * 1024
+//    private int _chunkDataSzie = 1048576; //1024 * 1024
     
     private ProxyAgent  _proxyAgent;
-    private String _destUri = "http://127.0.0.1:8000";
+//    private String _destUri = "http://127.0.0.1:8000";
+    private HttpRequestDispatcher _dispatcher;
     
     /**
      * 负责处理来自终端的request到AccessCenterBiz
@@ -104,13 +106,27 @@ public class HttpGatewayServer {
         public void channelRead(final ChannelHandlerContext ctx, final Object msg) throws Exception {
             
             if (msg instanceof HttpRequest) {
-                detachCurrentTaskOf(ctx);
+                final HttpRequest request = (HttpRequest)msg;
                 
                 if ( LOG.isDebugEnabled()) {
-                    LOG.debug("messageReceived:{} default http request\n[{}]",ctx.channel(),msg);
+                    LOG.debug("messageReceived:{} default http request\n[{}]",ctx.channel(),request);
                 }
-                final ProxyTask newTask = _proxyAgent.createProxyTask(new URI(_destUri), ctx);
-                newTask.sendHttpRequest((HttpRequest)msg);
+                
+                final URI dest = _dispatcher.dispatch(request);
+                
+                if ( null == dest ) {
+                    LOG.warn("can't found matched dest uri for request {}, just ignore", request);
+                    return;
+                }
+                
+                if ( LOG.isDebugEnabled() ) {
+                    LOG.debug("dispatch to ({}) for request({})", dest, request);
+                }
+                
+                detachCurrentTaskOf(ctx);
+                
+                final ProxyTask newTask = _proxyAgent.createProxyTask(dest, ctx);
+                newTask.sendHttpRequest(request);
                 setProxyTaskOf(ctx, newTask);
             }
             else if (msg instanceof HttpContent) {
@@ -308,12 +324,17 @@ public class HttpGatewayServer {
         this._proxyAgent = agent;
     }
     
+    public void setDispatcher(final HttpRequestDispatcher dispatcher) {
+        this._dispatcher = dispatcher;
+    }
+    
     public void setDestUri(final String uri) {
-        this._destUri = uri;
+//        this._destUri = uri;
     }
     
     public String getDestUri() {
-        return this._destUri;
+//        return this._destUri;
+        return null;
     }
     
 //    public void setGroupStatisticsFSM(FiniteStateMachine groupStatisticsFSM) {
