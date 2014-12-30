@@ -46,14 +46,15 @@ dependencies {
     compile "org.springframework:spring-context-support:${springVersion}"
     compile "org.springframework:spring-orm:${springVersion}"
     compile "org.springframework:spring-test:${springVersion}"
+
+    /* zookeeper */
+    compile "org.apache.curator:curator-recipes:2.7.0"
     
     runtime "cglib:cglib:3.0"
     runtime "org.aspectj:aspectjweaver:1.7.3"
 
     runtime 'org.jvnet.opendmk:jmxremote_optional:1.0_01-ea'
-    runtime "org.apache.curator:curator-recipes:2.7.0"
 
     testCompile "junit:junit:4.11"
     testCompile 'org.apache.curator:curator-examples:2.7.0'
-
 }
