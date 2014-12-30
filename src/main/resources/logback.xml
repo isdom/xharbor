@@ -75,6 +75,7 @@
 <!--     <logger name="org.jocean" level="TRACE"/>
  -->
     <logger name="io.netty" level="TRACE"/>
+    <logger name="org.apache.zookeeper" level="WARN"/>
     
     <logger name="timeoutLogger" level="INFO" additivity="false">
         <appender-ref ref="timeoutLogger"/>

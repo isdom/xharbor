@@ -61,7 +61,7 @@ public class HttpGatewayServer {
     
     private ProxyAgent  _proxyAgent;
 //    private String _destUri = "http://127.0.0.1:8000";
-    private HttpRequestDispatcher _dispatcher;
+    private HttpRequestDispatcher _dispatcher = null;
     
     /**
      * 负责处理来自终端的request到AccessCenterBiz
@@ -110,6 +110,11 @@ public class HttpGatewayServer {
                 
                 if ( LOG.isDebugEnabled()) {
                     LOG.debug("messageReceived:{} default http request\n[{}]",ctx.channel(),request);
+                }
+                
+                if ( null == _dispatcher ) {
+                    LOG.warn("dispatcher is null, just ignore request {}", request);
+                    return;
                 }
                 
                 final URI dest = _dispatcher.dispatch(request);

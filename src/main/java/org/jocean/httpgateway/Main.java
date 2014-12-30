@@ -3,20 +3,24 @@
  */
 package org.jocean.httpgateway;
 
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.regex.Pattern;
-
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.framework.recipes.cache.TreeCache;
+import org.apache.curator.framework.recipes.cache.TreeCacheEvent;
+import org.apache.curator.framework.recipes.cache.TreeCacheListener;
+import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.jocean.event.api.EventReceiverSource;
 import org.jocean.event.extend.Runners;
 import org.jocean.event.extend.Services;
 import org.jocean.httpclient.HttpStack;
 import org.jocean.httpclient.impl.HttpUtils;
 import org.jocean.httpgateway.biz.DefaultDispatcher;
-import org.jocean.httpgateway.biz.DefaultDispatcher.RuleSet;
 import org.jocean.httpgateway.impl.ProxyAgentImpl;
+import org.jocean.httpgateway.route.RouteUtils;
 import org.jocean.idiom.pool.Pools;
 import org.jocean.netty.NettyClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 
@@ -25,6 +29,8 @@ import org.springframework.context.support.ClassPathXmlApplicationContext;
  *
  */
 public class Main {
+    private static final Logger LOG = LoggerFactory
+            .getLogger(Main.class);
 
     /**
      * @param args
@@ -53,18 +59,35 @@ public class Main {
         
         server.setProxyAgent(agent);
         
-        // construct dispatch
+        final CuratorFramework client = 
+                CuratorFrameworkFactory.newClient("121.41.45.51:2181", 
+                        new ExponentialBackoffRetry(1000, 3));
+        client.start();
+        
         final DefaultDispatcher dispatcher = new DefaultDispatcher();
-        
-        dispatcher.addRuleSet(new RuleSet(100) {{
-            this.addTarget(new URI("http://121.41.100.24"), new Pattern[]{Pattern.compile("/ydd[/|\\w]*")});
-        }} );
-        
-        dispatcher.addRuleSet(new RuleSet(0) {{
-            this.addTarget(new URI("http://api.huaban.com"), new Pattern[]{Pattern.compile("/\\w*")});
-        }} );
-        
+         
         server.setDispatcher(dispatcher);
+        
+        dispatcher.setRoutingRules(RouteUtils.buildRoutingRulesFromZK(client, "/demo"));
+        final TreeCache cache = TreeCache.newBuilder(client, "/demo").setCacheData(false).build();
+        cache.getListenable().addListener(new TreeCacheListener() {
+
+            @Override
+            public void childEvent(final CuratorFramework client, final TreeCacheEvent event)
+                    throws Exception {
+                switch (event.getType()) {
+                case NODE_ADDED:
+                case NODE_UPDATED:
+                case NODE_REMOVED:
+                    LOG.debug("childEvent: {} event received, rebuild dispatcher", event);
+                    dispatcher.setRoutingRules(RouteUtils.buildRoutingRulesFromZK(client, "/demo"));
+                    break;
+                default:
+                    LOG.debug("childEvent: {} event received.", event);
+                }
+                
+            }});
+        cache.start();
     }
 
 }
