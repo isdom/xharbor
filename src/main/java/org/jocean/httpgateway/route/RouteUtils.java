@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 import org.apache.curator.framework.CuratorFramework;
-import org.jocean.httpgateway.route.RoutingRulesImpl.Level;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.Pair;
 import org.slf4j.Logger;
@@ -30,14 +29,10 @@ public class RouteUtils {
     public static RoutingRules buildRoutingRulesFromZK(final CuratorFramework client, final String path) 
             throws Exception {
         final RoutingRulesImpl routingRules = new RoutingRulesImpl();
-        final List<String> children = client.getChildren().forPath(path);
-        for ( String child : children ) {
+        final List<String> levels = client.getChildren().forPath(path);
+        for ( String priority : levels ) {
             try {
-                final int priority = Integer.parseInt(child);
-                final Level level = generateLevel(client, path + "/" + child, priority);
-                if ( null != level ) {
-                    routingRules.addLevel(level);
-                }
+                addRules(client, routingRules, path + "/" + priority, Integer.parseInt(priority));
             }
             catch (NumberFormatException e) {
                 LOG.warn("invalid priority for can't convert to integer, detail: {}", 
@@ -47,31 +42,22 @@ public class RouteUtils {
         return routingRules;
     }
 
-    private static Level generateLevel(final CuratorFramework client, final String pathToLevel,
+    private static void addRules(
+            final CuratorFramework client, 
+            final RoutingRulesImpl routingRules,
+            final String pathToLevel,
             final int priority) throws Exception {
-        final List<Pair<URI, Pattern[]>> rules = new ArrayList<Pair<URI, Pattern[]>>();
         final List<String> hosts = client.getChildren().forPath(pathToLevel);
         for ( String host : hosts ) {
             final Pair<URI, Pattern[]> rule = 
                     generateRule(client, pathToLevel + "/" + host, host);
             if ( null != rule ) {
-                rules.add(rule);
+                routingRules.addRule(priority, rule.getFirst(), rule.getSecond());
             }
-        }
-        if ( !rules.isEmpty() ) {
-            final Level level = new Level(priority);
-            for (Pair<URI, Pattern[]> target : rules ) {
-                level.addRule(target.getFirst(), target.getSecond());
-            }
-            LOG.debug("generateRuleSet for path:{}, priority:{}", pathToLevel, priority );
-            return level;
-        }
-        else {
-            return null;
         }
     }
 
-    public static class Rule {
+    public static class RuleDesc {
         
         private String descrption;
         private String scheme;
@@ -117,11 +103,14 @@ public class RouteUtils {
         }
     }
     
-    private static Pair<URI, Pattern[]> generateRule(final CuratorFramework client, final String pathToHost, final String host) 
+    private static Pair<URI, Pattern[]> generateRule(
+            final CuratorFramework client, 
+            final String pathToHost, 
+            final String host)
             throws Exception {
         final byte[] content = client.getData().forPath(pathToHost);
         if ( content != null && content.length > 0) {
-            final Rule target = JSON.parseObject(new String(content,  "UTF-8"), Rule.class);
+            final RuleDesc target = JSON.parseObject(new String(content,  "UTF-8"), RuleDesc.class);
             if ( null != target ) {
                 LOG.debug("generateRule for {}/{}", target.getScheme(), Arrays.toString( target.getRegexs() ) );
                 return Pair.of(new URI(target.getScheme() + "://" + host), target.asPatternArray());

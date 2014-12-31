@@ -41,6 +41,7 @@ public class DefaultDispatcher implements HttpRequestDispatcher {
         }
         this._routingRulesRef.set(rules);
         // clear all cached routing items
+        this._routerMBeanSupport.unregisterAllMBeans();
         this._router.clear();
         this._mbeanSupport.registerMBean("name=rules", rules);
     }
@@ -83,6 +84,8 @@ public class DefaultDispatcher implements HttpRequestDispatcher {
     
     public void destroy() {
         this._mbeanSupport.destroy();
+        this._routerMBeanSupport.destroy();
+        this._router.clear();
     }
     
     public static interface RouteMXBean {
@@ -109,27 +112,30 @@ public class DefaultDispatcher implements HttpRequestDispatcher {
     
     private final MBeanRegisterSupport _mbeanSupport = 
             new MBeanRegisterSupport("org.jocean:type=gateway,attr=route", null);
+    private final MBeanRegisterSupport _routerMBeanSupport = 
+            new MBeanRegisterSupport("org.jocean:type=gateway,attr=route", null);
     
     private final SimpleCache<String, URI[]> _router = new SimpleCache<String, URI[]>(
             new Function<String, URI[]>() {
         public URI[] apply(final String path) {
             final RoutingRules rules = _routingRulesRef.get();
-            final URI[] result = ( null != rules ? rules.calculateRoute(path) : new URI[0] );
-            _mbeanSupport.registerMBean("path=" + path,
+            final URI[] routes = ( null != rules ? rules.calculateRoute(path) : new URI[0] );
+            final String[] routesAsStringArray = new ArrayList<String>() {
+                private static final long serialVersionUID = 1L;
+                {
+                    for (URI uri : routes) {
+                        this.add(uri.toString());
+                    }
+                }
+            }.toArray(new String[0]);
+            _routerMBeanSupport.registerMBean("path=" + path,
                     new RouteMXBean() {
                         @Override
                         public String[] getRoutes() {
-                            return new ArrayList<String>() {
-                                private static final long serialVersionUID = 1L;
-                                {
-                                    for (URI uri : result) {
-                                        this.add(uri.toString());
-                                    }
-                                }
-                            }.toArray(new String[0]);
+                            return routesAsStringArray;
                         }
                     });
-            return result;
+            return routes;
         }
     });
     

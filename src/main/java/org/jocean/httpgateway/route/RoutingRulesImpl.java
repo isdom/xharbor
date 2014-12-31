@@ -26,10 +26,23 @@ public class RoutingRulesImpl implements RoutingRules {
         }}.toArray(new String[0]);
     }
 
-    public void addLevel(final Level level) {
-        this._levels.add(level);
+    public void addRule(final int priority, final URI uri, final Pattern[] patterns) {
+        getOrCreateLevel(priority).addRule(uri, patterns);
     }
     
+    private Level getOrCreateLevel(final int priority) {
+        final Iterator<Level> itr = this._levels.iterator();
+        while (itr.hasNext()) {
+            final Level level = itr.next();
+            if ( level.getPriority() == priority ) {
+                return level;
+            }
+        }
+        final Level level = new Level(priority);
+        this._levels.add(level);
+        return level;
+    }
+
     @Override
     public URI[] calculateRoute(final String path) {
         final Iterator<Level> itr = _levels.iterator();
@@ -43,7 +56,7 @@ public class RoutingRulesImpl implements RoutingRules {
         return new URI[0];
     }
     
-    public static class Level implements Comparable<Level> {
+    private static class Level implements Comparable<Level> {
 
         public Level(final int priority) {
             this._priority = priority;
