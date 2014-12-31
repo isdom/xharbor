@@ -32,6 +32,19 @@ public class DefaultDispatcher implements HttpRequestDispatcher {
             .getLogger(DefaultDispatcher.class);
 
     public DefaultDispatcher() {
+        this._mbeanSupport.registerMBean("name=table", new RouteMXBean() {
+            @Override
+            public String[] getRoutes() {
+                return new ArrayList<String>() {
+                    private static final long serialVersionUID = 1L;
+                {
+                    final Iterator<Map.Entry<String, URI[]>> itr = _router.snapshot().entrySet().iterator();
+                    while (itr.hasNext()) {
+                        final Map.Entry<String, URI[]> entry = itr.next();
+                        this.add(entry.getKey() + "-->" + Arrays.toString( entry.getValue() ));
+                    }
+                }}.toArray(new String[0]);
+            }});
     }
     
     public void setRoutingRules(final RoutingRules rules) {
@@ -66,22 +79,6 @@ public class DefaultDispatcher implements HttpRequestDispatcher {
         }
     }
 
-    public void registerAllMBean() {
-        this._mbeanSupport.registerMBean("name=table", new RouteMXBean() {
-            @Override
-            public String[] getRoutes() {
-                return new ArrayList<String>() {
-                    private static final long serialVersionUID = 1L;
-                {
-                    final Iterator<Map.Entry<String, URI[]>> itr = _router.snapshot().entrySet().iterator();
-                    while (itr.hasNext()) {
-                        final Map.Entry<String, URI[]> entry = itr.next();
-                        this.add(entry.getKey() + "-->" + Arrays.toString( entry.getValue() ));
-                    }
-                }}.toArray(new String[0]);
-            }});
-    }
-    
     public void destroy() {
         this._mbeanSupport.destroy();
         this._routerMBeanSupport.destroy();
