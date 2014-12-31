@@ -23,15 +23,13 @@ import io.netty.handler.traffic.TrafficCounterExt;
 import io.netty.util.AttributeKey;
 
 import java.io.IOException;
-import java.net.URI;
 
 import org.jocean.ext.netty.initializer.BaseInitializer;
-import org.jocean.httpgateway.ProxyAgent.ProxyTask;
-import org.jocean.httpgateway.biz.HttpRequestDispatcher;
-import org.jocean.httpgateway.biz.HttpRequestDispatcher.RelayContext;
-import org.jocean.httpgateway.impl.ProxyMonitor;
+import org.jocean.httpgateway.biz.HttpDispatcher;
+import org.jocean.httpgateway.biz.HttpDispatcher.RelayContext;
+import org.jocean.httpgateway.biz.RelayAgent;
+import org.jocean.httpgateway.biz.RelayAgent.RelayTask;
 import org.jocean.idiom.ExceptionUtils;
-import org.jocean.idiom.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +42,7 @@ public class HttpGatewayServer {
     private static final Logger LOG = LoggerFactory
             .getLogger(HttpGatewayServer.class);
 
-    public static final AttributeKey<ProxyTask> PROXY = AttributeKey.valueOf("Proxy");
+    public static final AttributeKey<RelayTask> RELAY = AttributeKey.valueOf("RELAY");
     
     private static final int MAX_RETRY = 20;
     private static final long RETRY_TIMEOUT = 30 * 1000; // 30s
@@ -62,9 +60,9 @@ public class HttpGatewayServer {
     private int _idleTimeSeconds = 180; //seconds  为了避免建立了过多的闲置连接 闲置180秒的连接主动关闭
 //    private int _chunkDataSzie = 1048576; //1024 * 1024
     
-    private ProxyAgent  _proxyAgent;
+    private RelayAgent  _relayAgent;
 //    private String _destUri = "http://127.0.0.1:8000";
-    private HttpRequestDispatcher _dispatcher = null;
+    private HttpDispatcher _dispatcher = null;
     
     /**
      * 负责处理来自终端的request到AccessCenterBiz
@@ -72,7 +70,7 @@ public class HttpGatewayServer {
      *
      */
     @ChannelHandler.Sharable
-    private class ProxyHandler extends ChannelInboundHandlerAdapter{
+    private class RelayHandler extends ChannelInboundHandlerAdapter{
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
             LOG.info("exceptionCaught {}, detail:{}", 
@@ -85,12 +83,12 @@ public class HttpGatewayServer {
             ctx.flush();
         }
         
-        private ProxyTask getProxyTaskOf(final ChannelHandlerContext ctx) {
-            return ctx.attr(PROXY).get();
+        private RelayTask getRelayTaskOf(final ChannelHandlerContext ctx) {
+            return ctx.attr(RELAY).get();
         }
         
-        private void setProxyTaskOf(final ChannelHandlerContext ctx, final ProxyTask task) {
-            ctx.attr(PROXY).set(task);
+        private void setRelayTaskOf(final ChannelHandlerContext ctx, final RelayTask task) {
+            ctx.attr(RELAY).set(task);
         }
         
         /**
@@ -99,7 +97,7 @@ public class HttpGatewayServer {
          */
         private void detachCurrentTaskOf(ChannelHandlerContext ctx)
                 throws Exception {
-            final ProxyTask task = getProxyTaskOf(ctx);
+            final RelayTask task = getRelayTaskOf(ctx);
             if ( null != task ) {
                 task.detach();
             }
@@ -133,17 +131,17 @@ public class HttpGatewayServer {
                 
                 detachCurrentTaskOf(ctx);
                 
-                final ProxyTask newTask = _proxyAgent.createProxyTask(relay, ctx);
+                final RelayTask newTask = _relayAgent.createRelayTask(relay, ctx);
+                setRelayTaskOf(ctx, newTask);
                 newTask.sendHttpRequest(request);
-                setProxyTaskOf(ctx, newTask);
             }
             else if (msg instanceof HttpContent) {
-                final ProxyTask task = getProxyTaskOf(ctx);
+                final RelayTask task = getRelayTaskOf(ctx);
                 if ( null != task ) {
                     task.sendHttpContent((HttpContent)msg);
                 }
                 else {
-                    LOG.warn("NO PROXY TASK, messageReceived:{} unhandled msg [{}]",ctx.channel(),msg);
+                    LOG.warn("NO RELAY TASK, messageReceived:{} unhandled msg [{}]",ctx.channel(),msg);
                 }
             }
             else {
@@ -221,8 +219,6 @@ public class HttpGatewayServer {
             protected void addCodecHandler(final ChannelPipeline pipeline) throws Exception {
                 //IN decoder
                 pipeline.addLast("decoder",new HttpRequestDecoder());
-                //IN aggregator
-//                pipeline.addLast("aggregator", new HttpObjectAggregator(_chunkDataSzie));
                 //OUT 统计数据流大小 这个handler需要放在HttpResponseToByteEncoder前面处理
 //                pipeline.addLast("statistics",new StatisticsResponseHandler()); 
                 //OUT encoder
@@ -234,7 +230,7 @@ public class HttpGatewayServer {
             
             @Override
             protected void addBusinessHandler(final ChannelPipeline pipeline) throws Exception {
-                pipeline.addLast("biz-handler", new ProxyHandler());
+                pipeline.addLast("biz-handler", new RelayHandler());
                 
             }
         };
@@ -295,11 +291,7 @@ public class HttpGatewayServer {
 //    public void setSessionFactory(SessionFactory sessionFactory) {
 //        this.sessionFactory = sessionFactory;
 //    }
-//
-//    public void setCenterFSM(FiniteStateMachine centerFSM) {
-//        this.centerFSM = centerFSM;
-//    }
-//
+    
 //    public int getChannelCount() {
 //        return channelCount.intValue();
 //    }
@@ -328,32 +320,11 @@ public class HttpGatewayServer {
         this._trafficCounterExt = trafficCounterExt;
     }
 
-    public void setProxyAgent(final ProxyAgent agent) {
-        this._proxyAgent = agent;
+    public void setRelayAgent(final RelayAgent agent) {
+        this._relayAgent = agent;
     }
     
-    public void setDispatcher(final HttpRequestDispatcher dispatcher) {
+    public void setHttpDispatcher(final HttpDispatcher dispatcher) {
         this._dispatcher = dispatcher;
     }
-    
-    public void setDestUri(final String uri) {
-//        this._destUri = uri;
-    }
-    
-    public String getDestUri() {
-//        return this._destUri;
-        return null;
-    }
-    
-//    public void setGroupStatisticsFSM(FiniteStateMachine groupStatisticsFSM) {
-//        this.groupStatisticsFSM = groupStatisticsFSM;
-//    }
-//
-//    public List<String> getSupportCompressUriList() {
-//        return supportCompressUriList;
-//    }
-//
-//    public void setSupportCompressUriList(List<String> supportCompressUriList) {
-//        this.supportCompressUriList = supportCompressUriList;
-//    }
 }

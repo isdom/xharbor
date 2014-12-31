@@ -14,9 +14,10 @@ import org.jocean.event.extend.Runners;
 import org.jocean.event.extend.Services;
 import org.jocean.httpclient.HttpStack;
 import org.jocean.httpclient.impl.HttpUtils;
-import org.jocean.httpgateway.biz.DefaultDispatcher;
-import org.jocean.httpgateway.impl.ProxyAgentImpl;
-import org.jocean.httpgateway.impl.ProxyMonitorImpl;
+import org.jocean.httpgateway.biz.RelayAgent;
+import org.jocean.httpgateway.impl.DefaultDispatcher;
+import org.jocean.httpgateway.impl.RelayAgentImpl;
+import org.jocean.httpgateway.impl.RelayMonitorImpl;
 import org.jocean.httpgateway.route.RouteUtils;
 import org.jocean.idiom.pool.Pools;
 import org.jocean.netty.NettyClient;
@@ -53,21 +54,25 @@ public class Main {
                     .executorSource(Services.lookupOrCreateFlowBasedExecutorSource("gateway"))
                     );
         
-        final HttpStack httpStack = new HttpStack(Pools.createCachedBytesPool(10240), source, new NettyClient(4), 100);
-        final ProxyAgent agent = new ProxyAgentImpl(httpStack, source);
+        final HttpStack httpStack = new HttpStack(
+                Pools.createCachedBytesPool(10240), 
+                source, 
+                new NettyClient(4), 
+                100);
         
         final HttpGatewayServer server = ctx.getBean(HttpGatewayServer.class);
         
-        server.setProxyAgent(agent);
+        final RelayAgent agent = new RelayAgentImpl(httpStack, source);
+        server.setRelayAgent(agent);
         
         final CuratorFramework client = 
                 CuratorFrameworkFactory.newClient("121.41.45.51:2181", 
                         new ExponentialBackoffRetry(1000, 3));
         client.start();
         
-        final DefaultDispatcher dispatcher = new DefaultDispatcher(new ProxyMonitorImpl());
+        final DefaultDispatcher dispatcher = new DefaultDispatcher(new RelayMonitorImpl());
          
-        server.setDispatcher(dispatcher);
+        server.setHttpDispatcher(dispatcher);
         
         dispatcher.setRoutingRules(RouteUtils.buildRoutingRulesFromZK(client, "/demo"));
         final TreeCache cache = TreeCache.newBuilder(client, "/demo").setCacheData(false).build();

@@ -6,6 +6,7 @@ package org.jocean.httpgateway.impl;
 import java.net.URI;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.jocean.httpgateway.biz.RelayMonitor;
 import org.jocean.idiom.Function;
 import org.jocean.idiom.Pair;
 import org.jocean.idiom.SimpleCache;
@@ -16,7 +17,7 @@ import org.jocean.j2se.MBeanRegisterSupport;
  * @author isdom
  *
  */
-public class ProxyMonitorImpl implements ProxyMonitor {
+public class RelayMonitorImpl implements RelayMonitor {
 
     @Override
     public Counter getCounter(final String path, final URI relayTo) {

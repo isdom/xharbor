@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.httpgateway.biz;
+package org.jocean.httpgateway.impl;
 
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.QueryStringDecoder;
@@ -13,8 +13,10 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.jocean.httpgateway.impl.ProxyMonitor;
-import org.jocean.httpgateway.impl.ProxyMonitor.Counter;
+import org.jocean.httpgateway.biz.HttpDispatcher;
+import org.jocean.httpgateway.biz.RelayMonitor;
+import org.jocean.httpgateway.biz.HttpDispatcher.RelayContext;
+import org.jocean.httpgateway.biz.RelayMonitor.Counter;
 import org.jocean.httpgateway.route.RoutingRules;
 import org.jocean.idiom.Function;
 import org.jocean.idiom.SimpleCache;
@@ -26,7 +28,7 @@ import org.slf4j.LoggerFactory;
  * @author isdom
  *
  */
-public class DefaultDispatcher implements HttpRequestDispatcher {
+public class DefaultDispatcher implements HttpDispatcher {
     private static final Logger LOG = LoggerFactory
             .getLogger(DefaultDispatcher.class);
 
@@ -34,7 +36,7 @@ public class DefaultDispatcher implements HttpRequestDispatcher {
         public String[] getRoutes();
     }
     
-    public DefaultDispatcher(final ProxyMonitor monitor) {
+    public DefaultDispatcher(final RelayMonitor monitor) {
         this._mbeanSupport.registerMBean("name=table", new RouteMXBean() {
             @Override
             public String[] getRoutes() {
@@ -98,7 +100,7 @@ public class DefaultDispatcher implements HttpRequestDispatcher {
         this._router.clear();
     }
     
-    private final ProxyMonitor _monitor;
+    private final RelayMonitor _monitor;
     private AtomicReference<RoutingRules> _routingRulesRef = new AtomicReference<RoutingRules>(null);
     
     private final MBeanRegisterSupport _mbeanSupport = 

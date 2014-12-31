@@ -7,29 +7,29 @@ import io.netty.channel.ChannelHandlerContext;
 
 import org.jocean.event.api.EventReceiverSource;
 import org.jocean.httpclient.HttpStack;
-import org.jocean.httpgateway.ProxyAgent;
-import org.jocean.httpgateway.biz.HttpRequestDispatcher.RelayContext;
+import org.jocean.httpgateway.biz.RelayAgent;
+import org.jocean.httpgateway.biz.HttpDispatcher.RelayContext;
 
 /**
  * @author isdom
  *
  */
-public class ProxyAgentImpl implements ProxyAgent {
-    public ProxyAgentImpl(final HttpStack httpStack, final EventReceiverSource source) {
+public class RelayAgentImpl implements RelayAgent {
+    public RelayAgentImpl(final HttpStack httpStack, final EventReceiverSource source) {
         this._stack = httpStack;
         this._source = source;
     }
     
     @Override
-    public ProxyTask createProxyTask(
+    public RelayTask createRelayTask(
             final RelayContext relay,
             final ChannelHandlerContext ctx) {
-        final ProxyFlow flow = 
-                new ProxyFlow(this._stack, relay, ctx);
+        final RelayFlow flow = 
+                new RelayFlow(this._stack, relay, ctx);
         
         this._source.create(flow, flow.WAIT);
         
-        return flow.queryInterfaceInstance(ProxyTask.class);
+        return flow.queryInterfaceInstance(RelayTask.class);
     }
 
     private final HttpStack _stack;

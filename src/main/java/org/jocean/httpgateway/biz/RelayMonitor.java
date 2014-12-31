@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.httpgateway.impl;
+package org.jocean.httpgateway.biz;
 
 import java.net.URI;
 
@@ -9,7 +9,7 @@ import java.net.URI;
  * @author isdom
  *
  */
-public interface ProxyMonitor {
+public interface RelayMonitor {
     public static interface CounterMXBean {
         public int getCount();
     }

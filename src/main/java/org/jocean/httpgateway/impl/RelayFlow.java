@@ -29,7 +29,7 @@ import org.jocean.httpclient.api.Guide;
 import org.jocean.httpclient.api.Guide.GuideReactor;
 import org.jocean.httpclient.api.HttpClient;
 import org.jocean.httpclient.api.HttpClient.HttpReactor;
-import org.jocean.httpgateway.biz.HttpRequestDispatcher.RelayContext;
+import org.jocean.httpgateway.biz.HttpDispatcher.RelayContext;
 import org.jocean.idiom.Detachable;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.ValidationId;
@@ -41,30 +41,30 @@ import org.slf4j.LoggerFactory;
  * @author isdom
  * 
  */
-public class ProxyFlow extends AbstractFlow<ProxyFlow> {
+public class RelayFlow extends AbstractFlow<RelayFlow> {
 
     private static final Logger LOG = LoggerFactory
-            .getLogger(ProxyFlow.class);
+            .getLogger(RelayFlow.class);
 
-    public ProxyFlow(final HttpStack stack, final RelayContext relay, final ChannelHandlerContext ctx) {
+    public RelayFlow(final HttpStack stack, final RelayContext relay, final ChannelHandlerContext ctx) {
         this._stack = stack;
         this._relay = relay;
         this._channelCtx = ctx;
         
-        addFlowLifecycleListener(new FlowLifecycleListener<ProxyFlow>() {
+        addFlowLifecycleListener(new FlowLifecycleListener<RelayFlow>() {
 
             @Override
             public void afterEventReceiverCreated(
-                    ProxyFlow flow, EventReceiver receiver)
+                    RelayFlow flow, EventReceiver receiver)
                     throws Exception {
             }
 
             @Override
-            public void afterFlowDestroy(ProxyFlow flow)
+            public void afterFlowDestroy(RelayFlow flow)
                     throws Exception {
-                if (null != ProxyFlow.this._forceFinishedTimer) {
-                    ProxyFlow.this._forceFinishedTimer.detach();
-                    ProxyFlow.this._forceFinishedTimer = null;
+                if (null != RelayFlow.this._forceFinishedTimer) {
+                    RelayFlow.this._forceFinishedTimer.detach();
+                    RelayFlow.this._forceFinishedTimer = null;
                 }
                 _contents.clear();
             }
@@ -331,7 +331,7 @@ public class ProxyFlow extends AbstractFlow<ProxyFlow> {
         if (!ret) {
             if (LOG.isTraceEnabled()) {
                 LOG.trace(
-                        "ProxyFlow({})/{}/{}: special guide id({}) is !NOT! current guide id ({}), just ignore.",
+                        "RelayFlow({})/{}/{}: special guide id({}) is !NOT! current guide id ({}), just ignore.",
                         this, currentEventHandler().getName(), currentEvent(),
                         guideId, this._guideId);
             }
@@ -344,7 +344,7 @@ public class ProxyFlow extends AbstractFlow<ProxyFlow> {
         if (!ret) {
             if (LOG.isTraceEnabled()) {
                 LOG.trace(
-                        "ProxyFlow({})/{}/{}: special httpclient id({}) is !NOT! current httpclient id ({}), just ignore.",
+                        "RelayFlow({})/{}/{}: special httpclient id({}) is !NOT! current httpclient id ({}), just ignore.",
                         this, currentEventHandler().getName(), currentEvent(),
                         httpClientId, this._httpClientId);
             }
