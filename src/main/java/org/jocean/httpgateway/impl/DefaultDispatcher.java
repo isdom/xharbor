@@ -15,7 +15,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.httpgateway.biz.HttpDispatcher;
 import org.jocean.httpgateway.biz.RelayMonitor;
-import org.jocean.httpgateway.biz.HttpDispatcher.RelayContext;
 import org.jocean.httpgateway.biz.RelayMonitor.Counter;
 import org.jocean.httpgateway.route.RoutingRules;
 import org.jocean.idiom.Function;
