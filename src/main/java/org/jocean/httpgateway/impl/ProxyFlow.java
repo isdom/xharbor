@@ -16,7 +16,6 @@ import io.netty.handler.codec.http.LastHttpContent;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,6 +29,7 @@ import org.jocean.httpclient.api.Guide;
 import org.jocean.httpclient.api.Guide.GuideReactor;
 import org.jocean.httpclient.api.HttpClient;
 import org.jocean.httpclient.api.HttpClient.HttpReactor;
+import org.jocean.httpgateway.biz.HttpRequestDispatcher.RelayContext;
 import org.jocean.idiom.Detachable;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.ValidationId;
@@ -46,11 +46,11 @@ public class ProxyFlow extends AbstractFlow<ProxyFlow> {
     private static final Logger LOG = LoggerFactory
             .getLogger(ProxyFlow.class);
 
-    public ProxyFlow(final HttpStack stack, final URI uri, final ChannelHandlerContext ctx) {
+    public ProxyFlow(final HttpStack stack, final RelayContext relay, final ChannelHandlerContext ctx) {
         this._stack = stack;
-        this._uri = uri;
+        this._relay = relay;
         this._channelCtx = ctx;
-
+        
         addFlowLifecycleListener(new FlowLifecycleListener<ProxyFlow>() {
 
             @Override
@@ -80,7 +80,7 @@ public class ProxyFlow extends AbstractFlow<ProxyFlow> {
                 return currentEventHandler();
             }
             if (LOG.isDebugEnabled()) {
-                LOG.debug("http for {} lost.", _uri);
+                LOG.debug("http for {} lost.", _relay.relayTo());
             }
             return null;
         }
@@ -90,7 +90,7 @@ public class ProxyFlow extends AbstractFlow<ProxyFlow> {
         @OnEvent(event = "detach")
         private BizStep onDetach() throws Exception {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("proxy for uri:{} progress canceled", _uri);
+                LOG.debug("proxy for uri:{} progress canceled", _relay.relayTo());
             }
             safeDetachHttpHandle();
             return null;
@@ -102,6 +102,7 @@ public class ProxyFlow extends AbstractFlow<ProxyFlow> {
         @OnEvent(event = "sendHttpRequest")
         private BizStep sendHttpRequest(final HttpRequest httpRequest) {
 
+            _relay.counter().inc();
             _httpRequest = httpRequest;
             updateTransferHttpRequestState(_httpRequest);
             
@@ -207,7 +208,7 @@ public class ProxyFlow extends AbstractFlow<ProxyFlow> {
                 return currentEventHandler();
             }
             if (LOG.isDebugEnabled()) {
-                LOG.debug("channel for {} recv response {}", _uri, response);
+                LOG.debug("channel for {} recv response {}", _relay.relayTo(), response);
             }
             _channelCtx.write(response);
             return RECVCONTENT;
@@ -277,14 +278,14 @@ public class ProxyFlow extends AbstractFlow<ProxyFlow> {
                                 if (LOG.isDebugEnabled()) {
                                     LOG.debug(
                                             "uri:{} force finished timeout, so force detach.",
-                                            _uri);
+                                            _relay.relayTo());
                                 }
                                 _forceFinishedTimer = null;
                                 selfEventReceiver().acceptEvent("detach");
                             } catch (Exception e) {
                                 LOG.warn(
                                         "exception when acceptEvent detach by force finished for uri:{}, detail:{}",
-                                        _uri,
+                                        _relay.relayTo(),
                                         ExceptionUtils.exception2detail(e));
                             }
                         }
@@ -298,7 +299,7 @@ public class ProxyFlow extends AbstractFlow<ProxyFlow> {
                 this._guideId.updateIdAndGet(),
                 genGuideReactor(),
                 new Guide.DefaultRequirement()
-                        .uri(this._uri)
+                        .uri(this._relay.relayTo())
                         .priority(0)
                 );
     }
@@ -319,7 +320,7 @@ public class ProxyFlow extends AbstractFlow<ProxyFlow> {
             } catch (Exception e) {
                 LOG.warn(
                         "exception when detach http handle for uri:{}, detail:{}",
-                        this._uri, ExceptionUtils.exception2detail(e));
+                        this._relay.relayTo(), ExceptionUtils.exception2detail(e));
             }
             this._guide = null;
         }
@@ -364,7 +365,7 @@ public class ProxyFlow extends AbstractFlow<ProxyFlow> {
     }
     
     private final HttpStack _stack;
-    private final URI _uri;
+    private final RelayContext _relay;
     private final ChannelHandlerContext _channelCtx;
     
     private HttpClient _httpClient;

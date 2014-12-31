@@ -28,7 +28,10 @@ import java.net.URI;
 import org.jocean.ext.netty.initializer.BaseInitializer;
 import org.jocean.httpgateway.ProxyAgent.ProxyTask;
 import org.jocean.httpgateway.biz.HttpRequestDispatcher;
+import org.jocean.httpgateway.biz.HttpRequestDispatcher.RelayContext;
+import org.jocean.httpgateway.impl.ProxyMonitor;
 import org.jocean.idiom.ExceptionUtils;
+import org.jocean.idiom.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -117,20 +120,20 @@ public class HttpGatewayServer {
                     return;
                 }
                 
-                final URI dest = _dispatcher.dispatch(request);
+                final RelayContext relay = _dispatcher.dispatch(request);
                 
-                if ( null == dest ) {
+                if ( null == relay ) {
                     LOG.warn("can't found matched dest uri for request {}, just ignore", request);
                     return;
                 }
                 
                 if ( LOG.isDebugEnabled() ) {
-                    LOG.debug("dispatch to ({}) for request({})", dest, request);
+                    LOG.debug("dispatch to ({}) for request({})", relay, request);
                 }
                 
                 detachCurrentTaskOf(ctx);
                 
-                final ProxyTask newTask = _proxyAgent.createProxyTask(dest, ctx);
+                final ProxyTask newTask = _proxyAgent.createProxyTask(relay, ctx);
                 newTask.sendHttpRequest(request);
                 setProxyTaskOf(ctx, newTask);
             }

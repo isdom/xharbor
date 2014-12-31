@@ -5,11 +5,10 @@ package org.jocean.httpgateway.impl;
 
 import io.netty.channel.ChannelHandlerContext;
 
-import java.net.URI;
-
 import org.jocean.event.api.EventReceiverSource;
 import org.jocean.httpclient.HttpStack;
 import org.jocean.httpgateway.ProxyAgent;
+import org.jocean.httpgateway.biz.HttpRequestDispatcher.RelayContext;
 
 /**
  * @author isdom
@@ -23,10 +22,10 @@ public class ProxyAgentImpl implements ProxyAgent {
     
     @Override
     public ProxyTask createProxyTask(
-            final URI uri,
+            final RelayContext relay,
             final ChannelHandlerContext ctx) {
         final ProxyFlow flow = 
-                new ProxyFlow(this._stack, uri, ctx);
+                new ProxyFlow(this._stack, relay, ctx);
         
         this._source.create(flow, flow.WAIT);
         

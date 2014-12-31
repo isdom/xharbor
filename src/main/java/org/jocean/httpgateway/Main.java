@@ -16,6 +16,7 @@ import org.jocean.httpclient.HttpStack;
 import org.jocean.httpclient.impl.HttpUtils;
 import org.jocean.httpgateway.biz.DefaultDispatcher;
 import org.jocean.httpgateway.impl.ProxyAgentImpl;
+import org.jocean.httpgateway.impl.ProxyMonitorImpl;
 import org.jocean.httpgateway.route.RouteUtils;
 import org.jocean.idiom.pool.Pools;
 import org.jocean.netty.NettyClient;
@@ -64,7 +65,7 @@ public class Main {
                         new ExponentialBackoffRetry(1000, 3));
         client.start();
         
-        final DefaultDispatcher dispatcher = new DefaultDispatcher();
+        final DefaultDispatcher dispatcher = new DefaultDispatcher(new ProxyMonitorImpl());
          
         server.setDispatcher(dispatcher);
         

@@ -7,8 +7,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
 
-import java.net.URI;
-
+import org.jocean.httpgateway.biz.HttpRequestDispatcher.RelayContext;
 import org.jocean.idiom.Detachable;
 
 /**
@@ -22,5 +21,5 @@ public interface ProxyAgent {
         public void sendHttpContent(final HttpContent httpContent);
     }
     
-    public ProxyTask createProxyTask(final URI uri, final ChannelHandlerContext ctx);
+    public ProxyTask createProxyTask(final RelayContext relay, final ChannelHandlerContext ctx);
 }

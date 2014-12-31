@@ -11,14 +11,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.jocean.httpgateway.impl.ProxyMonitor;
+import org.jocean.httpgateway.impl.ProxyMonitor.Counter;
 import org.jocean.httpgateway.route.RoutingRules;
 import org.jocean.idiom.Function;
-import org.jocean.idiom.Pair;
 import org.jocean.idiom.SimpleCache;
-import org.jocean.idiom.Visitor2;
 import org.jocean.j2se.MBeanRegisterSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +30,11 @@ public class DefaultDispatcher implements HttpRequestDispatcher {
     private static final Logger LOG = LoggerFactory
             .getLogger(DefaultDispatcher.class);
 
-    public DefaultDispatcher() {
+    public static interface RouteMXBean {
+        public String[] getRoutes();
+    }
+    
+    public DefaultDispatcher(final ProxyMonitor monitor) {
         this._mbeanSupport.registerMBean("name=table", new RouteMXBean() {
             @Override
             public String[] getRoutes() {
@@ -45,6 +48,7 @@ public class DefaultDispatcher implements HttpRequestDispatcher {
                     }
                 }}.toArray(new String[0]);
             }});
+        this._monitor = monitor;
     }
     
     public void setRoutingRules(final RoutingRules rules) {
@@ -60,7 +64,7 @@ public class DefaultDispatcher implements HttpRequestDispatcher {
     }
     
     @Override
-    public URI dispatch(final HttpRequest request) {
+    public RelayContext dispatch(final HttpRequest request) {
         final QueryStringDecoder decoder = new QueryStringDecoder(request.getUri());
 
         final String path = decoder.path();
@@ -70,9 +74,18 @@ public class DefaultDispatcher implements HttpRequestDispatcher {
         final URI[] uris = this._router.get(path);
         if (uris != null && uris.length > 0) {
             final URI uri = uris[(int)(Math.random() * uris.length)];
-            final DispatchCounter counter = this._counters.get(Pair.of(path, uri));
-            counter.inc();
-            return uri;
+            final Counter counter = this._monitor.getCounter(path, uri);
+            return new RelayContext() {
+
+                @Override
+                public URI relayTo() {
+                    return uri;
+                }
+
+                @Override
+                public Counter counter() {
+                    return counter;
+                }};
         }
         else {
             return null;
@@ -85,26 +98,7 @@ public class DefaultDispatcher implements HttpRequestDispatcher {
         this._router.clear();
     }
     
-    public static interface RouteMXBean {
-        public String[] getRoutes();
-    }
-    
-    public static interface DispatchCounterMXBean {
-        public int getCount();
-    }
-    
-    public static class DispatchCounter implements DispatchCounterMXBean {
-        public int getCount() {
-            return this._counter.get();
-        }
-        
-        public void inc() {
-            this._counter.incrementAndGet();
-        }
-        
-        private final AtomicInteger _counter = new AtomicInteger(0);
-    }
-    
+    private final ProxyMonitor _monitor;
     private AtomicReference<RoutingRules> _routingRulesRef = new AtomicReference<RoutingRules>(null);
     
     private final MBeanRegisterSupport _mbeanSupport = 
@@ -135,24 +129,4 @@ public class DefaultDispatcher implements HttpRequestDispatcher {
             return routes;
         }
     });
-    
-    private final Function<Pair<String, URI>,DispatchCounter> _counterMaker = 
-            new Function<Pair<String, URI>,DispatchCounter>() {
-        @Override
-        public DispatchCounter apply(final Pair<String, URI> input) {
-            return new DispatchCounter();
-        }};
-
-    private final Visitor2<Pair<String,URI>,DispatchCounter> _counterRegister = 
-            new Visitor2<Pair<String,URI>,DispatchCounter>() {
-        @Override
-        public void visit(final Pair<String, URI> pair, final DispatchCounter newCounter)
-                throws Exception {
-            _mbeanSupport.registerMBean("path=" + pair.getFirst() + ",dest=" + pair.getSecond().toString().replaceAll(":", ""), 
-                    newCounter);
-        }};
-
-    private final SimpleCache<Pair<String, URI>,DispatchCounter> _counters = 
-            new SimpleCache<Pair<String, URI>,DispatchCounter>(this._counterMaker, this._counterRegister);
-        
 }
