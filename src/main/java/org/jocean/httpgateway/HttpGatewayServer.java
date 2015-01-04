@@ -25,9 +25,9 @@ import io.netty.util.AttributeKey;
 import java.io.IOException;
 
 import org.jocean.ext.netty.initializer.BaseInitializer;
-import org.jocean.httpgateway.biz.HttpDispatcher;
-import org.jocean.httpgateway.biz.RelayAgent;
-import org.jocean.httpgateway.biz.RelayAgent.RelayTask;
+import org.jocean.httpgateway.api.HttpDispatcher;
+import org.jocean.httpgateway.api.RelayAgent;
+import org.jocean.httpgateway.api.RelayAgent.RelayTask;
 import org.jocean.idiom.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -13,7 +13,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.jocean.httpgateway.biz.HttpDispatcher;
+import org.jocean.httpgateway.api.HttpDispatcher;
 import org.jocean.httpgateway.route.RoutingRules;
 import org.jocean.idiom.Function;
 import org.jocean.idiom.SimpleCache;

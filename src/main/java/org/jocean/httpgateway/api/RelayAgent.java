@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.httpgateway.biz;
+package org.jocean.httpgateway.api;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContent;

@@ -14,7 +14,7 @@ import org.jocean.event.extend.Runners;
 import org.jocean.event.extend.Services;
 import org.jocean.httpclient.HttpStack;
 import org.jocean.httpclient.impl.HttpUtils;
-import org.jocean.httpgateway.biz.RelayAgent;
+import org.jocean.httpgateway.api.RelayAgent;
 import org.jocean.httpgateway.impl.DispatcherImpl;
 import org.jocean.httpgateway.impl.RelayAgentImpl;
 import org.jocean.httpgateway.impl.MemoFactoryImpl;

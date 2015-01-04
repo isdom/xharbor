@@ -7,7 +7,7 @@ import io.netty.channel.ChannelHandlerContext;
 
 import org.jocean.event.api.EventReceiverSource;
 import org.jocean.httpclient.HttpStack;
-import org.jocean.httpgateway.biz.RelayAgent;
+import org.jocean.httpgateway.api.RelayAgent;
 
 /**
  * @author isdom
