@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.httpgateway;
+package org.jocean.xharbor;
 
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
@@ -14,13 +14,13 @@ import org.jocean.event.extend.Runners;
 import org.jocean.event.extend.Services;
 import org.jocean.httpclient.HttpStack;
 import org.jocean.httpclient.impl.HttpUtils;
-import org.jocean.httpgateway.api.RelayAgent;
-import org.jocean.httpgateway.impl.DispatcherImpl;
-import org.jocean.httpgateway.impl.RelayAgentImpl;
-import org.jocean.httpgateway.impl.MemoFactoryImpl;
-import org.jocean.httpgateway.route.RouteUtils;
 import org.jocean.idiom.pool.Pools;
 import org.jocean.netty.NettyClient;
+import org.jocean.xharbor.api.RelayAgent;
+import org.jocean.xharbor.impl.DispatcherImpl;
+import org.jocean.xharbor.impl.MemoFactoryImpl;
+import org.jocean.xharbor.impl.RelayAgentImpl;
+import org.jocean.xharbor.route.RouteUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.support.AbstractApplicationContext;
@@ -44,7 +44,7 @@ public class Main {
         
         final AbstractApplicationContext ctx =
                 new ClassPathXmlApplicationContext(
-                        new String[]{"gateway.xml"});
+                        new String[]{"xharbor.xml"});
         
         final EventReceiverSource source = 
                 Runners.build(new Runners.Config()

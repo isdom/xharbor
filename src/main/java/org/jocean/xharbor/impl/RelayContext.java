@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.httpgateway.impl;
+package org.jocean.xharbor.impl;
 
 import java.net.URI;
 

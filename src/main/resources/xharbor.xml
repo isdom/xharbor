@@ -6,13 +6,13 @@
     <bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
         <property name="locations">
             <list>
-                <value>classpath:gateway.properties</value>
+                <value>classpath:xharbor.properties</value>
             </list>
         </property>
         <property name="fileEncoding" value="UTF-8"/>
     </bean>
     
-    <bean id="httpServer" class="org.jocean.httpgateway.HttpGatewayServer"
+    <bean id="httpServer" class="org.jocean.xharbor.HttpGatewayServer"
         init-method="start" destroy-method="stop">
         <property name="acceptPort" value="${gateway.port:8080}" />
         <property name="acceptIp" value="${gateway.ip:0.0.0.0}" />

@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.httpgateway.api;
+package org.jocean.xharbor.api;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContent;

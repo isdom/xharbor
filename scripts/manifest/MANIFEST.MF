@@ -1,2 +1,2 @@
-Main-Class: org.jocean.httpgateway.Booter
+Main-Class: org.jocean.xharbor.Booter
 Class-Path: ./
