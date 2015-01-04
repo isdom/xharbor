@@ -5,11 +5,14 @@ package org.jocean.httpgateway.impl;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.LastHttpContent;
@@ -67,7 +70,20 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
                 LOG.debug("http for {} lost.", _relayCtx.relayTo());
             }
             if (null != this._ifHttpLost) {
-                this._ifHttpLost.run();
+                try {
+                    this._ifHttpLost.run();
+                }
+                catch(Throwable e) {
+                    LOG.warn("exception when invoke {}, detail: {}", 
+                            this._ifHttpLost, ExceptionUtils.exception2detail(e));
+                }
+            }
+            try {
+                _channelCtx.close();
+            }
+            catch(Throwable e) {
+                LOG.warn("exception when close {}, detail: {}", 
+                        _channelCtx, ExceptionUtils.exception2detail(e));
             }
             return null;
         }
@@ -79,7 +95,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
         if (null != this._guide) {
             try {
                 this._guide.detach();
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 LOG.warn(
                         "exception when detach http handle for uri:{}, detail:{}",
                         this._relayCtx.relayTo(), ExceptionUtils.exception2detail(e));
@@ -100,7 +116,20 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
             }
             safeDetachHttp();
             if (null != this._ifDetached) {
-                this._ifDetached.run();
+                try {
+                    this._ifDetached.run();
+                }
+                catch(Throwable e) {
+                    LOG.warn("exception when invoke {}, detail: {}", 
+                            this._ifDetached, ExceptionUtils.exception2detail(e));
+                }
+            }
+            try {
+                _channelCtx.close();
+            }
+            catch(Throwable e) {
+                LOG.warn("exception when close {}, detail: {}", 
+                        _channelCtx, ExceptionUtils.exception2detail(e));
             }
             return null;
         }
@@ -288,7 +317,13 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
                 return currentEventHandler();
             }
 
-            _channelCtx.writeAndFlush(new DefaultLastHttpContent(blob2ByteBuf(contentBlob)));
+            //  release relay's http client
+            safeDetachHttp();
+            
+            final ChannelFuture future = _channelCtx.writeAndFlush(new DefaultLastHttpContent(blob2ByteBuf(contentBlob)));
+            if ( !HttpHeaders.isKeepAlive( _httpRequest ) ) {
+                future.addListener(ChannelFutureListener.CLOSE);
+            }
             _relayCtx.memo().decRecvResp();
             _relayCtx.memo().incRelaySuccess();
             return null;

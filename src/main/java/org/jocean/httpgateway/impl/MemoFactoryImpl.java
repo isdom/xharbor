@@ -133,7 +133,7 @@ public class MemoFactoryImpl implements DispatcherImpl.MemoFactory {
         @Override
         public void visit(final Pair<String, URI> pair, final RelayMemo newMemo)
                 throws Exception {
-            _mbeanSupport.registerMBean("path=" + pair.getFirst() + ",dest=" + pair.getSecond().toString().replaceAll(":", ""), 
+            _mbeanSupport.registerMBean("path=" + pair.getFirst() + ",dest=" + pair.getSecond().toString().replaceAll(":", "-"), 
                     newMemo);
         }};
 
