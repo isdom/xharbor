@@ -17,7 +17,7 @@ import org.jocean.httpclient.impl.HttpUtils;
 import org.jocean.httpgateway.biz.RelayAgent;
 import org.jocean.httpgateway.impl.DefaultDispatcher;
 import org.jocean.httpgateway.impl.RelayAgentImpl;
-import org.jocean.httpgateway.impl.RelayMonitorImpl;
+import org.jocean.httpgateway.impl.MemoFactoryImpl;
 import org.jocean.httpgateway.route.RouteUtils;
 import org.jocean.idiom.pool.Pools;
 import org.jocean.netty.NettyClient;
@@ -70,7 +70,7 @@ public class Main {
                         new ExponentialBackoffRetry(1000, 3));
         client.start();
         
-        final DefaultDispatcher dispatcher = new DefaultDispatcher(new RelayMonitorImpl());
+        final DefaultDispatcher dispatcher = new DefaultDispatcher(new MemoFactoryImpl());
          
         server.setHttpDispatcher(dispatcher);
         

@@ -26,7 +26,6 @@ import java.io.IOException;
 
 import org.jocean.ext.netty.initializer.BaseInitializer;
 import org.jocean.httpgateway.biz.HttpDispatcher;
-import org.jocean.httpgateway.biz.HttpDispatcher.RelayContext;
 import org.jocean.httpgateway.biz.RelayAgent;
 import org.jocean.httpgateway.biz.RelayAgent.RelayTask;
 import org.jocean.idiom.ExceptionUtils;
@@ -37,7 +36,7 @@ import org.slf4j.LoggerFactory;
  * @author isdom
  *
  */
-public class HttpGatewayServer {
+public class HttpGatewayServer<RELAYCTX> {
     
     private static final Logger LOG = LoggerFactory
             .getLogger(HttpGatewayServer.class);
@@ -60,9 +59,9 @@ public class HttpGatewayServer {
     private int _idleTimeSeconds = 180; //seconds  为了避免建立了过多的闲置连接 闲置180秒的连接主动关闭
 //    private int _chunkDataSzie = 1048576; //1024 * 1024
     
-    private RelayAgent  _relayAgent;
+    private RelayAgent<RELAYCTX>  _relayAgent;
 //    private String _destUri = "http://127.0.0.1:8000";
-    private HttpDispatcher _dispatcher = null;
+    private HttpDispatcher<RELAYCTX> _dispatcher = null;
     
     /**
      * 负责处理来自终端的request到AccessCenterBiz
@@ -119,20 +118,20 @@ public class HttpGatewayServer {
                     return;
                 }
                 
-                final RelayContext relay = _dispatcher.dispatch(request);
+                final RELAYCTX relayCtx = _dispatcher.dispatch(request);
                 
-                if ( null == relay ) {
+                if ( null == relayCtx ) {
                     LOG.warn("can't found matched dest uri for request {}, just ignore", request);
                     return;
                 }
                 
                 if ( LOG.isDebugEnabled() ) {
-                    LOG.debug("dispatch to ({}) for request({})", relay, request);
+                    LOG.debug("dispatch to ({}) for request({})", relayCtx, request);
                 }
                 
                 detachCurrentTaskOf(ctx);
                 
-                final RelayTask newTask = _relayAgent.createRelayTask(relay, ctx);
+                final RelayTask newTask = _relayAgent.createRelayTask(relayCtx, ctx);
                 setRelayTaskOf(ctx, newTask);
                 newTask.sendHttpRequest(request);
             }
@@ -321,11 +320,11 @@ public class HttpGatewayServer {
         this._trafficCounterExt = trafficCounterExt;
     }
 
-    public void setRelayAgent(final RelayAgent agent) {
+    public void setRelayAgent(final RelayAgent<RELAYCTX> agent) {
         this._relayAgent = agent;
     }
     
-    public void setHttpDispatcher(final HttpDispatcher dispatcher) {
+    public void setHttpDispatcher(final HttpDispatcher<RELAYCTX> dispatcher) {
         this._dispatcher = dispatcher;
     }
 }

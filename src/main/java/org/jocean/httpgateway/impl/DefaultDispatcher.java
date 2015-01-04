@@ -14,8 +14,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.httpgateway.biz.HttpDispatcher;
-import org.jocean.httpgateway.biz.RelayMonitor;
-import org.jocean.httpgateway.biz.RelayMonitor.Counter;
 import org.jocean.httpgateway.route.RoutingRules;
 import org.jocean.idiom.Function;
 import org.jocean.idiom.SimpleCache;
@@ -27,15 +25,19 @@ import org.slf4j.LoggerFactory;
  * @author isdom
  *
  */
-public class DefaultDispatcher implements HttpDispatcher {
+public class DefaultDispatcher implements HttpDispatcher<RelayContext> {
     private static final Logger LOG = LoggerFactory
             .getLogger(DefaultDispatcher.class);
 
+    public interface MemoFactory {
+        public RelayContext.RelayMemo getRelayMemo(final String path, final URI relayTo);
+    }
+    
     public static interface RouteMXBean {
         public String[] getRoutes();
     }
     
-    public DefaultDispatcher(final RelayMonitor monitor) {
+    public DefaultDispatcher(final MemoFactory memoFactory) {
         this._mbeanSupport.registerMBean("name=table", new RouteMXBean() {
             @Override
             public String[] getRoutes() {
@@ -49,7 +51,7 @@ public class DefaultDispatcher implements HttpDispatcher {
                     }
                 }}.toArray(new String[0]);
             }});
-        this._monitor = monitor;
+        this._memoFactory = memoFactory;
     }
     
     public void setRoutingRules(final RoutingRules rules) {
@@ -57,6 +59,7 @@ public class DefaultDispatcher implements HttpDispatcher {
         if ( null != prev ) {
             this._mbeanSupport.unregisterMBean("name=rules");
         }
+        //  TODO check multi-thread safe
         this._routingRulesRef.set(rules);
         // clear all cached routing items
         this._routerMBeanSupport.unregisterAllMBeans();
@@ -75,7 +78,7 @@ public class DefaultDispatcher implements HttpDispatcher {
         final URI[] uris = this._router.get(path);
         if (uris != null && uris.length > 0) {
             final URI uri = uris[(int)(Math.random() * uris.length)];
-            final Counter counter = this._monitor.getCounter(path, uri);
+            final RelayContext.RelayMemo memo = this._memoFactory.getRelayMemo(path, uri);
             return new RelayContext() {
 
                 @Override
@@ -84,8 +87,8 @@ public class DefaultDispatcher implements HttpDispatcher {
                 }
 
                 @Override
-                public Counter counter() {
-                    return counter;
+                public RelayMemo memo() {
+                    return memo;
                 }};
         }
         else {
@@ -99,8 +102,9 @@ public class DefaultDispatcher implements HttpDispatcher {
         this._router.clear();
     }
     
-    private final RelayMonitor _monitor;
-    private AtomicReference<RoutingRules> _routingRulesRef = new AtomicReference<RoutingRules>(null);
+    private final MemoFactory _memoFactory;
+    private final AtomicReference<RoutingRules> _routingRulesRef = 
+            new AtomicReference<RoutingRules>(null);
     
     private final MBeanRegisterSupport _mbeanSupport = 
             new MBeanRegisterSupport("org.jocean:type=gateway,attr=route", null);

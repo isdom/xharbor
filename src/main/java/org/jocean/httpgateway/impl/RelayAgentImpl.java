@@ -8,13 +8,12 @@ import io.netty.channel.ChannelHandlerContext;
 import org.jocean.event.api.EventReceiverSource;
 import org.jocean.httpclient.HttpStack;
 import org.jocean.httpgateway.biz.RelayAgent;
-import org.jocean.httpgateway.biz.HttpDispatcher.RelayContext;
 
 /**
  * @author isdom
  *
  */
-public class RelayAgentImpl implements RelayAgent {
+public class RelayAgentImpl implements RelayAgent<RelayContext> {
     public RelayAgentImpl(final HttpStack httpStack, final EventReceiverSource source) {
         this._stack = httpStack;
         this._source = source;
@@ -22,10 +21,10 @@ public class RelayAgentImpl implements RelayAgent {
     
     @Override
     public RelayTask createRelayTask(
-            final RelayContext relay,
-            final ChannelHandlerContext ctx) {
+            final RelayContext relayCtx,
+            final ChannelHandlerContext channelCtx) {
         final RelayFlow flow = 
-                new RelayFlow(this._stack, relay, ctx);
+                new RelayFlow(this._stack.createHttpClientGuide(), relayCtx, channelCtx);
         
         this._source.create(flow, flow.WAIT);
         
