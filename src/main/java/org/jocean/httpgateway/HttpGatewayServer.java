@@ -100,6 +100,7 @@ public class HttpGatewayServer {
             final RelayTask task = getRelayTaskOf(ctx);
             if ( null != task ) {
                 task.detach();
+                ctx.attr(RELAY).remove();
             }
         }
 
