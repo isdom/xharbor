@@ -74,7 +74,7 @@ public class Main {
          
         server.setHttpDispatcher(dispatcher);
         
-        dispatcher.setRoutingRules(RouteUtils.buildRoutingRulesFromZK(client, "/demo"));
+        dispatcher.updateRoutingRules(RouteUtils.buildRoutingRulesFromZK(client, "/demo"));
         final TreeCache cache = TreeCache.newBuilder(client, "/demo").setCacheData(false).build();
         cache.getListenable().addListener(new TreeCacheListener() {
 
@@ -86,7 +86,7 @@ public class Main {
                 case NODE_UPDATED:
                 case NODE_REMOVED:
                     LOG.debug("childEvent: {} event received, rebuild dispatcher", event);
-                    dispatcher.setRoutingRules(RouteUtils.buildRoutingRulesFromZK(client, "/demo"));
+                    dispatcher.updateRoutingRules(RouteUtils.buildRoutingRulesFromZK(client, "/demo"));
                     break;
                 default:
                     LOG.debug("childEvent: {} event received.", event);

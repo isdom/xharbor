@@ -54,7 +54,7 @@ public class DispatcherImpl implements HttpDispatcher<RelayContext> {
         this._memoFactory = memoFactory;
     }
     
-    public void setRoutingRules(final RoutingRules rules) {
+    public void updateRoutingRules(final RoutingRules rules) {
         final RoutingRules prev = this._routingRulesRef.get();
         if ( null != prev ) {
             this._mbeanSupport.unregisterMBean("name=rules");
