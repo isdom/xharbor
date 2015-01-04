@@ -63,6 +63,35 @@ public class RoutingRulesImpl implements RoutingRules {
         }
         
         @Override
+        public int hashCode() {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result + _priority;
+            result = prime * result
+                    + ((_rules == null) ? 0 : _rules.hashCode());
+            return result;
+        }
+
+        @Override
+        public boolean equals(final Object obj) {
+            if (this == obj)
+                return true;
+            if (obj == null)
+                return false;
+            if (getClass() != obj.getClass())
+                return false;
+            Level other = (Level) obj;
+            if (_priority != other._priority)
+                return false;
+            if (_rules == null) {
+                if (other._rules != null)
+                    return false;
+            } else if (!_rules.equals(other._rules))
+                return false;
+            return true;
+        }
+
+        @Override
         public int compareTo(final Level o) {
             return o._priority - this._priority;
         }
