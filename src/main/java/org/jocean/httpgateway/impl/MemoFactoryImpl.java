@@ -17,7 +17,7 @@ import org.jocean.j2se.MBeanRegisterSupport;
  * @author isdom
  *
  */
-public class MemoFactoryImpl implements DefaultDispatcher.MemoFactory {
+public class MemoFactoryImpl implements DispatcherImpl.MemoFactory {
 
     @Override
     public RelayMemo getRelayMemo(String path, URI relayTo) {

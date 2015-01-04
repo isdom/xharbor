@@ -25,9 +25,9 @@ import org.slf4j.LoggerFactory;
  * @author isdom
  *
  */
-public class DefaultDispatcher implements HttpDispatcher<RelayContext> {
+public class DispatcherImpl implements HttpDispatcher<RelayContext> {
     private static final Logger LOG = LoggerFactory
-            .getLogger(DefaultDispatcher.class);
+            .getLogger(DispatcherImpl.class);
 
     public interface MemoFactory {
         public RelayContext.RelayMemo getRelayMemo(final String path, final URI relayTo);
@@ -37,7 +37,7 @@ public class DefaultDispatcher implements HttpDispatcher<RelayContext> {
         public String[] getRoutes();
     }
     
-    public DefaultDispatcher(final MemoFactory memoFactory) {
+    public DispatcherImpl(final MemoFactory memoFactory) {
         this._mbeanSupport.registerMBean("name=table", new RouteMXBean() {
             @Override
             public String[] getRoutes() {
