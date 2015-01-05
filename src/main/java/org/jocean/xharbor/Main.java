@@ -48,10 +48,10 @@ public class Main {
         
         final EventReceiverSource source = 
                 Runners.build(new Runners.Config()
-                    .objectNamePrefix("org.jocean:type=gateway")
-                    .name("gateway")
-                    .timerService(Services.lookupOrCreateTimerService("gateway"))
-                    .executorSource(Services.lookupOrCreateFlowBasedExecutorSource("gateway"))
+                    .objectNamePrefix("org.jocean:type=xharbor")
+                    .name("xharbor")
+                    .timerService(Services.lookupOrCreateTimerService("xharbor"))
+                    .executorSource(Services.lookupOrCreateFlowBasedExecutorSource("xharbor"))
                     );
         
         final HttpStack httpStack = new HttpStack(
@@ -70,7 +70,7 @@ public class Main {
                         new ExponentialBackoffRetry(1000, 3));
         client.start();
         
-        final DispatcherImpl dispatcher = new DispatcherImpl(new MemoFactoryImpl());
+        final DispatcherImpl dispatcher = new DispatcherImpl(source, new MemoFactoryImpl());
          
         server.setHttpDispatcher(dispatcher);
         

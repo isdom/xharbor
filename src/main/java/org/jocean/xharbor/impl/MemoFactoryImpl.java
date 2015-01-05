@@ -141,5 +141,5 @@ public class MemoFactoryImpl implements DispatcherImpl.MemoFactory {
             new SimpleCache<Pair<String, URI>, RelayMemo>(this._memoMaker, this._memoRegister);
         
     private final MBeanRegisterSupport _mbeanSupport = 
-            new MBeanRegisterSupport("org.jocean:type=gateway,attr=route", null);
+            new MBeanRegisterSupport("org.jocean:type=router", null);
 }
