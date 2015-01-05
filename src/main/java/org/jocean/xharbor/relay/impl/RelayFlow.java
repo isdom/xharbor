@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.xharbor.impl;
+package org.jocean.xharbor.relay.impl;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -33,6 +33,7 @@ import org.jocean.httpclient.api.HttpClient;
 import org.jocean.httpclient.api.HttpClient.HttpReactor;
 import org.jocean.idiom.Detachable;
 import org.jocean.idiom.ExceptionUtils;
+import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.ValidationId;
 import org.jocean.idiom.block.Blob;
 import org.slf4j.Logger;
@@ -41,6 +42,17 @@ import org.slf4j.LoggerFactory;
 /**
  * @author isdom
  * 
+ */
+/*
+ * start to obtain httpclient  -->  send request & content --> recv resp & content
+ * |<----------ttlObtaining------>|                                                |   --+
+ * |                              |<---ttlTransferContent---->|                    |     +---> STEP time cost
+ * |                                                          |<----ttlRecvResp--->|   --+
+ * +-------------------------------------------------------------------------------+
+ * |<-ttlConnectDestinationFailure->                                               |   --+
+ * |<---------------ttlSourceCanceled------------------------>                     |     |
+ * |<---------------ttlRelayFailure--------------------------------->              |     +---> WHOLE time cost
+ * |<------------------------------------ttlRelaySuccess-------------------------->|   --+
  */
 public class RelayFlow extends AbstractFlow<RelayFlow> {
 
@@ -142,6 +154,8 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
         @OnEvent(event = "sendHttpRequest")
         private BizStep sendHttpRequest(final HttpRequest httpRequest) {
 
+            _watch4Step.start();
+            _watch4Whole.start();
             _relayCtx.memo().incObtainingHttpClient();
             _httpRequest = httpRequest;
             updateTransferHttpRequestState(_httpRequest);
@@ -175,6 +189,8 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
             }
 
             _relayCtx.memo().decObtainingHttpClient();
+            _relayCtx.memo().ttl4ObtainingHttpClient(
+                    _watch4Step.stopAndRestart());
             
             if (LOG.isDebugEnabled()) {
                 LOG.debug("send http request {} & contents size: {}", _httpRequest, _contents.size());
@@ -210,6 +226,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
                 return TRANSFERCONTENT;
             }
             else {
+                _relayCtx.memo().ttl4TransferContent(_watch4Step.stopAndRestart());
                 tryStartForceFinishedTimer();
                 _relayCtx.memo().incRecvResp();
                 return RECVRESP;
@@ -221,12 +238,18 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
         public void run() {
             _relayCtx.memo().decObtainingHttpClient();
             _relayCtx.memo().incConnectDestinationFailure();
+            
+            _relayCtx.memo().ttl4ConnectDestinationFailure(
+                    _watch4Whole.stopAndRestart());
         }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
         public void run() {
             _relayCtx.memo().decObtainingHttpClient();
             _relayCtx.memo().incSourceCanceled();
+            
+            _relayCtx.memo().ttl4SourceCanceled(
+                    _watch4Whole.stopAndRestart());
         }})))
     .freeze();
 
@@ -251,6 +274,8 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
             else {
                 tryStartForceFinishedTimer();
                 _relayCtx.memo().decTransferContent();
+                _relayCtx.memo().ttl4TransferContent(
+                        _watch4Step.stopAndRestart());
                 _relayCtx.memo().incRecvResp();
                 return RECVRESP;
             }
@@ -261,12 +286,18 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
         public void run() {
             _relayCtx.memo().decTransferContent();
             _relayCtx.memo().incRelayFailure();
+            
+            _relayCtx.memo().ttl4RelayFailure(
+                    _watch4Whole.stopAndRestart());
         }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
         public void run() {
             _relayCtx.memo().decTransferContent();
             _relayCtx.memo().incSourceCanceled();
+            
+            _relayCtx.memo().ttl4SourceCanceled(
+                    _watch4Whole.stopAndRestart());
         }})))
     .freeze();
         
@@ -289,12 +320,18 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
         public void run() {
             _relayCtx.memo().decRecvResp();
             _relayCtx.memo().incRelayFailure();
+            
+            _relayCtx.memo().ttl4RelayFailure(
+                    _watch4Whole.stopAndRestart());
         }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
         public void run() {
             _relayCtx.memo().decRecvResp();
             _relayCtx.memo().incSourceCanceled();
+            
+            _relayCtx.memo().ttl4SourceCanceled(
+                    _watch4Whole.stopAndRestart());
         }})))
     .freeze();
 
@@ -317,15 +354,21 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
                 return currentEventHandler();
             }
 
+            _relayCtx.memo().decRecvResp();
+            _relayCtx.memo().ttl4RecvResp(
+                    _watch4Step.stopAndRestart());
+            
             //  release relay's http client
             safeDetachHttp();
             
-            final ChannelFuture future = _channelCtx.writeAndFlush(new DefaultLastHttpContent(blob2ByteBuf(contentBlob)));
+            final ChannelFuture future = _channelCtx.writeAndFlush(
+                    new DefaultLastHttpContent(blob2ByteBuf(contentBlob)));
             if ( !HttpHeaders.isKeepAlive( _httpRequest ) ) {
                 future.addListener(ChannelFutureListener.CLOSE);
             }
-            _relayCtx.memo().decRecvResp();
             _relayCtx.memo().incRelaySuccess();
+            
+            _relayCtx.memo().ttl4RelaySuccess(_watch4Whole.stopAndRestart());
             return null;
         }
 
@@ -350,12 +393,18 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
         public void run() {
             _relayCtx.memo().decRecvResp();
             _relayCtx.memo().incRelayFailure();
+            
+            _relayCtx.memo().ttl4RelayFailure(
+                    _watch4Whole.stopAndRestart());
         }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
         public void run() {
             _relayCtx.memo().decRecvResp();
             _relayCtx.memo().incSourceCanceled();
+            
+            _relayCtx.memo().ttl4SourceCanceled(
+                    _watch4Whole.stopAndRestart());
         }})))
     .freeze();
 
@@ -480,4 +529,6 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
     private final ValidationId _httpClientId = new ValidationId();
     private Detachable _forceFinishedTimer;
     private long _timeoutFromActived = -1;
+    private final StopWatch _watch4Step = new StopWatch();
+    private final StopWatch _watch4Whole = new StopWatch();
 }

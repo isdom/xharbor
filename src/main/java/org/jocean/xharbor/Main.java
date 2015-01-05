@@ -16,11 +16,11 @@ import org.jocean.httpclient.HttpStack;
 import org.jocean.httpclient.impl.HttpUtils;
 import org.jocean.idiom.pool.Pools;
 import org.jocean.netty.NettyClient;
-import org.jocean.xharbor.api.RelayAgent;
-import org.jocean.xharbor.impl.DispatcherImpl;
-import org.jocean.xharbor.impl.MemoFactoryImpl;
-import org.jocean.xharbor.impl.RelayAgentImpl;
-import org.jocean.xharbor.route.RouteUtils;
+import org.jocean.xharbor.relay.RelayAgent;
+import org.jocean.xharbor.relay.impl.DispatcherImpl;
+import org.jocean.xharbor.relay.impl.MemoFactoryImpl;
+import org.jocean.xharbor.relay.impl.RelayAgentImpl;
+import org.jocean.xharbor.route.impl.RouteUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.support.AbstractApplicationContext;
@@ -74,7 +74,7 @@ public class Main {
          
         server.setHttpDispatcher(dispatcher);
         
-        dispatcher.updateRoutingRules(RouteUtils.buildRoutingRulesFromZK(client, "/demo"));
+        dispatcher.updateRouteProvider(RouteUtils.buildRouteProviderFromZK(client, "/demo"));
         final TreeCache cache = TreeCache.newBuilder(client, "/demo").setCacheData(false).build();
         cache.getListenable().addListener(new TreeCacheListener() {
 
@@ -86,7 +86,7 @@ public class Main {
                 case NODE_UPDATED:
                 case NODE_REMOVED:
                     LOG.debug("childEvent: {} event received, rebuild dispatcher", event);
-                    dispatcher.updateRoutingRules(RouteUtils.buildRoutingRulesFromZK(client, "/demo"));
+                    dispatcher.updateRouteProvider(RouteUtils.buildRouteProviderFromZK(client, "/demo"));
                     break;
                 default:
                     LOG.debug("childEvent: {} event received.", event);

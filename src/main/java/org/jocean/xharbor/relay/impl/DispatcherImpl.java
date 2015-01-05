@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.xharbor.impl;
+package org.jocean.xharbor.relay.impl;
 
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.QueryStringDecoder;
@@ -18,19 +18,21 @@ import org.jocean.event.api.BizStep;
 import org.jocean.event.api.EventReceiverSource;
 import org.jocean.event.api.annotation.OnEvent;
 import org.jocean.idiom.Function;
-import org.jocean.idiom.Visitor2;
 import org.jocean.idiom.SimpleCache;
+import org.jocean.idiom.Visitor2;
 import org.jocean.j2se.MBeanRegisterSupport;
-import org.jocean.xharbor.api.HttpDispatcher;
-import org.jocean.xharbor.route.RoutingRules;
+import org.jocean.xharbor.relay.HttpDispatcher;
+import org.jocean.xharbor.route.RouteProvider;
+import org.jocean.xharbor.route.RouteUpdatable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * @author isdom
- *
+ * TODO
+ * 考虑根据 HTTP 请求进行分派: GET/POST/PUT ...... 
  */
-public class DispatcherImpl implements HttpDispatcher<RelayContext> {
+public class DispatcherImpl implements HttpDispatcher<RelayContext>, RouteUpdatable {
     private static final Logger LOG = LoggerFactory
             .getLogger(DispatcherImpl.class);
 
@@ -65,30 +67,30 @@ public class DispatcherImpl implements HttpDispatcher<RelayContext> {
     }
     
     private interface RoutingUpdater {
-        public void updateRoutingRules(final RoutingRules rules);
-        public void registerRouteMXBean(final String path);
+        public void updateRouteProvider(final RouteProvider provider);
+        public void registerRoutesOfPath(final String path);
     }
     
     private class UpdateRoutingFlow extends AbstractFlow<UpdateRoutingFlow> {
         final BizStep UPDATE = new BizStep("routing.UPDATE") {
 
-            @OnEvent(event = "updateRoutingRules")
-            private BizStep updateRoutingRules(final RoutingRules rules) {
-                final RoutingRules prev = _routingRulesRef.get();
+            @OnEvent(event = "updateRouteProvider")
+            private BizStep updateRouteProvider(final RouteProvider provider) {
+                final RouteProvider prev = _routeProviderRef.get();
                 if ( null != prev ) {
-                    _mbeanSupport.unregisterMBean("name=rules");
+                    _mbeanSupport.unregisterMBean("name=provider");
                 }
-                _routingRulesRef.set(rules);
+                _routeProviderRef.set(provider);
                 // clear all cached routing items
                 _routerMBeanSupport.unregisterAllMBeans();
                 _router.clear();
-                _mbeanSupport.registerMBean("name=rules", rules);
+                _mbeanSupport.registerMBean("name=provider", provider);
 
                 return currentEventHandler();
             }
             
-            @OnEvent(event = "registerRouteMXBean")
-            private BizStep registerRouteMXBean(final String path) {
+            @OnEvent(event = "registerRoutesOfPath")
+            private BizStep registerRoutesOfPath(final String path) {
                 if ( !_routerMBeanSupport.isRegistered("path=" + path) ) {
                     final URI[] routes = _router.get(path);
                     final String[] routesAsStringArray = new ArrayList<String>() {
@@ -119,8 +121,9 @@ public class DispatcherImpl implements HttpDispatcher<RelayContext> {
         }
     }
     
-    public void updateRoutingRules(final RoutingRules rules) {
-        this._routingUpdater.updateRoutingRules(rules);
+    @Override
+    public void updateRouteProvider(final RouteProvider routeProvider) {
+        this._routingUpdater.updateRouteProvider(routeProvider);
     }
     
     @Override
@@ -159,8 +162,8 @@ public class DispatcherImpl implements HttpDispatcher<RelayContext> {
     }
     
     private final MemoFactory _memoFactory;
-    private final AtomicReference<RoutingRules> _routingRulesRef = 
-            new AtomicReference<RoutingRules>(null);
+    private final AtomicReference<RouteProvider> _routeProviderRef = 
+            new AtomicReference<RouteProvider>(null);
     
     private final MBeanRegisterSupport _mbeanSupport = 
             new MBeanRegisterSupport("org.jocean:type=router", null);
@@ -173,14 +176,14 @@ public class DispatcherImpl implements HttpDispatcher<RelayContext> {
             new Function<String, URI[]>() {
                 @Override
                 public URI[] apply(final String path) {
-                    final RoutingRules rules = _routingRulesRef.get();
-                    return ( null != rules ? rules.calculateRoute(path) : new URI[0] );
+                    final RouteProvider provider = _routeProviderRef.get();
+                    return ( null != provider ? provider.calculateRoute(path) : new URI[0] );
                 }
             },
             //  ifAssociated
             new Visitor2<String, URI[]>() {
                 @Override
                 public void visit(final String path, final URI[] routes) throws Exception {
-                    _routingUpdater.registerRouteMXBean(path);
+                    _routingUpdater.registerRoutesOfPath(path);
                 }});
 }

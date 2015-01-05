@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.xharbor.route;
+package org.jocean.xharbor.route.impl;
 
 import java.util.Arrays;
 import java.util.List;
@@ -9,6 +9,7 @@ import java.util.List;
 import org.apache.curator.framework.CuratorFramework;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.Pair;
+import org.jocean.xharbor.route.RouteProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,9 +24,9 @@ public class RouteUtils {
     private static final Logger LOG = LoggerFactory
             .getLogger(RouteUtils.class);
 
-    public static RoutingRules buildRoutingRulesFromZK(final CuratorFramework client, final String path) 
+    public static RouteProvider buildRouteProviderFromZK(final CuratorFramework client, final String path) 
             throws Exception {
-        final RoutingRulesImpl routingRules = new RoutingRulesImpl();
+        final RouteProviderImpl routingRules = new RouteProviderImpl();
         final List<String> levels = client.getChildren().forPath(path);
         for ( String priority : levels ) {
             try {
@@ -41,7 +42,7 @@ public class RouteUtils {
 
     private static void addRules(
             final CuratorFramework client, 
-            final RoutingRulesImpl routingRules,
+            final RouteProviderImpl routingRules,
             final String pathToLevel,
             final int priority) throws Exception {
         final List<String> hosts = client.getChildren().forPath(pathToLevel);

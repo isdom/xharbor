@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.xharbor.impl;
+package org.jocean.xharbor.relay.impl;
 
 import java.net.URI;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -9,18 +9,21 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.jocean.idiom.Function;
 import org.jocean.idiom.Pair;
 import org.jocean.idiom.SimpleCache;
+import org.jocean.idiom.Triple;
 import org.jocean.idiom.Visitor2;
 import org.jocean.j2se.MBeanRegisterSupport;
-import org.jocean.xharbor.impl.RelayContext.RelayMemo;
+import org.jocean.xharbor.relay.impl.RelayContext.RelayMemo;
 
 /**
  * @author isdom
- *
+ * TODO
+ * 考虑 HTTP 请求的方法区分: GET/POST/PUT ...... 
+ * 实现 Composite RelayMemo，包含 细粒度(path,relayTo) 以及 其上两级的 RelayMemo，分别为 全局 RelayMemo 以及 path 相关的 RelayMemo
  */
 public class MemoFactoryImpl implements DispatcherImpl.MemoFactory {
 
     @Override
-    public RelayMemo getRelayMemo(String path, URI relayTo) {
+    public RelayMemo getRelayMemo(final String path, final URI relayTo) {
         return this._memos.get(Pair.of(path, relayTo));
     }
     
@@ -35,6 +38,10 @@ public class MemoFactoryImpl implements DispatcherImpl.MemoFactory {
     }
     
     private static class MemoImpl implements RelayMemo, FunctionMXBean {
+        public MemoImpl(final TimeIntervalMemo[] ttlMemos) {
+            this._ttlMemos = ttlMemos;
+        }
+        
         public int getObtainingHttpClient() {
             return this._obtainingHttpClient.get();
         }
@@ -112,6 +119,41 @@ public class MemoFactoryImpl implements DispatcherImpl.MemoFactory {
             this._relayFailure.incrementAndGet();
         }
         
+        @Override
+        public void ttl4ObtainingHttpClient(final long ttl) {
+            this._ttlMemos[0].recordInterval(ttl);
+        }
+
+        @Override
+        public void ttl4TransferContent(final long ttl) {
+            this._ttlMemos[1].recordInterval(ttl);
+        }
+
+        @Override
+        public void ttl4RecvResp(final long ttl) {
+            this._ttlMemos[2].recordInterval(ttl);
+        }
+
+        @Override
+        public void ttl4RelaySuccess(final long ttl) {
+            this._ttlMemos[3].recordInterval(ttl);
+        }
+
+        @Override
+        public void ttl4SourceCanceled(final long ttl) {
+            this._ttlMemos[4].recordInterval(ttl);
+        }
+
+        @Override
+        public void ttl4ConnectDestinationFailure(final long ttl) {
+            this._ttlMemos[5].recordInterval(ttl);
+        }
+
+        @Override
+        public void ttl4RelayFailure(final long ttl) {
+            this._ttlMemos[6].recordInterval(ttl);
+        }
+        
         private final AtomicInteger _obtainingHttpClient = new AtomicInteger(0);
         private final AtomicInteger _transferContent = new AtomicInteger(0);
         private final AtomicInteger _recvResp = new AtomicInteger(0);
@@ -119,13 +161,39 @@ public class MemoFactoryImpl implements DispatcherImpl.MemoFactory {
         private final AtomicInteger _relayFailure = new AtomicInteger(0);
         private final AtomicInteger _connectDestinationFailure = new AtomicInteger(0);
         private final AtomicInteger _sourceCanceled = new AtomicInteger(0);
+        private final TimeIntervalMemo[] _ttlMemos;
     }
+    
+    private final SimpleCache<Triple<String, URI, String>, TimeIntervalMemo> _ttlmemos = 
+            new SimpleCache<Triple<String, URI, String>, TimeIntervalMemo>(
+                new Function<Triple<String, URI, String>, TimeIntervalMemo>() {
+                    @Override
+                    public TimeIntervalMemo apply(final Triple<String, URI, String> input) {
+                        return new TimeInterval10ms_100ms_500ms_1s_5sImpl();
+                    }}, 
+                new Visitor2<Triple<String,URI, String>, TimeIntervalMemo>() {
+                    @Override
+                    public void visit(final Triple<String,URI, String> triple, final TimeIntervalMemo newMemo)
+                            throws Exception {
+                        _mbeanSupport.registerMBean("path=" + triple.getFirst() 
+                                + ",dest=" + triple.getSecond().toString().replaceAll(":", "-")
+                                + ",ttl=" + triple.getThird(), 
+                                newMemo);
+                    }});
     
     private final Function<Pair<String, URI>, RelayMemo> _memoMaker = 
             new Function<Pair<String, URI>, RelayMemo>() {
         @Override
         public RelayMemo apply(final Pair<String, URI> input) {
-            return new MemoImpl();
+            return new MemoImpl(new TimeIntervalMemo[]{
+                    _ttlmemos.get(Triple.of(input.getFirst(), input.getSecond(), "obtainingHttpClient")),
+                    _ttlmemos.get(Triple.of(input.getFirst(), input.getSecond(), "transferContent")),
+                    _ttlmemos.get(Triple.of(input.getFirst(), input.getSecond(), "recvResp")),
+                    _ttlmemos.get(Triple.of(input.getFirst(), input.getSecond(), "relaySuccess")),
+                    _ttlmemos.get(Triple.of(input.getFirst(), input.getSecond(), "sourceCanceled")),
+                    _ttlmemos.get(Triple.of(input.getFirst(), input.getSecond(), "connectDestinationFailure")),
+                    _ttlmemos.get(Triple.of(input.getFirst(), input.getSecond(), "relayFailure"))
+                    });
         }};
 
     private final Visitor2<Pair<String,URI>, RelayMemo> _memoRegister = 

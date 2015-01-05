@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.xharbor.impl;
+package org.jocean.xharbor.relay.impl;
 
 import java.net.URI;
 
@@ -26,6 +26,15 @@ interface RelayContext {
         public void incSourceCanceled();
         public void incConnectDestinationFailure();
         public void incRelayFailure();
+        
+        public void ttl4ObtainingHttpClient(final long ttl);
+        public void ttl4TransferContent(final long ttl);
+        public void ttl4RecvResp(final long ttl);
+        
+        public void ttl4RelaySuccess(final long ttl);
+        public void ttl4SourceCanceled(final long ttl);
+        public void ttl4ConnectDestinationFailure(final long ttl);
+        public void ttl4RelayFailure(final long ttl);
     }
     
     public URI relayTo();

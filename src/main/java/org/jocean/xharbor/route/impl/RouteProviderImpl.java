@@ -1,4 +1,4 @@
-package org.jocean.xharbor.route;
+package org.jocean.xharbor.route.impl;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -12,7 +12,9 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
 
-public class RoutingRulesImpl implements RoutingRules {
+import org.jocean.xharbor.route.RouteProvider;
+
+public class RouteProviderImpl implements RouteProvider, RulesMXBean  {
     
     @Override
     public String[] getRoutingRules() {
