@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
 public class RoutingRulesImpl implements RoutingRules {
     
     @Override
-    public String[] getRules() {
+    public String[] getRoutingRules() {
         return new ArrayList<String>() {
             private static final long serialVersionUID = 1L;
         {
@@ -26,8 +26,9 @@ public class RoutingRulesImpl implements RoutingRules {
         }}.toArray(new String[0]);
     }
 
-    public void addRule(final int priority, final URI uri, final Pattern[] patterns) {
-        getOrCreateLevel(priority).addRule(uri, patterns);
+    public void addRule(final int priority, final String uri, final String[] regexs) 
+            throws Exception {
+        getOrCreateLevel(priority).addRule(uri, regexs);
     }
     
     private Level getOrCreateLevel(final int priority) {
@@ -101,8 +102,12 @@ public class RoutingRulesImpl implements RoutingRules {
             return this._priority;
         }
 
-        public void addRule(final URI uri, final Pattern[] patterns) {
-            this._rules.put(uri, patterns);
+        public void addRule(final String uri, final String[] regexs) throws Exception {
+            final Pattern[] patterns = new Pattern[regexs.length];
+            for ( int idx = 0; idx < regexs.length; idx++) {
+                patterns[idx] = Pattern.compile(regexs[idx]);
+            }
+            this._rules.put(new URI(uri), patterns);
         }
         
         private URI[] match(final String path) {

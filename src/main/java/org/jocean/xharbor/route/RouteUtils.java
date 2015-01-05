@@ -3,11 +3,8 @@
  */
 package org.jocean.xharbor.route;
 
-import java.net.URI;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.regex.Pattern;
 
 import org.apache.curator.framework.CuratorFramework;
 import org.jocean.idiom.ExceptionUtils;
@@ -49,10 +46,16 @@ public class RouteUtils {
             final int priority) throws Exception {
         final List<String> hosts = client.getChildren().forPath(pathToLevel);
         for ( String host : hosts ) {
-            final Pair<URI, Pattern[]> rule = 
+            final Pair<String, String[]> rule = 
                     generateRule(client, pathToLevel + "/" + host, host);
             if ( null != rule ) {
-                routingRules.addRule(priority, rule.getFirst(), rule.getSecond());
+                try {
+                    routingRules.addRule(priority, rule.getFirst(), rule.getSecond());
+                } catch (Exception e) {
+                    LOG.warn("exception when add rule({}/{}) for level({}), detail:{}",
+                            rule.getFirst(), Arrays.toString(rule.getSecond()), 
+                            pathToLevel, ExceptionUtils.exception2detail(e));
+                }
             }
         }
     }
@@ -92,28 +95,19 @@ public class RouteUtils {
         public void setRegexs(String[] patterns) {
             this.regexs = patterns;
         }
-        
-        public Pattern[] asPatternArray() {
-            final List<Pattern> patterns = new ArrayList<Pattern>();
-            
-            for ( String regex : this.regexs) {
-                patterns.add(Pattern.compile(regex));
-            }
-            return patterns.toArray(new Pattern[0]);
-        }
     }
     
-    private static Pair<URI, Pattern[]> generateRule(
+    private static Pair<String, String[]> generateRule(
             final CuratorFramework client, 
             final String pathToHost, 
             final String host)
             throws Exception {
         final byte[] content = client.getData().forPath(pathToHost);
         if ( content != null && content.length > 0) {
-            final RuleDesc target = JSON.parseObject(new String(content,  "UTF-8"), RuleDesc.class);
-            if ( null != target ) {
-                LOG.debug("generateRule for {}/{}", target.getScheme(), Arrays.toString( target.getRegexs() ) );
-                return Pair.of(new URI(target.getScheme() + "://" + host), target.asPatternArray());
+            final RuleDesc desc = JSON.parseObject(new String(content,  "UTF-8"), RuleDesc.class);
+            if ( null != desc ) {
+                LOG.debug("generateRule for {}/{}", desc.getScheme(), Arrays.toString( desc.getRegexs() ) );
+                return Pair.of(desc.getScheme() + "://" + host, desc.getRegexs());
             }
         }
         return null;
