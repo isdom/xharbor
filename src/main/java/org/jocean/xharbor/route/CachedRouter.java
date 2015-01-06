@@ -22,33 +22,33 @@ import org.slf4j.LoggerFactory;
  * @author isdom
  *
  */
-public class CachedRouter<ROUTECTX, RELAYCTX> implements Router<ROUTECTX, RELAYCTX>, 
-    RouterUpdatable<ROUTECTX, RELAYCTX> {
+public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT>, 
+    RouterUpdatable<INPUT, OUTPUT> {
 
     private static final Logger LOG = LoggerFactory
             .getLogger(CachedRouter.class);
     
-    public interface OnRouterUpdated<ROUTECTX, RELAYCTX> extends 
-        Visitor2<Router<ROUTECTX, RELAYCTX>,Router<ROUTECTX, RELAYCTX>> {
+    public interface OnRouterUpdated<I, O> extends 
+        Visitor2<Router<I, O>,Router<I, O>> {
     }
     
-    public interface OnRouted<ROUTECTX, RELAYCTX> extends 
-        Visitor2<ROUTECTX, RELAYCTX> {
+    public interface OnRouted<I, O> extends 
+        Visitor2<I, O> {
     }
     
     @Override
-    public RELAYCTX calculateRoute(final ROUTECTX routectx) {
-        return this._cache.get(routectx);
+    public OUTPUT calculateRoute(final INPUT input, final Context routectx) {
+        return this._cache.get(input);
     }
 
     @Override
-    public void updateRouter(final Router<ROUTECTX, RELAYCTX> routerImpl) {
+    public void updateRouter(final Router<INPUT, OUTPUT> routerImpl) {
         this._implUpdater.updateImpl(routerImpl);
     }
 
     public CachedRouter(final EventReceiverSource source, 
-            final OnRouterUpdated<ROUTECTX, RELAYCTX> onRouterUpdated, 
-            final OnRouted<ROUTECTX, RELAYCTX> onRouted) {
+            final OnRouterUpdated<INPUT, OUTPUT> onRouterUpdated, 
+            final OnRouted<INPUT, OUTPUT> onRouted) {
 //        this._mbeanSupport.registerMBean("name=table", new RouteMXBean() {
 //            @Override
 //            public String[] getRoutes() {
@@ -70,17 +70,17 @@ public class CachedRouter<ROUTECTX, RELAYCTX> implements Router<ROUTECTX, RELAYC
             }}.queryInterfaceInstance(ImplUpdater.class);
     }
     
-    private interface ImplUpdater<ROUTECTX, RELAYCTX> {
-        public void updateImpl(final Router<ROUTECTX, RELAYCTX> impl);
-        public void onRouted(final ROUTECTX routectx);
+    private interface ImplUpdater<I, O> {
+        public void updateImpl(final Router<I, O> impl);
+        public void onRouted(final I input);
     }
     
     private class UpdateImplFlow extends AbstractFlow<UpdateImplFlow> {
         final BizStep UPDATE = new BizStep("routing.UPDATE") {
 
             @OnEvent(event = "updateImpl")
-            private BizStep updateImpl(final Router<ROUTECTX, RELAYCTX> newImpl) {
-                final Router<ROUTECTX, RELAYCTX> prevImpl = _implRef.getAndSet(newImpl);
+            private BizStep updateImpl(final Router<INPUT, OUTPUT> newImpl) {
+                final Router<INPUT, OUTPUT> prevImpl = _implRef.getAndSet(newImpl);
                 // clear all cached routing
                 _cache.clear();
                 try {
@@ -94,12 +94,12 @@ public class CachedRouter<ROUTECTX, RELAYCTX> implements Router<ROUTECTX, RELAYC
             }
             
             @OnEvent(event = "onRouted")
-            private BizStep onRouted(final ROUTECTX routectx) {
+            private BizStep onRouted(final INPUT input) {
                 try {
-                    _onRouted.visit(routectx, _cache.get(routectx));
+                    _onRouted.visit(input, _cache.get(input));
                 } catch (Exception e) {
                     LOG.warn("exception when call onRouted({}) with ctx({}), detail: {}",
-                            _onRouted, routectx, ExceptionUtils.exception2detail(e));
+                            _onRouted, input, ExceptionUtils.exception2detail(e));
                 }
 
                 return currentEventHandler();
@@ -117,24 +117,24 @@ public class CachedRouter<ROUTECTX, RELAYCTX> implements Router<ROUTECTX, RELAYC
         this._cache.clear();
     }
     
-    private final OnRouterUpdated<ROUTECTX, RELAYCTX> _onRouterUpdated;
-    private final OnRouted<ROUTECTX, RELAYCTX> _onRouted;
-    private final AtomicReference<Router<ROUTECTX, RELAYCTX>> _implRef = 
-            new AtomicReference<Router<ROUTECTX, RELAYCTX>>(null);
+    private final OnRouterUpdated<INPUT, OUTPUT> _onRouterUpdated;
+    private final OnRouted<INPUT, OUTPUT> _onRouted;
+    private final AtomicReference<Router<INPUT, OUTPUT>> _implRef = 
+            new AtomicReference<Router<INPUT, OUTPUT>>(null);
     
-    private final ImplUpdater<ROUTECTX, RELAYCTX> _implUpdater;
-    private final SimpleCache<ROUTECTX, RELAYCTX> _cache = new SimpleCache<ROUTECTX, RELAYCTX>(
+    private final ImplUpdater<INPUT, OUTPUT> _implUpdater;
+    private final SimpleCache<INPUT, OUTPUT> _cache = new SimpleCache<INPUT, OUTPUT>(
             //  ifAbsent
-            new Function<ROUTECTX, RELAYCTX>() {
+            new Function<INPUT, OUTPUT>() {
                 @Override
-                public RELAYCTX apply(final ROUTECTX routectx) {
-                    return _implRef.get().calculateRoute(routectx);
+                public OUTPUT apply(final INPUT input) {
+                    return _implRef.get().calculateRoute(input, null);
                 }
             },
             //  ifAssociated
-            new Visitor2<ROUTECTX, RELAYCTX>() {
+            new Visitor2<INPUT, OUTPUT>() {
                 @Override
-                public void visit(final ROUTECTX routectx, final RELAYCTX relayctx) throws Exception {
-                    _implUpdater.onRouted(routectx);
+                public void visit(final INPUT input, final OUTPUT output) throws Exception {
+                    _implUpdater.onRouted(input);
                 }});
 }

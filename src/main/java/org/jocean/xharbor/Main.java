@@ -81,22 +81,23 @@ public class Main {
         
 //        final DispatcherImpl dispatcher = new DispatcherImpl(source, new MemoFactoryImpl());
          
-        final Router<String, Pair<String,URI[]>> cachedRouter = RouteUtils.buildCachedPathRouter("org.jocean:type=router", source);
-        ((RouterUpdatable<String, Pair<String,URI[]>>)cachedRouter).updateRouter(RouteUtils.buildPathRouterFromZK(client, "/demo"));
+        final Router<String, URI[]> cachedRouter = RouteUtils.buildCachedPathRouter("org.jocean:type=router", source);
+        ((RouterUpdatable<String, URI[]>)cachedRouter).updateRouter(RouteUtils.buildPathRouterFromZK(client, "/demo"));
         
         server.setRouter(new Router<HttpRequest, RelayContext>() {
             
             final URIs2RelayCtxRouter _router = new URIs2RelayCtxRouter(new MemoFactoryImpl());
 
             @Override
-            public RelayContext calculateRoute(final HttpRequest request) {
+            public RelayContext calculateRoute(final HttpRequest request, final Context routectx) {
                 final QueryStringDecoder decoder = new QueryStringDecoder(request.getUri());
 
                 final String path = decoder.path();
+                routectx.setProperty("path", path);
                 if ( LOG.isDebugEnabled()) {
                     LOG.debug("dispatch for path:{}", path);
                 }
-                return _router.calculateRoute( cachedRouter.calculateRoute(path) );
+                return _router.calculateRoute( cachedRouter.calculateRoute(path, routectx), routectx );
             }});
         
         final TreeCache cache = TreeCache.newBuilder(client, "/demo").setCacheData(false).build();
@@ -110,7 +111,7 @@ public class Main {
                 case NODE_UPDATED:
                 case NODE_REMOVED:
                     LOG.debug("childEvent: {} event received, rebuild dispatcher", event);
-                    ((RouterUpdatable<String, Pair<String,URI[]>>)cachedRouter).updateRouter(RouteUtils.buildPathRouterFromZK(client, "/demo"));
+                    ((RouterUpdatable<String, URI[]>)cachedRouter).updateRouter(RouteUtils.buildPathRouterFromZK(client, "/demo"));
                     break;
                 default:
                     LOG.debug("childEvent: {} event received.", event);

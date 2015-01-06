@@ -5,16 +5,14 @@ package org.jocean.xharbor.route;
 
 import java.net.URI;
 
-import org.jocean.idiom.Pair;
 import org.jocean.xharbor.relay.RelayContext;
-import org.jocean.xharbor.relay.RelayContext.RelayMemo;
 import org.jocean.xharbor.spi.Router;
 
 /**
  * @author isdom
  *
  */
-public class URIs2RelayCtxRouter implements Router<Pair<String,URI[]>, RelayContext> {
+public class URIs2RelayCtxRouter implements Router<URI[], RelayContext> {
 
     public interface MemoFactory {
         public RelayContext.RelayMemo getRelayMemo(final String path, final URI relayTo);
@@ -25,11 +23,10 @@ public class URIs2RelayCtxRouter implements Router<Pair<String,URI[]>, RelayCont
     }
     
     @Override
-    public RelayContext calculateRoute(final Pair<String,URI[]> ctx) {
-        final URI[] uris = ctx.getSecond();
+    public RelayContext calculateRoute(final URI[] uris, final Context routectx) {
         if (uris != null && uris.length > 0) {
             final URI uri = uris[(int)(Math.random() * uris.length)];
-            final RelayContext.RelayMemo memo = this._memoFactory.getRelayMemo(ctx.getFirst(), uri);
+            final RelayContext.RelayMemo memo = this._memoFactory.getRelayMemo((String)routectx.getProperty("path"), uri);
             return new RelayContext() {
 
                 @Override

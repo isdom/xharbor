@@ -32,17 +32,17 @@ public class RouteUtils {
         public String[] getRoutes();
     }
     
-    public static Router<String, Pair<String,URI[]>> buildCachedPathRouter(final String prefix, final EventReceiverSource source) {
+    public static Router<String, URI[]> buildCachedPathRouter(final String prefix, final EventReceiverSource source) {
         final MBeanRegisterSupport routerMbeanSupport = 
                 new MBeanRegisterSupport(prefix, null);
 
         final MBeanRegisterSupport pathMBeanSupport =
                 new MBeanRegisterSupport(prefix, null);
       
-        return new CachedRouter<String, Pair<String,URI[]>>(source, 
-                new CachedRouter.OnRouterUpdated<String, Pair<String,URI[]>>() {
+        return new CachedRouter<String, URI[]>(source, 
+                new CachedRouter.OnRouterUpdated<String, URI[]>() {
                     @Override
-                    public void visit(final Router<String, Pair<String,URI[]>> prevImpl, final Router<String, Pair<String,URI[]>> newImpl)
+                    public void visit(final Router<String, URI[]> prevImpl, final Router<String, URI[]> newImpl)
                             throws Exception {
                       if ( null != prevImpl ) {
                           routerMbeanSupport.unregisterMBean("name=routerImpl");
@@ -51,14 +51,14 @@ public class RouteUtils {
                       pathMBeanSupport.unregisterAllMBeans();
                         
                     }}, 
-                new CachedRouter.OnRouted<String, Pair<String,URI[]>>() {
+                new CachedRouter.OnRouted<String, URI[]>() {
                     @Override
-                    public void visit(final String path, final Pair<String,URI[]> ctx) throws Exception {
+                    public void visit(final String path, final URI[] uris) throws Exception {
                         if (!pathMBeanSupport.isRegistered("path=" + path)) {
                             final String[] routesAsStringArray = new ArrayList<String>() {
                                 private static final long serialVersionUID = 1L;
                                 {
-                                    for (URI uri : ctx.getSecond()) {
+                                    for (URI uri : uris) {
                                         this.add(uri.toString());
                                     }
                                 }
@@ -75,7 +75,7 @@ public class RouteUtils {
                     }});
     }
     
-    public static Router<String, Pair<String,URI[]>> buildPathRouterFromZK(final CuratorFramework client, final String path) 
+    public static Router<String, URI[]> buildPathRouterFromZK(final CuratorFramework client, final String path) 
             throws Exception {
         final Path2URIsRouter router = new Path2URIsRouter();
         final List<String> levels = client.getChildren().forPath(path);

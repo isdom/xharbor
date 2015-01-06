@@ -15,14 +15,13 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
 
-import org.jocean.idiom.Pair;
 import org.jocean.xharbor.spi.Router;
 
 /**
  * @author isdom
  *
  */
-public class Path2URIsRouter implements Router<String, Pair<String,URI[]>>, RulesMXBean {
+public class Path2URIsRouter implements Router<String, URI[]>, RulesMXBean {
 
     @Override
     public String[] getRoutingRules() {
@@ -37,16 +36,16 @@ public class Path2URIsRouter implements Router<String, Pair<String,URI[]>>, Rule
     }
     
     @Override
-    public Pair<String,URI[]> calculateRoute(final String path) {
+    public URI[] calculateRoute(final String path, final Context routectx) {
         final Iterator<Level> itr = _levels.iterator();
         while (itr.hasNext()) {
             final Level level = itr.next();
             final URI[] uris = level.match(path);
             if ( null != uris && uris.length > 0 ) {
-                return Pair.of(path, uris);
+                return uris;
             }
         }
-        return Pair.of(path,new URI[0]);
+        return new URI[0];
     }
 
     public void addRule(final int priority, final String uri, final String[] regexs) 

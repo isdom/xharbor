@@ -23,11 +23,14 @@ import io.netty.handler.traffic.TrafficCounterExt;
 import io.netty.util.AttributeKey;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.jocean.ext.netty.initializer.BaseInitializer;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.xharbor.spi.RelayAgent;
 import org.jocean.xharbor.spi.RelayAgent.RelayTask;
+import org.jocean.xharbor.spi.Router.Context;
 import org.jocean.xharbor.spi.Router;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,7 +116,28 @@ public class HttpGatewayServer<RELAYCTX> {
                     LOG.debug("messageReceived:{} default http request\n[{}]",ctx.channel(),request);
                 }
                 
-                final RELAYCTX relayCtx = _router.calculateRoute(request);
+                final Map<String, Object> routectx = new HashMap<String, Object>();
+                
+                final RELAYCTX relayCtx = _router.calculateRoute(request, new Router.Context() {
+                    
+                    @Override
+                    public <V> Context setProperty(final String key, final V obj) {
+                        routectx.put(key, obj);
+                        return this;
+                    }
+                    
+                    @Override
+                    public <V> V getProperty(String key) {
+                        return (V)routectx.get(key);
+                    }
+                    
+                    @Override
+                    public Map<String, Object> getProperties() {
+                        return routectx;
+                    }
+                });
+                
+                routectx.clear();
                 
                 if ( null == relayCtx ) {
                     LOG.warn("can't found matched dest uri for request {}, just ignore", request);

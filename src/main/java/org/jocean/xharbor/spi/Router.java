@@ -1,5 +1,10 @@
 package org.jocean.xharbor.spi;
 
-public interface Router<ROUTECTX, RELAYCTX> {
-    public RELAYCTX calculateRoute(final ROUTECTX routectx);
+import org.jocean.idiom.Propertyable;
+
+public interface Router<INPUT, OUTPUT> {
+    public interface Context extends Propertyable<Context> {
+    }
+    
+    public OUTPUT calculateRoute(final INPUT input, final Context context);
 }

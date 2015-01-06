@@ -7,6 +7,6 @@ package org.jocean.xharbor.spi;
  * @author isdom
  *
  */
-public interface RouterUpdatable<ROUTECTX, RELAYCTX> {
-    public void updateRouter(final Router<ROUTECTX, RELAYCTX> router);
+public interface RouterUpdatable<INPUT, OUTPUT> {
+    public void updateRouter(final Router<INPUT, OUTPUT> router);
 }
