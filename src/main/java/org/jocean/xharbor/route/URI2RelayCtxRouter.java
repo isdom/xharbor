@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.xharbor.relay;
+package org.jocean.xharbor.route;
 
 import java.net.URI;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -12,8 +12,11 @@ import org.jocean.idiom.SimpleCache;
 import org.jocean.idiom.Triple;
 import org.jocean.idiom.Visitor2;
 import org.jocean.j2se.MBeanRegisterSupport;
+import org.jocean.xharbor.relay.RelayContext;
+import org.jocean.xharbor.relay.TimeInterval10ms_100ms_500ms_1s_5sImpl;
+import org.jocean.xharbor.relay.TimeIntervalMemo;
 import org.jocean.xharbor.relay.RelayContext.RelayMemo;
-import org.jocean.xharbor.route.URIs2RelayCtxRouter;
+import org.jocean.xharbor.spi.Router;
 
 /**
  * @author isdom
@@ -21,13 +24,31 @@ import org.jocean.xharbor.route.URIs2RelayCtxRouter;
  * 考虑 HTTP 请求的方法区分: GET/POST/PUT ...... 
  * 实现 Composite RelayMemo，包含 细粒度(path,relayTo) 以及 其上两级的 RelayMemo，分别为 全局 RelayMemo 以及 path 相关的 RelayMemo
  */
-public class MemoFactoryImpl implements URIs2RelayCtxRouter.MemoFactory {
+public class URI2RelayCtxRouter implements Router<URI, RelayContext> {
 
     @Override
-    public RelayMemo getRelayMemo(final String path, final URI relayTo) {
-        return this._memos.get(Pair.of(path, relayTo));
+    public RelayContext calculateRoute(final URI uri, final Context routectx) {
+        if (null != uri) {
+            final String path = routectx.getProperty("path");
+            final RelayContext.RelayMemo memo = this._memos.get(Pair.of(path, uri));
+            
+            return new RelayContext() {
+
+                @Override
+                public URI relayTo() {
+                    return uri;
+                }
+
+                @Override
+                public RelayMemo memo() {
+                    return memo;
+                }};
+        }
+        else {
+            return null;
+        }
     }
-    
+
     public static interface FunctionMXBean {
         public int getObtainingHttpClient();
         public int getTransferContent();

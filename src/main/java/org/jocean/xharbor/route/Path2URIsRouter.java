@@ -23,6 +23,8 @@ import org.jocean.xharbor.spi.Router;
  */
 public class Path2URIsRouter implements Router<String, URI[]>, RulesMXBean {
 
+    private static final URI[] EMPTY_URIS = new URI[0];
+
     @Override
     public String[] getRoutingRules() {
         return new ArrayList<String>() {
@@ -45,7 +47,7 @@ public class Path2URIsRouter implements Router<String, URI[]>, RulesMXBean {
                 return uris;
             }
         }
-        return new URI[0];
+        return EMPTY_URIS;
     }
 
     public void addRule(final int priority, final String uri, final String[] regexs) 
@@ -130,7 +132,7 @@ public class Path2URIsRouter implements Router<String, URI[]>, RulesMXBean {
                     }
                 }
             }
-            return ret.toArray(new URI[0]);
+            return ret.toArray(EMPTY_URIS);
         }
         
         private Collection<String> getRules() {
