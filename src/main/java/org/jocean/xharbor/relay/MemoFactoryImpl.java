@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.xharbor.relay.impl;
+package org.jocean.xharbor.relay;
 
 import java.net.URI;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -12,7 +12,8 @@ import org.jocean.idiom.SimpleCache;
 import org.jocean.idiom.Triple;
 import org.jocean.idiom.Visitor2;
 import org.jocean.j2se.MBeanRegisterSupport;
-import org.jocean.xharbor.relay.impl.RelayContext.RelayMemo;
+import org.jocean.xharbor.relay.RelayContext.RelayMemo;
+import org.jocean.xharbor.route.URIs2RelayCtxRouter;
 
 /**
  * @author isdom
@@ -20,7 +21,7 @@ import org.jocean.xharbor.relay.impl.RelayContext.RelayMemo;
  * 考虑 HTTP 请求的方法区分: GET/POST/PUT ...... 
  * 实现 Composite RelayMemo，包含 细粒度(path,relayTo) 以及 其上两级的 RelayMemo，分别为 全局 RelayMemo 以及 path 相关的 RelayMemo
  */
-public class MemoFactoryImpl implements DispatcherImpl.MemoFactory {
+public class MemoFactoryImpl implements URIs2RelayCtxRouter.MemoFactory {
 
     @Override
     public RelayMemo getRelayMemo(final String path, final URI relayTo) {

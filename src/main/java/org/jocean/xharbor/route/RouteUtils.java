@@ -1,15 +1,19 @@
 /**
  * 
  */
-package org.jocean.xharbor.route.impl;
+package org.jocean.xharbor.route;
 
+import java.net.URI;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 import org.apache.curator.framework.CuratorFramework;
+import org.jocean.event.api.EventReceiverSource;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.Pair;
-import org.jocean.xharbor.route.RouteProvider;
+import org.jocean.j2se.MBeanRegisterSupport;
+import org.jocean.xharbor.spi.Router;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,25 +28,72 @@ public class RouteUtils {
     private static final Logger LOG = LoggerFactory
             .getLogger(RouteUtils.class);
 
-    public static RouteProvider buildRouteProviderFromZK(final CuratorFramework client, final String path) 
+    public interface PathMXBean {
+        public String[] getRoutes();
+    }
+    
+    public static Router<String, Pair<String,URI[]>> buildCachedPathRouter(final String prefix, final EventReceiverSource source) {
+        final MBeanRegisterSupport routerMbeanSupport = 
+                new MBeanRegisterSupport(prefix, null);
+
+        final MBeanRegisterSupport pathMBeanSupport =
+                new MBeanRegisterSupport(prefix, null);
+      
+        return new CachedRouter<String, Pair<String,URI[]>>(source, 
+                new CachedRouter.OnRouterUpdated<String, Pair<String,URI[]>>() {
+                    @Override
+                    public void visit(final Router<String, Pair<String,URI[]>> prevImpl, final Router<String, Pair<String,URI[]>> newImpl)
+                            throws Exception {
+                      if ( null != prevImpl ) {
+                          routerMbeanSupport.unregisterMBean("name=routerImpl");
+                      }
+                      routerMbeanSupport.registerMBean("name=routerImpl", newImpl);
+                      pathMBeanSupport.unregisterAllMBeans();
+                        
+                    }}, 
+                new CachedRouter.OnRouted<String, Pair<String,URI[]>>() {
+                    @Override
+                    public void visit(final String path, final Pair<String,URI[]> ctx) throws Exception {
+                        if (!pathMBeanSupport.isRegistered("path=" + path)) {
+                            final String[] routesAsStringArray = new ArrayList<String>() {
+                                private static final long serialVersionUID = 1L;
+                                {
+                                    for (URI uri : ctx.getSecond()) {
+                                        this.add(uri.toString());
+                                    }
+                                }
+                            }.toArray(new String[0]);
+                            pathMBeanSupport.registerMBean("path=" + path,
+                                    new PathMXBean() {
+                                        @Override
+                                        public String[] getRoutes() {
+                                            return routesAsStringArray;
+                                        }
+                                    });
+                        }
+                        
+                    }});
+    }
+    
+    public static Router<String, Pair<String,URI[]>> buildPathRouterFromZK(final CuratorFramework client, final String path) 
             throws Exception {
-        final RouteProviderImpl routingRules = new RouteProviderImpl();
+        final Path2URIsRouter router = new Path2URIsRouter();
         final List<String> levels = client.getChildren().forPath(path);
         for ( String priority : levels ) {
             try {
-                addRules(client, routingRules, path + "/" + priority, Integer.parseInt(priority));
+                addRules(client, router, path + "/" + priority, Integer.parseInt(priority));
             }
             catch (NumberFormatException e) {
                 LOG.warn("invalid priority for can't convert to integer, detail: {}", 
                         ExceptionUtils.exception2detail(e));
             }
         }
-        return routingRules;
+        return router;
     }
 
     private static void addRules(
             final CuratorFramework client, 
-            final RouteProviderImpl routingRules,
+            final Path2URIsRouter router,
             final String pathToLevel,
             final int priority) throws Exception {
         final List<String> hosts = client.getChildren().forPath(pathToLevel);
@@ -51,7 +102,7 @@ public class RouteUtils {
                     generateRule(client, pathToLevel + "/" + host, host);
             if ( null != rule ) {
                 try {
-                    routingRules.addRule(priority, rule.getFirst(), rule.getSecond());
+                    router.addRule(priority, rule.getFirst(), rule.getSecond());
                 } catch (Exception e) {
                     LOG.warn("exception when add rule({}/{}) for level({}), detail:{}",
                             rule.getFirst(), Arrays.toString(rule.getSecond()), 

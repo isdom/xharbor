@@ -1,13 +1,13 @@
 /**
  * 
  */
-package org.jocean.xharbor.relay.impl;
+package org.jocean.xharbor.relay;
 
 import io.netty.channel.ChannelHandlerContext;
 
 import org.jocean.event.api.EventReceiverSource;
 import org.jocean.httpclient.HttpStack;
-import org.jocean.xharbor.relay.RelayAgent;
+import org.jocean.xharbor.spi.RelayAgent;
 
 /**
  * @author isdom

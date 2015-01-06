@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.xharbor.relay.impl;
+package org.jocean.xharbor.relay;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;

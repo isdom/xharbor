@@ -1,4 +1,7 @@
-package org.jocean.xharbor.route.impl;
+/**
+ * 
+ */
+package org.jocean.xharbor.route;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -12,10 +15,15 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
 
-import org.jocean.xharbor.route.RouteProvider;
+import org.jocean.idiom.Pair;
+import org.jocean.xharbor.spi.Router;
 
-public class RouteProviderImpl implements RouteProvider, RulesMXBean  {
-    
+/**
+ * @author isdom
+ *
+ */
+public class Path2URIsRouter implements Router<String, Pair<String,URI[]>>, RulesMXBean {
+
     @Override
     public String[] getRoutingRules() {
         return new ArrayList<String>() {
@@ -26,6 +34,19 @@ public class RouteProviderImpl implements RouteProvider, RulesMXBean  {
                 this.addAll(itr.next().getRules());
             }
         }}.toArray(new String[0]);
+    }
+    
+    @Override
+    public Pair<String,URI[]> calculateRoute(final String path) {
+        final Iterator<Level> itr = _levels.iterator();
+        while (itr.hasNext()) {
+            final Level level = itr.next();
+            final URI[] uris = level.match(path);
+            if ( null != uris && uris.length > 0 ) {
+                return Pair.of(path, uris);
+            }
+        }
+        return Pair.of(path,new URI[0]);
     }
 
     public void addRule(final int priority, final String uri, final String[] regexs) 
@@ -46,19 +67,6 @@ public class RouteProviderImpl implements RouteProvider, RulesMXBean  {
         return level;
     }
 
-    @Override
-    public URI[] calculateRoute(final String path) {
-        final Iterator<Level> itr = _levels.iterator();
-        while (itr.hasNext()) {
-            final Level level = itr.next();
-            final URI[] uris = level.match(path);
-            if ( null != uris && uris.length > 0 ) {
-                return uris;
-            }
-        }
-        return new URI[0];
-    }
-    
     private static class Level implements Comparable<Level> {
 
         public Level(final int priority) {

@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.xharbor.relay.impl;
+package org.jocean.xharbor.relay;
 
 import java.util.concurrent.atomic.AtomicInteger;
 

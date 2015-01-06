@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.xharbor.relay.impl;
+package org.jocean.xharbor.relay;
 
 import java.net.URI;
 
@@ -9,7 +9,7 @@ import java.net.URI;
  * @author isdom
  *
  */
-interface RelayContext {
+public interface RelayContext {
     
     public interface RelayMemo {
         public void incObtainingHttpClient();

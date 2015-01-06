@@ -3,6 +3,11 @@
  */
 package org.jocean.xharbor;
 
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.QueryStringDecoder;
+
+import java.net.URI;
+
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.framework.recipes.cache.TreeCache;
@@ -14,13 +19,17 @@ import org.jocean.event.extend.Runners;
 import org.jocean.event.extend.Services;
 import org.jocean.httpclient.HttpStack;
 import org.jocean.httpclient.impl.HttpUtils;
+import org.jocean.idiom.Pair;
 import org.jocean.idiom.pool.Pools;
 import org.jocean.netty.NettyClient;
-import org.jocean.xharbor.relay.RelayAgent;
-import org.jocean.xharbor.relay.impl.DispatcherImpl;
-import org.jocean.xharbor.relay.impl.MemoFactoryImpl;
-import org.jocean.xharbor.relay.impl.RelayAgentImpl;
-import org.jocean.xharbor.route.impl.RouteUtils;
+import org.jocean.xharbor.relay.MemoFactoryImpl;
+import org.jocean.xharbor.relay.RelayAgentImpl;
+import org.jocean.xharbor.relay.RelayContext;
+import org.jocean.xharbor.route.RouteUtils;
+import org.jocean.xharbor.route.URIs2RelayCtxRouter;
+import org.jocean.xharbor.spi.RelayAgent;
+import org.jocean.xharbor.spi.Router;
+import org.jocean.xharbor.spi.RouterUpdatable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.support.AbstractApplicationContext;
@@ -60,9 +69,9 @@ public class Main {
                 new NettyClient(4), 
                 100);
         
-        final HttpGatewayServer server = ctx.getBean(HttpGatewayServer.class);
+        final HttpGatewayServer<RelayContext> server = ctx.getBean(HttpGatewayServer.class);
         
-        final RelayAgent agent = new RelayAgentImpl(httpStack, source);
+        final RelayAgent<RelayContext> agent = new RelayAgentImpl(httpStack, source);
         server.setRelayAgent(agent);
         
         final CuratorFramework client = 
@@ -70,11 +79,26 @@ public class Main {
                         new ExponentialBackoffRetry(1000, 3));
         client.start();
         
-        final DispatcherImpl dispatcher = new DispatcherImpl(source, new MemoFactoryImpl());
+//        final DispatcherImpl dispatcher = new DispatcherImpl(source, new MemoFactoryImpl());
          
-        server.setHttpDispatcher(dispatcher);
+        final Router<String, Pair<String,URI[]>> cachedRouter = RouteUtils.buildCachedPathRouter("org.jocean:type=router", source);
+        ((RouterUpdatable<String, Pair<String,URI[]>>)cachedRouter).updateRouter(RouteUtils.buildPathRouterFromZK(client, "/demo"));
         
-        dispatcher.updateRouteProvider(RouteUtils.buildRouteProviderFromZK(client, "/demo"));
+        server.setRouter(new Router<HttpRequest, RelayContext>() {
+            
+            final URIs2RelayCtxRouter _router = new URIs2RelayCtxRouter(new MemoFactoryImpl());
+
+            @Override
+            public RelayContext calculateRoute(final HttpRequest request) {
+                final QueryStringDecoder decoder = new QueryStringDecoder(request.getUri());
+
+                final String path = decoder.path();
+                if ( LOG.isDebugEnabled()) {
+                    LOG.debug("dispatch for path:{}", path);
+                }
+                return _router.calculateRoute( cachedRouter.calculateRoute(path) );
+            }});
+        
         final TreeCache cache = TreeCache.newBuilder(client, "/demo").setCacheData(false).build();
         cache.getListenable().addListener(new TreeCacheListener() {
 
@@ -86,7 +110,7 @@ public class Main {
                 case NODE_UPDATED:
                 case NODE_REMOVED:
                     LOG.debug("childEvent: {} event received, rebuild dispatcher", event);
-                    dispatcher.updateRouteProvider(RouteUtils.buildRouteProviderFromZK(client, "/demo"));
+                    ((RouterUpdatable<String, Pair<String,URI[]>>)cachedRouter).updateRouter(RouteUtils.buildPathRouterFromZK(client, "/demo"));
                     break;
                 default:
                     LOG.debug("childEvent: {} event received.", event);

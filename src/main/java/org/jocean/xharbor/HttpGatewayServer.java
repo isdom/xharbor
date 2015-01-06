@@ -26,9 +26,9 @@ import java.io.IOException;
 
 import org.jocean.ext.netty.initializer.BaseInitializer;
 import org.jocean.idiom.ExceptionUtils;
-import org.jocean.xharbor.relay.HttpDispatcher;
-import org.jocean.xharbor.relay.RelayAgent;
-import org.jocean.xharbor.relay.RelayAgent.RelayTask;
+import org.jocean.xharbor.spi.RelayAgent;
+import org.jocean.xharbor.spi.RelayAgent.RelayTask;
+import org.jocean.xharbor.spi.Router;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,7 +61,7 @@ public class HttpGatewayServer<RELAYCTX> {
     
     private RelayAgent<RELAYCTX>  _relayAgent;
 //    private String _destUri = "http://127.0.0.1:8000";
-    private HttpDispatcher<RELAYCTX> _dispatcher = null;
+    private Router<HttpRequest, RELAYCTX> _router;
     
     /**
      * 负责处理来自终端的request到AccessCenterBiz
@@ -113,12 +113,7 @@ public class HttpGatewayServer<RELAYCTX> {
                     LOG.debug("messageReceived:{} default http request\n[{}]",ctx.channel(),request);
                 }
                 
-                if ( null == _dispatcher ) {
-                    LOG.warn("dispatcher is null, just ignore request {}", request);
-                    return;
-                }
-                
-                final RELAYCTX relayCtx = _dispatcher.dispatch(request);
+                final RELAYCTX relayCtx = _router.calculateRoute(request);
                 
                 if ( null == relayCtx ) {
                     LOG.warn("can't found matched dest uri for request {}, just ignore", request);
@@ -324,7 +319,7 @@ public class HttpGatewayServer<RELAYCTX> {
         this._relayAgent = agent;
     }
     
-    public void setHttpDispatcher(final HttpDispatcher<RELAYCTX> dispatcher) {
-        this._dispatcher = dispatcher;
+    public void setRouter(final Router<HttpRequest, RELAYCTX> router) {
+        this._router = router;
     }
 }
