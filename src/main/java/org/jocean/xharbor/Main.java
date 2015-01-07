@@ -25,7 +25,7 @@ import org.jocean.xharbor.route.Request2RoutingInfo;
 import org.jocean.xharbor.route.RouteUtils;
 import org.jocean.xharbor.route.RoutingInfo;
 import org.jocean.xharbor.route.SelectURI;
-import org.jocean.xharbor.route.URI2RelayCtx;
+import org.jocean.xharbor.route.URI2RelayCtxOfRoutingInfo;
 import org.jocean.xharbor.spi.RelayAgent;
 import org.jocean.xharbor.spi.Router;
 import org.jocean.xharbor.spi.RouterUpdatable;
@@ -85,7 +85,7 @@ public class Main {
                         new Function<RoutingInfo,String>() {
                             @Override
                             public String apply(final RoutingInfo info) {
-                                return "path=" + info.getPath() + ",method=" + info.getMethod();
+                                return "path=" + info.getPath() + ",method=" + info.getMethod()+",name=routes";
                             }});
         ((RouterUpdatable<RoutingInfo, URI[]>)cachedRouter).updateRouter(
                 RouteUtils.buildRoutingInfoRouterFromZK(client, "/demo"));
@@ -94,7 +94,7 @@ public class Main {
                 new Request2RoutingInfo(), RelayContext.class,
                 cachedRouter,
                 new SelectURI(),
-                new URI2RelayCtx()
+                new URI2RelayCtxOfRoutingInfo()
                 ));
         
         final TreeCache cache = TreeCache.newBuilder(client, "/demo").setCacheData(false).build();

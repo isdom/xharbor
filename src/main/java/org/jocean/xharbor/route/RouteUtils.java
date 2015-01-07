@@ -68,7 +68,7 @@ public class RouteUtils {
                     @Override
                     public void visit(final SimpleCache<INPUT, URI[]> cache)
                             throws Exception {
-                        routerMbeanSupport.registerMBean("name=table", new RoutesMXBean() {
+                        routerMbeanSupport.registerMBean("name=routes", new RoutesMXBean() {
                       @Override
                       public String[] getRoutes() {
                           return new ArrayList<String>() {
@@ -88,9 +88,9 @@ public class RouteUtils {
                     public void visit(final Router<INPUT, URI[]> prevImpl, final Router<INPUT, URI[]> newImpl)
                             throws Exception {
                       if ( null != prevImpl ) {
-                          routerMbeanSupport.unregisterMBean("name=routerImpl");
+                          routerMbeanSupport.unregisterMBean("name=rules");
                       }
-                      routerMbeanSupport.registerMBean("name=routerImpl", newImpl);
+                      routerMbeanSupport.registerMBean("name=rules", newImpl);
                       urisMBeanSupport.unregisterAllMBeans();
                         
                     }}, 
