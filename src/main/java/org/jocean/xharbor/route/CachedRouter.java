@@ -12,6 +12,7 @@ import org.jocean.event.api.annotation.OnEvent;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.Function;
 import org.jocean.idiom.SimpleCache;
+import org.jocean.idiom.Visitor;
 import org.jocean.idiom.Visitor2;
 import org.jocean.xharbor.spi.Router;
 import org.jocean.xharbor.spi.RouterUpdatable;
@@ -27,6 +28,10 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT>,
 
     private static final Logger LOG = LoggerFactory
             .getLogger(CachedRouter.class);
+    
+    public interface CacheVisitor<I, O> extends 
+        Visitor<SimpleCache<I, O>> {
+    }
     
     public interface OnRouterUpdated<I, O> extends 
         Visitor2<Router<I, O>,Router<I, O>> {
@@ -47,21 +52,17 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT>,
     }
 
     public CachedRouter(final EventReceiverSource source, 
+            final CacheVisitor<INPUT, OUTPUT> cacheVisitor,
             final OnRouterUpdated<INPUT, OUTPUT> onRouterUpdated, 
             final OnRouted<INPUT, OUTPUT> onRouted) {
-//        this._mbeanSupport.registerMBean("name=table", new RouteMXBean() {
-//            @Override
-//            public String[] getRoutes() {
-//                return new ArrayList<String>() {
-//                    private static final long serialVersionUID = 1L;
-//                {
-//                    final Iterator<Map.Entry<String, URI[]>> itr = _cache.snapshot().entrySet().iterator();
-//                    while (itr.hasNext()) {
-//                        final Map.Entry<String, URI[]> entry = itr.next();
-//                        this.add(entry.getKey() + "-->" + Arrays.toString( entry.getValue() ));
-//                    }
-//                }}.toArray(new String[0]);
-//            }});
+        if ( null != cacheVisitor ) {
+            try {
+                cacheVisitor.visit(this._cache);
+            } catch (Exception e) {
+                LOG.warn("exception when invoke cache visitor({}), detail:{}", 
+                        cacheVisitor, ExceptionUtils.exception2detail(e));
+            }
+        }
         
         this._onRouterUpdated = onRouterUpdated;
         this._onRouted = onRouted;
@@ -84,7 +85,9 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT>,
                 // clear all cached routing
                 _cache.clear();
                 try {
-                    _onRouterUpdated.visit(prevImpl, newImpl);
+                    if ( null != _onRouterUpdated ) {
+                        _onRouterUpdated.visit(prevImpl, newImpl);
+                    }
                 } catch (Exception e) {
                     LOG.warn("exception when call onCacheCleared({}), detail: {}",
                             _onRouterUpdated, ExceptionUtils.exception2detail(e));
@@ -96,7 +99,9 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT>,
             @OnEvent(event = "onRouted")
             private BizStep onRouted(final INPUT input) {
                 try {
-                    _onRouted.visit(input, _cache.get(input));
+                    if ( null != _onRouted ) {
+                        _onRouted.visit(input, _cache.get(input));
+                    }
                 } catch (Exception e) {
                     LOG.warn("exception when call onRouted({}) with ctx({}), detail: {}",
                             _onRouted, input, ExceptionUtils.exception2detail(e));

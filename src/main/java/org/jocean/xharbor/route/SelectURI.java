@@ -11,7 +11,7 @@ import org.jocean.xharbor.spi.Router;
  * @author isdom
  *
  */
-public class SelectURIRouter implements Router<URI[], URI> {
+public class SelectURI implements Router<URI[], URI> {
 
     @Override
     public URI calculateRoute(final URI[] uris, final Context context) {

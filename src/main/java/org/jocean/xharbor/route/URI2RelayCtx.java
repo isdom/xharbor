@@ -24,7 +24,7 @@ import org.jocean.xharbor.spi.Router;
  * 考虑 HTTP 请求的方法区分: GET/POST/PUT ...... 
  * 实现 Composite RelayMemo，包含 细粒度(path,relayTo) 以及 其上两级的 RelayMemo，分别为 全局 RelayMemo 以及 path 相关的 RelayMemo
  */
-public class URI2RelayCtxRouter implements Router<URI, RelayContext> {
+public class URI2RelayCtx implements Router<URI, RelayContext> {
 
     @Override
     public RelayContext calculateRoute(final URI uri, final Context routectx) {

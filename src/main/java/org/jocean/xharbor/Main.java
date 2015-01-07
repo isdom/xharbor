@@ -3,8 +3,6 @@
  */
 package org.jocean.xharbor;
 
-import io.netty.handler.codec.http.HttpRequest;
-
 import java.net.URI;
 
 import org.apache.curator.framework.CuratorFramework;
@@ -18,14 +16,16 @@ import org.jocean.event.extend.Runners;
 import org.jocean.event.extend.Services;
 import org.jocean.httpclient.HttpStack;
 import org.jocean.httpclient.impl.HttpUtils;
+import org.jocean.idiom.Function;
 import org.jocean.idiom.pool.Pools;
 import org.jocean.netty.NettyClient;
 import org.jocean.xharbor.relay.RelayAgentImpl;
 import org.jocean.xharbor.relay.RelayContext;
-import org.jocean.xharbor.route.Request2PathRouter;
+import org.jocean.xharbor.route.Request2RoutingInfo;
 import org.jocean.xharbor.route.RouteUtils;
-import org.jocean.xharbor.route.SelectURIRouter;
-import org.jocean.xharbor.route.URI2RelayCtxRouter;
+import org.jocean.xharbor.route.RoutingInfo;
+import org.jocean.xharbor.route.SelectURI;
+import org.jocean.xharbor.route.URI2RelayCtx;
 import org.jocean.xharbor.spi.RelayAgent;
 import org.jocean.xharbor.spi.Router;
 import org.jocean.xharbor.spi.RouterUpdatable;
@@ -78,16 +78,23 @@ public class Main {
                         new ExponentialBackoffRetry(1000, 3));
         client.start();
         
-//        final DispatcherImpl dispatcher = new DispatcherImpl(source, new MemoFactoryImpl());
-         
-        final Router<String, URI[]> cachedRouter = RouteUtils.buildCachedPathRouter("org.jocean:type=router", source);
-        ((RouterUpdatable<String, URI[]>)cachedRouter).updateRouter(RouteUtils.buildPathRouterFromZK(client, "/demo"));
+        final Router<RoutingInfo, URI[]> cachedRouter = 
+                RouteUtils.buildCachedURIsRouter(
+                        "org.jocean:type=router", 
+                        source, 
+                        new Function<RoutingInfo,String>() {
+                            @Override
+                            public String apply(final RoutingInfo info) {
+                                return "path=" + info.getPath() + ",method=" + info.getMethod();
+                            }});
+        ((RouterUpdatable<RoutingInfo, URI[]>)cachedRouter).updateRouter(
+                RouteUtils.buildRoutingInfoRouterFromZK(client, "/demo"));
         
         server.setRouter(RouteUtils.buildCompositeRouter(
-                new Request2PathRouter(), RelayContext.class,
+                new Request2RoutingInfo(), RelayContext.class,
                 cachedRouter,
-                new SelectURIRouter(),
-                new URI2RelayCtxRouter()
+                new SelectURI(),
+                new URI2RelayCtx()
                 ));
         
         final TreeCache cache = TreeCache.newBuilder(client, "/demo").setCacheData(false).build();
@@ -100,8 +107,9 @@ public class Main {
                 case NODE_ADDED:
                 case NODE_UPDATED:
                 case NODE_REMOVED:
-                    LOG.debug("childEvent: {} event received, rebuild dispatcher", event);
-                    ((RouterUpdatable<String, URI[]>)cachedRouter).updateRouter(RouteUtils.buildPathRouterFromZK(client, "/demo"));
+                    LOG.debug("childEvent: {} event received, rebuild router", event);
+                    ((RouterUpdatable<RoutingInfo, URI[]>)cachedRouter).updateRouter(
+                            RouteUtils.buildRoutingInfoRouterFromZK(client, "/demo"));
                     break;
                 default:
                     LOG.debug("childEvent: {} event received.", event);

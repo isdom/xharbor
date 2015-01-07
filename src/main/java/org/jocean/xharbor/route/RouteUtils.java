@@ -6,12 +6,16 @@ package org.jocean.xharbor.route;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.curator.framework.CuratorFramework;
 import org.jocean.event.api.EventReceiverSource;
 import org.jocean.idiom.ExceptionUtils;
+import org.jocean.idiom.Function;
 import org.jocean.idiom.Pair;
+import org.jocean.idiom.SimpleCache;
 import org.jocean.j2se.MBeanRegisterSupport;
 import org.jocean.xharbor.spi.Router;
 import org.slf4j.Logger;
@@ -45,33 +49,56 @@ public class RouteUtils {
             }};
     }
     
-    public interface PathMXBean {
+    public interface RoutesMXBean {
         public String[] getRoutes();
     }
     
-    public static Router<String, URI[]> buildCachedPathRouter(final String prefix, final EventReceiverSource source) {
+    public static <INPUT> Router<INPUT, URI[]> buildCachedURIsRouter(
+            final String prefix, 
+            final EventReceiverSource source, 
+            final Function<INPUT, String> input2objname) {
         final MBeanRegisterSupport routerMbeanSupport = 
                 new MBeanRegisterSupport(prefix, null);
 
-        final MBeanRegisterSupport pathMBeanSupport =
+        final MBeanRegisterSupport urisMBeanSupport =
                 new MBeanRegisterSupport(prefix, null);
       
-        return new CachedRouter<String, URI[]>(source, 
-                new CachedRouter.OnRouterUpdated<String, URI[]>() {
+        return new CachedRouter<INPUT, URI[]>(source, 
+                new CachedRouter.CacheVisitor<INPUT, URI[]>() {
                     @Override
-                    public void visit(final Router<String, URI[]> prevImpl, final Router<String, URI[]> newImpl)
+                    public void visit(final SimpleCache<INPUT, URI[]> cache)
+                            throws Exception {
+                        routerMbeanSupport.registerMBean("name=table", new RoutesMXBean() {
+                      @Override
+                      public String[] getRoutes() {
+                          return new ArrayList<String>() {
+                              private static final long serialVersionUID = 1L;
+                          {
+                              final Iterator<Map.Entry<INPUT, URI[]>> itr = cache.snapshot().entrySet().iterator();
+                              while (itr.hasNext()) {
+                                  final Map.Entry<INPUT, URI[]> entry = itr.next();
+                                  this.add(entry.getKey() + "-->" + Arrays.toString( entry.getValue() ));
+                              }
+                          }}.toArray(new String[0]);
+                      }});
+                    }
+                },
+                new CachedRouter.OnRouterUpdated<INPUT, URI[]>() {
+                    @Override
+                    public void visit(final Router<INPUT, URI[]> prevImpl, final Router<INPUT, URI[]> newImpl)
                             throws Exception {
                       if ( null != prevImpl ) {
                           routerMbeanSupport.unregisterMBean("name=routerImpl");
                       }
                       routerMbeanSupport.registerMBean("name=routerImpl", newImpl);
-                      pathMBeanSupport.unregisterAllMBeans();
+                      urisMBeanSupport.unregisterAllMBeans();
                         
                     }}, 
-                new CachedRouter.OnRouted<String, URI[]>() {
+                new CachedRouter.OnRouted<INPUT, URI[]>() {
                     @Override
-                    public void visit(final String path, final URI[] uris) throws Exception {
-                        if (!pathMBeanSupport.isRegistered("path=" + path)) {
+                    public void visit(final INPUT input, final URI[] uris) throws Exception {
+                        final String objname = input2objname.apply(input);
+                        if (!urisMBeanSupport.isRegistered(objname)) {
                             final String[] routesAsStringArray = new ArrayList<String>() {
                                 private static final long serialVersionUID = 1L;
                                 {
@@ -80,8 +107,8 @@ public class RouteUtils {
                                     }
                                 }
                             }.toArray(new String[0]);
-                            pathMBeanSupport.registerMBean("path=" + path,
-                                    new PathMXBean() {
+                            urisMBeanSupport.registerMBean(objname,
+                                    new RoutesMXBean() {
                                         @Override
                                         public String[] getRoutes() {
                                             return routesAsStringArray;
@@ -92,9 +119,10 @@ public class RouteUtils {
                     }});
     }
     
-    public static Router<String, URI[]> buildPathRouterFromZK(final CuratorFramework client, final String path) 
+    public static Router<RoutingInfo, URI[]> buildRoutingInfoRouterFromZK(
+            final CuratorFramework client, final String path) 
             throws Exception {
-        final Path2URIsRouter router = new Path2URIsRouter();
+        final RoutingInfo2URIs router = new RoutingInfo2URIs();
         final List<String> levels = client.getChildren().forPath(path);
         for ( String priority : levels ) {
             try {
@@ -110,12 +138,12 @@ public class RouteUtils {
 
     private static void addRules(
             final CuratorFramework client, 
-            final Path2URIsRouter router,
+            final RoutingInfo2URIs router,
             final String pathToLevel,
             final int priority) throws Exception {
         final List<String> hosts = client.getChildren().forPath(pathToLevel);
         for ( String host : hosts ) {
-            final Pair<String, String[]> rule = 
+            final Pair<String, RoutingInfo[]> rule = 
                     generateRule(client, pathToLevel + "/" + host, host);
             if ( null != rule ) {
                 try {
@@ -131,9 +159,25 @@ public class RouteUtils {
 
     public static class RuleDesc {
         
+        public static class InfoDesc implements RoutingInfo {
+
+            public String method;
+            public String path;
+            
+            @Override
+            public String getMethod() {
+                return method;
+            }
+
+            @Override
+            public String getPath() {
+                return path;
+            }
+        }
+        
         private String descrption;
         private String scheme;
-        private String[] regexs;
+        private InfoDesc[] regexs;
         
         @JSONField(name="descrption")
         public String getDescrption() {
@@ -156,17 +200,17 @@ public class RouteUtils {
         }
         
         @JSONField(name="regexs")
-        public String[] getRegexs() {
+        public InfoDesc[] getRegexs() {
             return regexs;
         }
         
         @JSONField(name="regexs")
-        public void setRegexs(String[] patterns) {
-            this.regexs = patterns;
+        public void setRegexs(InfoDesc[] regexs) {
+            this.regexs = regexs;
         }
     }
     
-    private static Pair<String, String[]> generateRule(
+    private static Pair<String, RoutingInfo[]> generateRule(
             final CuratorFramework client, 
             final String pathToHost, 
             final String host)
@@ -176,7 +220,8 @@ public class RouteUtils {
             final RuleDesc desc = JSON.parseObject(new String(content,  "UTF-8"), RuleDesc.class);
             if ( null != desc ) {
                 LOG.debug("generateRule for {}/{}", desc.getScheme(), Arrays.toString( desc.getRegexs() ) );
-                return Pair.of(desc.getScheme() + "://" + host, desc.getRegexs());
+                return Pair.of(desc.getScheme() + "://" + host,
+                        Arrays.asList( desc.getRegexs() ).toArray(new RoutingInfo[0]));
             }
         }
         return null;

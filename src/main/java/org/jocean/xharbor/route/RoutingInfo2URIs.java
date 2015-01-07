@@ -15,13 +15,14 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
 
+import org.jocean.idiom.Pair;
 import org.jocean.xharbor.spi.Router;
 
 /**
  * @author isdom
  *
  */
-public class Path2URIsRouter implements Router<String, URI[]>, RulesMXBean {
+public class RoutingInfo2URIs implements Router<RoutingInfo, URI[]>, RulesMXBean {
 
     private static final URI[] EMPTY_URIS = new URI[0];
 
@@ -38,11 +39,11 @@ public class Path2URIsRouter implements Router<String, URI[]>, RulesMXBean {
     }
     
     @Override
-    public URI[] calculateRoute(final String path, final Context routectx) {
+    public URI[] calculateRoute(final RoutingInfo info, final Context routectx) {
         final Iterator<Level> itr = _levels.iterator();
         while (itr.hasNext()) {
             final Level level = itr.next();
-            final URI[] uris = level.match(path);
+            final URI[] uris = level.match(info);
             if ( null != uris && uris.length > 0 ) {
                 return uris;
             }
@@ -50,9 +51,9 @@ public class Path2URIsRouter implements Router<String, URI[]>, RulesMXBean {
         return EMPTY_URIS;
     }
 
-    public void addRule(final int priority, final String uri, final String[] regexs) 
+    public void addRule(final int priority, final String uri, final RoutingInfo[] infoRegexs) 
             throws Exception {
-        getOrCreateLevel(priority).addRule(uri, regexs);
+        getOrCreateLevel(priority).addRule(uri, infoRegexs);
     }
     
     private Level getOrCreateLevel(final int priority) {
@@ -113,42 +114,70 @@ public class Path2URIsRouter implements Router<String, URI[]>, RulesMXBean {
             return this._priority;
         }
 
-        public void addRule(final String uri, final String[] regexs) throws Exception {
-            final Pattern[] patterns = new Pattern[regexs.length];
-            for ( int idx = 0; idx < regexs.length; idx++) {
-                patterns[idx] = Pattern.compile(regexs[idx]);
+        public void addRule(final String uri, final RoutingInfo[] infoRegexs) throws Exception {
+            final Pattern[] methodPatterns = new Pattern[infoRegexs.length];
+            final Pattern[] pathPatterns = new Pattern[infoRegexs.length];
+            for ( int idx = 0; idx < infoRegexs.length; idx++) {
+                methodPatterns[idx] = safeCompilePattern(infoRegexs[idx].getMethod());
+                pathPatterns[idx] = safeCompilePattern(infoRegexs[idx].getPath());
             }
-            this._rules.put(new URI(uri), patterns);
+            this._rules.put(new URI(uri), Pair.of(methodPatterns, pathPatterns));
+        }
+
+        /**
+         * @param regex
+         * @return
+         */
+        private static Pattern safeCompilePattern(final String regex) {
+            return null != regex ? Pattern.compile(regex) : null;
         }
         
-        private URI[] match(final String path) {
+        private URI[] match(final RoutingInfo info) {
             final List<URI> ret = new ArrayList<URI>();
             
-            for ( Map.Entry<URI, Pattern[]> entry : this._rules.entrySet() ) {
-                final Pattern[] patterns = entry.getValue();
-                for (Pattern p : patterns) {
-                    if ( p.matcher(path).find() ) {
+            for ( Map.Entry<URI, Pair<Pattern[],Pattern[]>> entry : this._rules.entrySet() ) {
+                final Pattern[] methodPatterns = entry.getValue().getFirst();
+                final Pattern[] pathPatterns = entry.getValue().getSecond();
+                for (int idx = 0; idx < methodPatterns.length; idx++) {
+                    final Pattern methodPattern = methodPatterns[idx];
+                    final Pattern pathPattern = pathPatterns[idx];
+                    if ( isMatched(methodPattern, info.getMethod()) 
+                            && isMatched(pathPattern, info.getPath()) ) {
                         ret.add(entry.getKey());
+                        break;
                     }
                 }
             }
-            return ret.toArray(EMPTY_URIS);
+            return !ret.isEmpty() ? ret.toArray(EMPTY_URIS) : EMPTY_URIS;
+        }
+
+        /**
+         * @param pattern
+         * @param content
+         * @return
+         */
+        private static boolean isMatched(final Pattern pattern, final String content) {
+            return pattern != null ? pattern.matcher(content).find() : true;
         }
         
         private Collection<String> getRules() {
             return new ArrayList<String>() {
                 private static final long serialVersionUID = 1L;
             {
-                for ( Map.Entry<URI, Pattern[]> entry : _rules.entrySet() ) {
-                    final Pattern[] patterns = entry.getValue();
-                    this.add(Integer.toString(_priority) + ":" + entry.getKey().toString() + ":" + Arrays.toString(patterns)); 
+                for ( Map.Entry<URI, Pair<Pattern[],Pattern[]>> entry : _rules.entrySet() ) {
+                    final Pair<Pattern[],Pattern[]> pair = entry.getValue();
+                    this.add(Integer.toString(_priority) + ":" + entry.getKey().toString() 
+                            + ":methods" + Arrays.toString(pair.getFirst())
+                            + ",paths" + Arrays.toString(pair.getSecond())
+                    ); 
                 }
             }};
         }
         
         private final int _priority;
         
-        private final Map<URI, Pattern[]> _rules = new HashMap<URI, Pattern[]>();
+        private final Map<URI, Pair<Pattern[],Pattern[]>> _rules = 
+                new HashMap<URI, Pair<Pattern[],Pattern[]>>();
 
     }
 
