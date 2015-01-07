@@ -83,20 +83,12 @@ public class Main {
         final Router<String, URI[]> cachedRouter = RouteUtils.buildCachedPathRouter("org.jocean:type=router", source);
         ((RouterUpdatable<String, URI[]>)cachedRouter).updateRouter(RouteUtils.buildPathRouterFromZK(client, "/demo"));
         
-        final Request2PathRouter req2path = new Request2PathRouter();
-        final SelectURIRouter selecturi = new SelectURIRouter();
-        final URI2RelayCtxRouter uri2relay = new URI2RelayCtxRouter();
-        
-        server.setRouter(new Router<HttpRequest, RelayContext>() {
-
-            @Override
-            public RelayContext calculateRoute(final HttpRequest request, final Context routectx) {
-                return uri2relay.calculateRoute( 
-                        selecturi.calculateRoute( 
-                                cachedRouter.calculateRoute(
-                                        req2path.calculateRoute(request, routectx), 
-                                            routectx), routectx ), routectx);
-            }});
+        server.setRouter(RouteUtils.buildCompositeRouter(
+                new Request2PathRouter(), RelayContext.class,
+                cachedRouter,
+                new SelectURIRouter(),
+                new URI2RelayCtxRouter()
+                ));
         
         final TreeCache cache = TreeCache.newBuilder(client, "/demo").setCacheData(false).build();
         cache.getListenable().addListener(new TreeCacheListener() {
