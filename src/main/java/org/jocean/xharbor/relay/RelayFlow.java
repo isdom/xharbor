@@ -36,7 +36,8 @@ import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.ValidationId;
 import org.jocean.idiom.block.Blob;
-import org.jocean.xharbor.relay.RelayContext.STATE;
+import org.jocean.xharbor.relay.RelayContext.STEP;
+import org.jocean.xharbor.relay.RelayContext.RESULT;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -156,8 +157,8 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
         private BizStep sendHttpRequest(final HttpRequest httpRequest) {
 
             _watch4Step.start();
-            _watch4Whole.start();
-            _relayCtx.memo().beginBizStep(STATE.OBTAINING_HTTPCLIENT);
+            _watch4Result.start();
+            _relayCtx.memo().beginBizStep(STEP.OBTAINING_HTTPCLIENT);
             _httpRequest = httpRequest;
             updateTransferHttpRequestState(_httpRequest);
             
@@ -168,7 +169,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
         public void run() {
-            _relayCtx.memo().incBizResult(STATE.SOURCE_CANCELED, -1);
+            _relayCtx.memo().incBizResult(RESULT.SOURCE_CANCELED, -1);
         }})))
     .freeze();
 
@@ -190,8 +191,8 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
                 return currentEventHandler();
             }
 
-            _relayCtx.memo().endBizStep(STATE.OBTAINING_HTTPCLIENT, _watch4Step.stopAndRestart());
-            _relayCtx.memo().beginBizStep(STATE.TRANSFER_CONTENT);
+            _relayCtx.memo().endBizStep(STEP.OBTAINING_HTTPCLIENT, _watch4Step.stopAndRestart());
+            _relayCtx.memo().beginBizStep(STEP.TRANSFER_CONTENT);
             
             if (LOG.isDebugEnabled()) {
                 LOG.debug("send http request {} & contents size: {}", _httpRequest, _contents.size());
@@ -226,9 +227,9 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
                 return TRANSFERCONTENT;
             }
             else {
-                _relayCtx.memo().endBizStep(STATE.TRANSFER_CONTENT, _watch4Step.stopAndRestart());
+                _relayCtx.memo().endBizStep(STEP.TRANSFER_CONTENT, _watch4Step.stopAndRestart());
                 tryStartForceFinishedTimer();
-                _relayCtx.memo().beginBizStep(STATE.RECV_RESP);
+                _relayCtx.memo().beginBizStep(STEP.RECV_RESP);
                 return RECVRESP;
             }
         }
@@ -236,14 +237,14 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
     .handler(handlersOf(new ONHTTPLOST(new Runnable() {
         @Override
         public void run() {
-            _relayCtx.memo().endBizStep(STATE.OBTAINING_HTTPCLIENT, -1);
-            _relayCtx.memo().incBizResult(STATE.CONNECTDESTINATION_FAILURE, _watch4Whole.stopAndRestart());
+            _relayCtx.memo().endBizStep(STEP.OBTAINING_HTTPCLIENT, -1);
+            _relayCtx.memo().incBizResult(RESULT.CONNECTDESTINATION_FAILURE, _watch4Result.stopAndRestart());
         }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
         public void run() {
-            _relayCtx.memo().endBizStep(STATE.OBTAINING_HTTPCLIENT, -1);
-            _relayCtx.memo().incBizResult(STATE.SOURCE_CANCELED, _watch4Whole.stopAndRestart());
+            _relayCtx.memo().endBizStep(STEP.OBTAINING_HTTPCLIENT, -1);
+            _relayCtx.memo().incBizResult(RESULT.SOURCE_CANCELED, _watch4Result.stopAndRestart());
         }})))
     .freeze();
 
@@ -267,8 +268,8 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
             }
             else {
                 tryStartForceFinishedTimer();
-                _relayCtx.memo().endBizStep(STATE.TRANSFER_CONTENT, _watch4Step.stopAndRestart());
-                _relayCtx.memo().beginBizStep(STATE.RECV_RESP);
+                _relayCtx.memo().endBizStep(STEP.TRANSFER_CONTENT, _watch4Step.stopAndRestart());
+                _relayCtx.memo().beginBizStep(STEP.RECV_RESP);
                 return RECVRESP;
             }
         }
@@ -276,14 +277,14 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
     .handler(handlersOf(new ONHTTPLOST(new Runnable() {
         @Override
         public void run() {
-            _relayCtx.memo().endBizStep(STATE.TRANSFER_CONTENT, -1);
-            _relayCtx.memo().incBizResult(STATE.RELAY_FAILURE, _watch4Whole.stopAndRestart());
+            _relayCtx.memo().endBizStep(STEP.TRANSFER_CONTENT, -1);
+            _relayCtx.memo().incBizResult(RESULT.RELAY_FAILURE, _watch4Result.stopAndRestart());
         }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
         public void run() {
-            _relayCtx.memo().endBizStep(STATE.TRANSFER_CONTENT, -1);
-            _relayCtx.memo().incBizResult(STATE.SOURCE_CANCELED, _watch4Whole.stopAndRestart());
+            _relayCtx.memo().endBizStep(STEP.TRANSFER_CONTENT, -1);
+            _relayCtx.memo().incBizResult(RESULT.SOURCE_CANCELED, _watch4Result.stopAndRestart());
         }})))
     .freeze();
         
@@ -304,14 +305,14 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
     .handler(handlersOf(new ONHTTPLOST(new Runnable() {
         @Override
         public void run() {
-            _relayCtx.memo().endBizStep(STATE.RECV_RESP, -1);
-            _relayCtx.memo().incBizResult(STATE.RELAY_FAILURE, _watch4Whole.stopAndRestart());
+            _relayCtx.memo().endBizStep(STEP.RECV_RESP, -1);
+            _relayCtx.memo().incBizResult(RESULT.RELAY_FAILURE, _watch4Result.stopAndRestart());
         }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
         public void run() {
-            _relayCtx.memo().endBizStep(STATE.RECV_RESP, -1);
-            _relayCtx.memo().incBizResult(STATE.SOURCE_CANCELED, _watch4Whole.stopAndRestart());
+            _relayCtx.memo().endBizStep(STEP.RECV_RESP, -1);
+            _relayCtx.memo().incBizResult(RESULT.SOURCE_CANCELED, _watch4Result.stopAndRestart());
         }})))
     .freeze();
 
@@ -334,7 +335,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
                 return currentEventHandler();
             }
 
-            _relayCtx.memo().endBizStep(STATE.RECV_RESP, _watch4Step.stopAndRestart());
+            _relayCtx.memo().endBizStep(STEP.RECV_RESP, _watch4Step.stopAndRestart());
             
             //  release relay's http client
             safeDetachHttp();
@@ -344,7 +345,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
             if ( !HttpHeaders.isKeepAlive( _httpRequest ) ) {
                 future.addListener(ChannelFutureListener.CLOSE);
             }
-            _relayCtx.memo().incBizResult(STATE.RELAY_SUCCESS, _watch4Whole.stopAndRestart());
+            _relayCtx.memo().incBizResult(RESULT.RELAY_SUCCESS, _watch4Result.stopAndRestart());
             return null;
         }
 
@@ -367,14 +368,14 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
     .handler(handlersOf(new ONHTTPLOST(new Runnable() {
         @Override
         public void run() {
-            _relayCtx.memo().endBizStep(STATE.RECV_RESP, -1);
-            _relayCtx.memo().incBizResult(STATE.RELAY_FAILURE, _watch4Whole.stopAndRestart());
+            _relayCtx.memo().endBizStep(STEP.RECV_RESP, -1);
+            _relayCtx.memo().incBizResult(RESULT.RELAY_FAILURE, _watch4Result.stopAndRestart());
         }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
         public void run() {
-            _relayCtx.memo().endBizStep(STATE.RECV_RESP, -1);
-            _relayCtx.memo().incBizResult(STATE.SOURCE_CANCELED, _watch4Whole.stopAndRestart());
+            _relayCtx.memo().endBizStep(STEP.RECV_RESP, -1);
+            _relayCtx.memo().incBizResult(RESULT.SOURCE_CANCELED, _watch4Result.stopAndRestart());
         }})))
     .freeze();
 
@@ -500,5 +501,5 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
     private Detachable _forceFinishedTimer;
     private long _timeoutFromActived = -1;
     private final StopWatch _watch4Step = new StopWatch();
-    private final StopWatch _watch4Whole = new StopWatch();
+    private final StopWatch _watch4Result = new StopWatch();
 }

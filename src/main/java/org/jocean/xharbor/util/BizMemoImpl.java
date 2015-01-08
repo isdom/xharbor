@@ -4,7 +4,6 @@
 package org.jocean.xharbor.util;
 
 import java.lang.reflect.Array;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -16,67 +15,83 @@ import org.slf4j.LoggerFactory;
  * @author isdom
  *
  */
-public abstract class BizMemoImpl<IMPL extends BizMemoImpl<?,E>, E extends Enum<?>> implements BizMemo<E> {
+public abstract class BizMemoImpl<IMPL extends BizMemoImpl<?,STEP,RESULT>, 
+    STEP extends Enum<?>, RESULT extends Enum<?>> 
+    implements BizMemo<STEP,RESULT> {
     
     private static final Logger LOG = LoggerFactory
             .getLogger(BizMemoImpl.class);
     
-    public BizMemoImpl(final Class<E> clsEnum) {
-        this._counters = new AtomicInteger[getValuesOf(clsEnum).length];
-        this._memos = new TimeIntervalMemo[this._counters.length];
-        for ( int idx = 0; idx < this._counters.length; idx++) {
-            this._counters[idx] = new AtomicInteger(0);
-            this._memos[idx] = TimeIntervalMemo.NOP;
+    public BizMemoImpl(final Class<STEP> clsStep, final Class<RESULT> clsResult) {
+        this._stepCounters = new AtomicInteger[getValuesOf(clsStep).length];
+        this._stepMemos = new TimeIntervalMemo[this._stepCounters.length];
+        this._resultCounters = new AtomicInteger[getValuesOf(clsResult).length];
+        this._resultMemos = new TimeIntervalMemo[this._resultCounters.length];
+        initCountersAndMemos(this._stepCounters, this._stepMemos);
+        initCountersAndMemos(this._resultCounters, this._resultMemos);
+    }
+
+    private static void initCountersAndMemos(
+            final AtomicInteger[] counters, 
+            final TimeIntervalMemo[] memos) {
+        for ( int idx = 0; idx < counters.length; idx++) {
+            counters[idx] = new AtomicInteger(0);
+            memos[idx] = TimeIntervalMemo.NOP;
         }
     }
 
-    /**
-     * @param clsEnum
-     * @return
-     * @throws NoSuchMethodException
-     * @throws IllegalAccessException
-     * @throws InvocationTargetException
-     */
     @SuppressWarnings("unchecked")
-    private E[] getValuesOf(final Class<E> clsEnum) {
+    private static <T> T[] getValuesOf(final Class<T> cls) {
         try {
-            final Method valuesMethod = clsEnum.getDeclaredMethod("values");
-            final E[] values = (E[])valuesMethod.invoke(null);
+            final Method valuesMethod = cls.getDeclaredMethod("values");
+            final T[] values = (T[])valuesMethod.invoke(null);
             return values;
         } catch (Exception e) {
             LOG.error("exception when invoke enum({})'s static method values, detail:{}",
-                    clsEnum, ExceptionUtils.exception2detail(e));
-            return (E[]) Array.newInstance(clsEnum, 0);
+                    cls, ExceptionUtils.exception2detail(e));
+            return (T[]) Array.newInstance(cls, 0);
         }
     }
 
     @Override
-    public void beginBizStep(final E step) {
-        this._counters[step.ordinal()].incrementAndGet();
+    public void beginBizStep(final STEP step) {
+        this._stepCounters[step.ordinal()].incrementAndGet();
     }
 
     @Override
-    public void endBizStep(final E step, final long ttl) {
-        this._counters[step.ordinal()].decrementAndGet();
-        this._memos[step.ordinal()].recordInterval(ttl);
+    public void endBizStep(final STEP step, final long ttl) {
+        this._stepCounters[step.ordinal()].decrementAndGet();
+        this._stepMemos[step.ordinal()].recordInterval(ttl);
     }
 
     @Override
-    public void incBizResult(final E result, final long ttl) {
-        this._counters[result.ordinal()].incrementAndGet();
-        this._memos[result.ordinal()].recordInterval(ttl);
+    public void incBizResult(final RESULT result, final long ttl) {
+        this._resultCounters[result.ordinal()].incrementAndGet();
+        this._resultMemos[result.ordinal()].recordInterval(ttl);
     }
     
-    protected AtomicInteger enum2Counter(final E e) {
-        return this._counters[e.ordinal()];
+    protected AtomicInteger step2Counter(final STEP step) {
+        return this._stepCounters[step.ordinal()];
+    }
+    
+    protected AtomicInteger result2Counter(final RESULT result) {
+        return this._resultCounters[result.ordinal()];
     }
     
     @SuppressWarnings("unchecked")
-    public IMPL setTimeIntervalMemoOfEnum(final E e, final TimeIntervalMemo memo) {
-        this._memos[e.ordinal()] = memo;
+    public IMPL setTimeIntervalMemoOfStep(final STEP step, final TimeIntervalMemo memo) {
+        this._stepMemos[step.ordinal()] = memo;
         return (IMPL)this;
     }
     
-    private final AtomicInteger[] _counters;
-    private final TimeIntervalMemo[] _memos;
-}
+    @SuppressWarnings("unchecked")
+    public IMPL setTimeIntervalMemoOfResult(final RESULT result, final TimeIntervalMemo memo) {
+        this._resultMemos[result.ordinal()] = memo;
+        return (IMPL)this;
+    }
+    
+    private final AtomicInteger[] _stepCounters;
+    private final TimeIntervalMemo[] _stepMemos;
+    private final AtomicInteger[] _resultCounters;
+    private final TimeIntervalMemo[] _resultMemos;
+    }

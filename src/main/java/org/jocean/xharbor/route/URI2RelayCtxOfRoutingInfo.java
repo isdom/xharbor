@@ -14,7 +14,8 @@ import org.jocean.idiom.Visitor2;
 import org.jocean.j2se.MBeanRegisterSupport;
 import org.jocean.xharbor.relay.RelayContext;
 import org.jocean.xharbor.relay.RelayContext.RelayMemo;
-import org.jocean.xharbor.relay.RelayContext.STATE;
+import org.jocean.xharbor.relay.RelayContext.STEP;
+import org.jocean.xharbor.relay.RelayContext.RESULT;
 import org.jocean.xharbor.spi.Router;
 import org.jocean.xharbor.util.BizMemoImpl;
 import org.jocean.xharbor.util.TimeInterval10ms_100ms_500ms_1s_5sImpl;
@@ -68,39 +69,39 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
         public int getConnectDestinationFailure();
     }
     
-    private static class MemoImpl extends BizMemoImpl<MemoImpl, STATE> 
+    private static class MemoImpl extends BizMemoImpl<MemoImpl, STEP, RESULT> 
         implements RelayMemo, FunctionMXBean {
         
         public MemoImpl() {
-            super(STATE.class);
+            super(STEP.class, RESULT.class);
         }
 
         public int getObtainingHttpClient() {
-            return this.enum2Counter(STATE.OBTAINING_HTTPCLIENT).get();
+            return this.step2Counter(STEP.OBTAINING_HTTPCLIENT).get();
         }
         
         public int getTransferContent() {
-            return this.enum2Counter(STATE.TRANSFER_CONTENT).get();
+            return this.step2Counter(STEP.TRANSFER_CONTENT).get();
         }
         
         public int getRecvResp() {
-            return this.enum2Counter(STATE.RECV_RESP).get();
+            return this.step2Counter(STEP.RECV_RESP).get();
         }
         
         public int getRelaySuccess() {
-            return this.enum2Counter(STATE.RELAY_SUCCESS).get();
+            return this.result2Counter(RESULT.RELAY_SUCCESS).get();
         }
         
         public int getRelayFailure() {
-            return this.enum2Counter(STATE.RELAY_FAILURE).get();
+            return this.result2Counter(RESULT.RELAY_FAILURE).get();
         }
         
         public int getSourceCanceled() {
-            return this.enum2Counter(STATE.SOURCE_CANCELED).get();
+            return this.result2Counter(RESULT.SOURCE_CANCELED).get();
         }
         
         public int getConnectDestinationFailure() {
-            return this.enum2Counter(STATE.CONNECTDESTINATION_FAILURE).get();
+            return this.result2Counter(RESULT.CONNECTDESTINATION_FAILURE).get();
         }
     }
     
@@ -135,19 +136,19 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
         @Override
         public RelayMemo apply(final Pair<RoutingInfo, URI> input) {
             return new MemoImpl()
-                .setTimeIntervalMemoOfEnum(STATE.OBTAINING_HTTPCLIENT,
+                .setTimeIntervalMemoOfStep(STEP.OBTAINING_HTTPCLIENT,
                     _level3TTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), Pair.of("step","obtainingHttpClient"))))
-                .setTimeIntervalMemoOfEnum(STATE.TRANSFER_CONTENT,
+                .setTimeIntervalMemoOfStep(STEP.TRANSFER_CONTENT,
                     _level3TTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), Pair.of("step","transferContent"))))
-                .setTimeIntervalMemoOfEnum(STATE.RECV_RESP,
+                .setTimeIntervalMemoOfStep(STEP.RECV_RESP,
                     _level3TTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), Pair.of("step","recvResp"))))
-                .setTimeIntervalMemoOfEnum(STATE.RELAY_SUCCESS,
+                .setTimeIntervalMemoOfResult(RESULT.RELAY_SUCCESS,
                     _level3TTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), Pair.of("whole","relaySuccess"))))
-                .setTimeIntervalMemoOfEnum(STATE.SOURCE_CANCELED,
+                .setTimeIntervalMemoOfResult(RESULT.SOURCE_CANCELED,
                     _level3TTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), Pair.of("whole","sourceCanceled"))))
-                .setTimeIntervalMemoOfEnum(STATE.CONNECTDESTINATION_FAILURE,
+                .setTimeIntervalMemoOfResult(RESULT.CONNECTDESTINATION_FAILURE,
                     _level3TTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), Pair.of("whole","connectDestinationFailure"))))
-                .setTimeIntervalMemoOfEnum(STATE.RELAY_FAILURE,
+                .setTimeIntervalMemoOfResult(RESULT.RELAY_FAILURE,
                     _level3TTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), Pair.of("whole","relayFailure"))));
         }};
 
@@ -193,19 +194,19 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
         @Override
         public RelayMemo apply(final RoutingInfo input) {
             return new MemoImpl()
-                .setTimeIntervalMemoOfEnum(STATE.OBTAINING_HTTPCLIENT,
+                .setTimeIntervalMemoOfStep(STEP.OBTAINING_HTTPCLIENT,
                     _level2TTLMemos.get(Pair.of(input, Pair.of("step","obtainingHttpClient"))))
-                .setTimeIntervalMemoOfEnum(STATE.TRANSFER_CONTENT,
+                .setTimeIntervalMemoOfStep(STEP.TRANSFER_CONTENT,
                     _level2TTLMemos.get(Pair.of(input, Pair.of("step","transferContent"))))
-                .setTimeIntervalMemoOfEnum(STATE.RECV_RESP,
+                .setTimeIntervalMemoOfStep(STEP.RECV_RESP,
                     _level2TTLMemos.get(Pair.of(input, Pair.of("step","recvResp"))))
-                .setTimeIntervalMemoOfEnum(STATE.RELAY_SUCCESS,
+                .setTimeIntervalMemoOfResult(RESULT.RELAY_SUCCESS,
                     _level2TTLMemos.get(Pair.of(input, Pair.of("whole","relaySuccess"))))
-                .setTimeIntervalMemoOfEnum(STATE.SOURCE_CANCELED,
+                .setTimeIntervalMemoOfResult(RESULT.SOURCE_CANCELED,
                     _level2TTLMemos.get(Pair.of(input, Pair.of("whole","sourceCanceled"))))
-                .setTimeIntervalMemoOfEnum(STATE.CONNECTDESTINATION_FAILURE,
+                .setTimeIntervalMemoOfResult(RESULT.CONNECTDESTINATION_FAILURE,
                     _level2TTLMemos.get(Pair.of(input, Pair.of("whole","connectDestinationFailure"))))
-                .setTimeIntervalMemoOfEnum(STATE.RELAY_FAILURE,
+                .setTimeIntervalMemoOfResult(RESULT.RELAY_FAILURE,
                     _level2TTLMemos.get(Pair.of(input, Pair.of("whole","relayFailure"))));
         }};
         
@@ -249,19 +250,19 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
         @Override
         public RelayMemo apply(final String path) {
             return new MemoImpl()
-            .setTimeIntervalMemoOfEnum(STATE.OBTAINING_HTTPCLIENT,
+            .setTimeIntervalMemoOfStep(STEP.OBTAINING_HTTPCLIENT,
                     _level1TTLMemos.get(Pair.of(path, Pair.of("step","obtainingHttpClient"))))
-            .setTimeIntervalMemoOfEnum(STATE.TRANSFER_CONTENT,
+            .setTimeIntervalMemoOfStep(STEP.TRANSFER_CONTENT,
                     _level1TTLMemos.get(Pair.of(path, Pair.of("step","transferContent"))))
-            .setTimeIntervalMemoOfEnum(STATE.RECV_RESP,
+            .setTimeIntervalMemoOfStep(STEP.RECV_RESP,
                     _level1TTLMemos.get(Pair.of(path, Pair.of("step","recvResp"))))
-            .setTimeIntervalMemoOfEnum(STATE.RELAY_SUCCESS,
+            .setTimeIntervalMemoOfResult(RESULT.RELAY_SUCCESS,
                     _level1TTLMemos.get(Pair.of(path, Pair.of("whole","relaySuccess"))))
-            .setTimeIntervalMemoOfEnum(STATE.SOURCE_CANCELED,
+            .setTimeIntervalMemoOfResult(RESULT.SOURCE_CANCELED,
                     _level1TTLMemos.get(Pair.of(path, Pair.of("whole","sourceCanceled"))))
-            .setTimeIntervalMemoOfEnum(STATE.CONNECTDESTINATION_FAILURE,
+            .setTimeIntervalMemoOfResult(RESULT.CONNECTDESTINATION_FAILURE,
                     _level1TTLMemos.get(Pair.of(path, Pair.of("whole","connectDestinationFailure"))))
-            .setTimeIntervalMemoOfEnum(STATE.RELAY_FAILURE,
+            .setTimeIntervalMemoOfResult(RESULT.RELAY_FAILURE,
                     _level1TTLMemos.get(Pair.of(path, Pair.of("whole","relayFailure"))));
         }};
         
@@ -297,18 +298,18 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
                     }});
 
     private RelayMemo _level0Memo = new MemoImpl()
-            .setTimeIntervalMemoOfEnum(STATE.OBTAINING_HTTPCLIENT,
+            .setTimeIntervalMemoOfStep(STEP.OBTAINING_HTTPCLIENT,
                     _level0TTLMemos.get(Pair.of("step","obtainingHttpClient")))
-            .setTimeIntervalMemoOfEnum(STATE.TRANSFER_CONTENT,
+            .setTimeIntervalMemoOfStep(STEP.TRANSFER_CONTENT,
                     _level0TTLMemos.get(Pair.of("step","transferContent")))
-            .setTimeIntervalMemoOfEnum(STATE.RECV_RESP,
+            .setTimeIntervalMemoOfStep(STEP.RECV_RESP,
                     _level0TTLMemos.get(Pair.of("step","recvResp")))
-            .setTimeIntervalMemoOfEnum(STATE.RELAY_SUCCESS,
+            .setTimeIntervalMemoOfResult(RESULT.RELAY_SUCCESS,
                     _level0TTLMemos.get(Pair.of("whole","relaySuccess")))
-            .setTimeIntervalMemoOfEnum(STATE.SOURCE_CANCELED,
+            .setTimeIntervalMemoOfResult(RESULT.SOURCE_CANCELED,
                     _level0TTLMemos.get(Pair.of("whole","sourceCanceled")))
-            .setTimeIntervalMemoOfEnum(STATE.CONNECTDESTINATION_FAILURE,
+            .setTimeIntervalMemoOfResult(RESULT.CONNECTDESTINATION_FAILURE,
                     _level0TTLMemos.get(Pair.of("whole","connectDestinationFailure")))
-            .setTimeIntervalMemoOfEnum(STATE.RELAY_FAILURE,
+            .setTimeIntervalMemoOfResult(RESULT.RELAY_FAILURE,
                     _level0TTLMemos.get(Pair.of("whole","relayFailure")));
 }
