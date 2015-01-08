@@ -243,7 +243,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
         @Override
         public void run() {
             _relayCtx.memo().endBizStep(STATE.OBTAINING_HTTPCLIENT, -1);
-            _relayCtx.memo().incBizResult(STATE.SOURCE_CANCELED, -_watch4Whole.stopAndRestart());
+            _relayCtx.memo().incBizResult(STATE.SOURCE_CANCELED, _watch4Whole.stopAndRestart());
         }})))
     .freeze();
 
@@ -283,7 +283,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
         @Override
         public void run() {
             _relayCtx.memo().endBizStep(STATE.TRANSFER_CONTENT, -1);
-            _relayCtx.memo().incBizResult(STATE.SOURCE_CANCELED, -_watch4Whole.stopAndRestart());
+            _relayCtx.memo().incBizResult(STATE.SOURCE_CANCELED, _watch4Whole.stopAndRestart());
         }})))
     .freeze();
         
@@ -311,7 +311,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
         @Override
         public void run() {
             _relayCtx.memo().endBizStep(STATE.RECV_RESP, -1);
-            _relayCtx.memo().incBizResult(STATE.SOURCE_CANCELED, -_watch4Whole.stopAndRestart());
+            _relayCtx.memo().incBizResult(STATE.SOURCE_CANCELED, _watch4Whole.stopAndRestart());
         }})))
     .freeze();
 
@@ -374,7 +374,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
         @Override
         public void run() {
             _relayCtx.memo().endBizStep(STATE.RECV_RESP, -1);
-            _relayCtx.memo().incBizResult(STATE.SOURCE_CANCELED, -_watch4Whole.stopAndRestart());
+            _relayCtx.memo().incBizResult(STATE.SOURCE_CANCELED, _watch4Whole.stopAndRestart());
         }})))
     .freeze();
 
