@@ -4,7 +4,6 @@
 package org.jocean.xharbor.route;
 
 import java.net.URI;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.jocean.idiom.Function;
 import org.jocean.idiom.InterfaceUtils;
@@ -14,16 +13,15 @@ import org.jocean.idiom.Triple;
 import org.jocean.idiom.Visitor2;
 import org.jocean.j2se.MBeanRegisterSupport;
 import org.jocean.xharbor.relay.RelayContext;
-import org.jocean.xharbor.relay.TimeInterval10ms_100ms_500ms_1s_5sImpl;
-import org.jocean.xharbor.relay.TimeIntervalMemo;
 import org.jocean.xharbor.relay.RelayContext.RelayMemo;
+import org.jocean.xharbor.relay.RelayContext.STATE;
 import org.jocean.xharbor.spi.Router;
+import org.jocean.xharbor.util.BizMemoImpl;
+import org.jocean.xharbor.util.TimeInterval10ms_100ms_500ms_1s_5sImpl;
+import org.jocean.xharbor.util.TimeIntervalMemo;
 
 /**
  * @author isdom
- * TODO
- * 考虑 HTTP 请求的方法区分: GET/POST/PUT ...... 
- * 实现 Composite RelayMemo，包含 细粒度(path,relayTo) 以及 其上两级的 RelayMemo，分别为 全局 RelayMemo 以及 path 相关的 RelayMemo
  */
 public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
 
@@ -70,131 +68,40 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
         public int getConnectDestinationFailure();
     }
     
-    private static class MemoImpl implements RelayMemo, FunctionMXBean {
-        public MemoImpl(final TimeIntervalMemo[] ttlMemos) {
-            this._ttlMemos = ttlMemos;
-        }
+    private static class MemoImpl extends BizMemoImpl<MemoImpl, STATE> 
+        implements RelayMemo, FunctionMXBean {
         
+        public MemoImpl() {
+            super(STATE.class);
+        }
+
         public int getObtainingHttpClient() {
-            return this._obtainingHttpClient.get();
+            return this.enum2Counter(STATE.OBTAINING_HTTPCLIENT).get();
         }
         
         public int getTransferContent() {
-            return this._transferContent.get();
+            return this.enum2Counter(STATE.TRANSFER_CONTENT).get();
         }
         
         public int getRecvResp() {
-            return this._recvResp.get();
+            return this.enum2Counter(STATE.RECV_RESP).get();
         }
         
         public int getRelaySuccess() {
-            return this._relaySuccess.get();
+            return this.enum2Counter(STATE.RELAY_SUCCESS).get();
         }
         
         public int getRelayFailure() {
-            return this._relayFailure.get();
+            return this.enum2Counter(STATE.RELAY_FAILURE).get();
         }
         
         public int getSourceCanceled() {
-            return this._sourceCanceled.get();
+            return this.enum2Counter(STATE.SOURCE_CANCELED).get();
         }
         
         public int getConnectDestinationFailure() {
-            return this._connectDestinationFailure.get();
+            return this.enum2Counter(STATE.CONNECTDESTINATION_FAILURE).get();
         }
-        
-        public void incObtainingHttpClient() {
-            this._obtainingHttpClient.incrementAndGet();
-        }
-        
-        @Override
-        public void decObtainingHttpClient() {
-            this._obtainingHttpClient.decrementAndGet();
-        }
-
-        @Override
-        public void incTransferContent() {
-            this._transferContent.incrementAndGet();
-        }
-
-        @Override
-        public void decTransferContent() {
-            this._transferContent.decrementAndGet();
-        }
-
-        @Override
-        public void incRecvResp() {
-            this._recvResp.incrementAndGet();
-        }
-
-        @Override
-        public void decRecvResp() {
-            this._recvResp.decrementAndGet();
-        }
-
-        @Override
-        public void incRelaySuccess() {
-            this._relaySuccess.incrementAndGet();
-        }
-
-        @Override
-        public void incSourceCanceled() {
-            this._sourceCanceled.incrementAndGet();
-        }
-
-        @Override
-        public void incConnectDestinationFailure() {
-            this._connectDestinationFailure.incrementAndGet();
-        }
-
-        @Override
-        public void incRelayFailure() {
-            this._relayFailure.incrementAndGet();
-        }
-        
-        @Override
-        public void ttl4ObtainingHttpClient(final long ttl) {
-            this._ttlMemos[0].recordInterval(ttl);
-        }
-
-        @Override
-        public void ttl4TransferContent(final long ttl) {
-            this._ttlMemos[1].recordInterval(ttl);
-        }
-
-        @Override
-        public void ttl4RecvResp(final long ttl) {
-            this._ttlMemos[2].recordInterval(ttl);
-        }
-
-        @Override
-        public void ttl4RelaySuccess(final long ttl) {
-            this._ttlMemos[3].recordInterval(ttl);
-        }
-
-        @Override
-        public void ttl4SourceCanceled(final long ttl) {
-            this._ttlMemos[4].recordInterval(ttl);
-        }
-
-        @Override
-        public void ttl4ConnectDestinationFailure(final long ttl) {
-            this._ttlMemos[5].recordInterval(ttl);
-        }
-
-        @Override
-        public void ttl4RelayFailure(final long ttl) {
-            this._ttlMemos[6].recordInterval(ttl);
-        }
-        
-        private final AtomicInteger _obtainingHttpClient = new AtomicInteger(0);
-        private final AtomicInteger _transferContent = new AtomicInteger(0);
-        private final AtomicInteger _recvResp = new AtomicInteger(0);
-        private final AtomicInteger _relaySuccess = new AtomicInteger(0);
-        private final AtomicInteger _relayFailure = new AtomicInteger(0);
-        private final AtomicInteger _connectDestinationFailure = new AtomicInteger(0);
-        private final AtomicInteger _sourceCanceled = new AtomicInteger(0);
-        private final TimeIntervalMemo[] _ttlMemos;
     }
     
     private final MBeanRegisterSupport _mbeanSupport = 
@@ -227,15 +134,21 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
             new Function<Pair<RoutingInfo, URI>, RelayMemo>() {
         @Override
         public RelayMemo apply(final Pair<RoutingInfo, URI> input) {
-            return new MemoImpl(new TimeIntervalMemo[]{
-                    _level3TTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), Pair.of("step","obtainingHttpClient"))),
-                    _level3TTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), Pair.of("step","transferContent"))),
-                    _level3TTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), Pair.of("step","recvResp"))),
-                    _level3TTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), Pair.of("whole","relaySuccess"))),
-                    _level3TTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), Pair.of("whole","sourceCanceled"))),
-                    _level3TTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), Pair.of("whole","connectDestinationFailure"))),
-                    _level3TTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), Pair.of("whole","relayFailure")))
-                    });
+            return new MemoImpl()
+                .setTimeIntervalMemoOfEnum(STATE.OBTAINING_HTTPCLIENT,
+                    _level3TTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), Pair.of("step","obtainingHttpClient"))))
+                .setTimeIntervalMemoOfEnum(STATE.TRANSFER_CONTENT,
+                    _level3TTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), Pair.of("step","transferContent"))))
+                .setTimeIntervalMemoOfEnum(STATE.RECV_RESP,
+                    _level3TTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), Pair.of("step","recvResp"))))
+                .setTimeIntervalMemoOfEnum(STATE.RELAY_SUCCESS,
+                    _level3TTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), Pair.of("whole","relaySuccess"))))
+                .setTimeIntervalMemoOfEnum(STATE.SOURCE_CANCELED,
+                    _level3TTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), Pair.of("whole","sourceCanceled"))))
+                .setTimeIntervalMemoOfEnum(STATE.CONNECTDESTINATION_FAILURE,
+                    _level3TTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), Pair.of("whole","connectDestinationFailure"))))
+                .setTimeIntervalMemoOfEnum(STATE.RELAY_FAILURE,
+                    _level3TTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), Pair.of("whole","relayFailure"))));
         }};
 
     private final Visitor2<Pair<RoutingInfo,URI>, RelayMemo> _level3MemoRegister = 
@@ -279,15 +192,21 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
             new Function<RoutingInfo, RelayMemo>() {
         @Override
         public RelayMemo apply(final RoutingInfo input) {
-            return new MemoImpl(new TimeIntervalMemo[]{
-                    _level2TTLMemos.get(Pair.of(input, Pair.of("step","obtainingHttpClient"))),
-                    _level2TTLMemos.get(Pair.of(input, Pair.of("step","transferContent"))),
-                    _level2TTLMemos.get(Pair.of(input, Pair.of("step","recvResp"))),
-                    _level2TTLMemos.get(Pair.of(input, Pair.of("whole","relaySuccess"))),
-                    _level2TTLMemos.get(Pair.of(input, Pair.of("whole","sourceCanceled"))),
-                    _level2TTLMemos.get(Pair.of(input, Pair.of("whole","connectDestinationFailure"))),
-                    _level2TTLMemos.get(Pair.of(input, Pair.of("whole","relayFailure")))
-                    });
+            return new MemoImpl()
+                .setTimeIntervalMemoOfEnum(STATE.OBTAINING_HTTPCLIENT,
+                    _level2TTLMemos.get(Pair.of(input, Pair.of("step","obtainingHttpClient"))))
+                .setTimeIntervalMemoOfEnum(STATE.TRANSFER_CONTENT,
+                    _level2TTLMemos.get(Pair.of(input, Pair.of("step","transferContent"))))
+                .setTimeIntervalMemoOfEnum(STATE.RECV_RESP,
+                    _level2TTLMemos.get(Pair.of(input, Pair.of("step","recvResp"))))
+                .setTimeIntervalMemoOfEnum(STATE.RELAY_SUCCESS,
+                    _level2TTLMemos.get(Pair.of(input, Pair.of("whole","relaySuccess"))))
+                .setTimeIntervalMemoOfEnum(STATE.SOURCE_CANCELED,
+                    _level2TTLMemos.get(Pair.of(input, Pair.of("whole","sourceCanceled"))))
+                .setTimeIntervalMemoOfEnum(STATE.CONNECTDESTINATION_FAILURE,
+                    _level2TTLMemos.get(Pair.of(input, Pair.of("whole","connectDestinationFailure"))))
+                .setTimeIntervalMemoOfEnum(STATE.RELAY_FAILURE,
+                    _level2TTLMemos.get(Pair.of(input, Pair.of("whole","relayFailure"))));
         }};
         
     private final Visitor2<RoutingInfo, RelayMemo> _level2MemoRegister = 
@@ -329,15 +248,21 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
             new Function<String, RelayMemo>() {
         @Override
         public RelayMemo apply(final String path) {
-            return new MemoImpl(new TimeIntervalMemo[]{
-                    _level1TTLMemos.get(Pair.of(path, Pair.of("step","obtainingHttpClient"))),
-                    _level1TTLMemos.get(Pair.of(path, Pair.of("step","transferContent"))),
-                    _level1TTLMemos.get(Pair.of(path, Pair.of("step","recvResp"))),
-                    _level1TTLMemos.get(Pair.of(path, Pair.of("whole","relaySuccess"))),
-                    _level1TTLMemos.get(Pair.of(path, Pair.of("whole","sourceCanceled"))),
-                    _level1TTLMemos.get(Pair.of(path, Pair.of("whole","connectDestinationFailure"))),
-                    _level1TTLMemos.get(Pair.of(path, Pair.of("whole","relayFailure")))
-                    });
+            return new MemoImpl()
+            .setTimeIntervalMemoOfEnum(STATE.OBTAINING_HTTPCLIENT,
+                    _level1TTLMemos.get(Pair.of(path, Pair.of("step","obtainingHttpClient"))))
+            .setTimeIntervalMemoOfEnum(STATE.TRANSFER_CONTENT,
+                    _level1TTLMemos.get(Pair.of(path, Pair.of("step","transferContent"))))
+            .setTimeIntervalMemoOfEnum(STATE.RECV_RESP,
+                    _level1TTLMemos.get(Pair.of(path, Pair.of("step","recvResp"))))
+            .setTimeIntervalMemoOfEnum(STATE.RELAY_SUCCESS,
+                    _level1TTLMemos.get(Pair.of(path, Pair.of("whole","relaySuccess"))))
+            .setTimeIntervalMemoOfEnum(STATE.SOURCE_CANCELED,
+                    _level1TTLMemos.get(Pair.of(path, Pair.of("whole","sourceCanceled"))))
+            .setTimeIntervalMemoOfEnum(STATE.CONNECTDESTINATION_FAILURE,
+                    _level1TTLMemos.get(Pair.of(path, Pair.of("whole","connectDestinationFailure"))))
+            .setTimeIntervalMemoOfEnum(STATE.RELAY_FAILURE,
+                    _level1TTLMemos.get(Pair.of(path, Pair.of("whole","relayFailure"))));
         }};
         
     private final Visitor2<String, RelayMemo> _level1MemoRegister = 
@@ -371,13 +296,19 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
                                 newMemo);
                     }});
 
-    private RelayMemo _level0Memo = new MemoImpl(new TimeIntervalMemo[]{
-                _level0TTLMemos.get(Pair.of("step","obtainingHttpClient")),
-                _level0TTLMemos.get(Pair.of("step","transferContent")),
-                _level0TTLMemos.get(Pair.of("step","recvResp")),
-                _level0TTLMemos.get(Pair.of("whole","relaySuccess")),
-                _level0TTLMemos.get(Pair.of("whole","sourceCanceled")),
-                _level0TTLMemos.get(Pair.of("whole","connectDestinationFailure")),
-                _level0TTLMemos.get(Pair.of("whole","relayFailure"))
-                });
+    private RelayMemo _level0Memo = new MemoImpl()
+            .setTimeIntervalMemoOfEnum(STATE.OBTAINING_HTTPCLIENT,
+                    _level0TTLMemos.get(Pair.of("step","obtainingHttpClient")))
+            .setTimeIntervalMemoOfEnum(STATE.TRANSFER_CONTENT,
+                    _level0TTLMemos.get(Pair.of("step","transferContent")))
+            .setTimeIntervalMemoOfEnum(STATE.RECV_RESP,
+                    _level0TTLMemos.get(Pair.of("step","recvResp")))
+            .setTimeIntervalMemoOfEnum(STATE.RELAY_SUCCESS,
+                    _level0TTLMemos.get(Pair.of("whole","relaySuccess")))
+            .setTimeIntervalMemoOfEnum(STATE.SOURCE_CANCELED,
+                    _level0TTLMemos.get(Pair.of("whole","sourceCanceled")))
+            .setTimeIntervalMemoOfEnum(STATE.CONNECTDESTINATION_FAILURE,
+                    _level0TTLMemos.get(Pair.of("whole","connectDestinationFailure")))
+            .setTimeIntervalMemoOfEnum(STATE.RELAY_FAILURE,
+                    _level0TTLMemos.get(Pair.of("whole","relayFailure")));
 }

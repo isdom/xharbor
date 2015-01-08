@@ -5,36 +5,25 @@ package org.jocean.xharbor.relay;
 
 import java.net.URI;
 
+import org.jocean.xharbor.util.BizMemo;
+
 /**
  * @author isdom
  *
  */
 public interface RelayContext {
     
-    public interface RelayMemo {
-        public void incObtainingHttpClient();
-        public void decObtainingHttpClient();
-        
-        public void incTransferContent();
-        public void decTransferContent();
-        
-        public void incRecvResp();
-        public void decRecvResp();
-        
-        public void incRelaySuccess();
-        
-        public void incSourceCanceled();
-        public void incConnectDestinationFailure();
-        public void incRelayFailure();
-        
-        public void ttl4ObtainingHttpClient(final long ttl);
-        public void ttl4TransferContent(final long ttl);
-        public void ttl4RecvResp(final long ttl);
-        
-        public void ttl4RelaySuccess(final long ttl);
-        public void ttl4SourceCanceled(final long ttl);
-        public void ttl4ConnectDestinationFailure(final long ttl);
-        public void ttl4RelayFailure(final long ttl);
+    public enum STATE { 
+        OBTAINING_HTTPCLIENT,
+        TRANSFER_CONTENT,
+        RECV_RESP,
+        RELAY_SUCCESS,
+        RELAY_FAILURE,
+        SOURCE_CANCELED,
+        CONNECTDESTINATION_FAILURE
+    }
+    
+    public interface RelayMemo extends BizMemo<STATE> {
     }
     
     public URI relayTo();

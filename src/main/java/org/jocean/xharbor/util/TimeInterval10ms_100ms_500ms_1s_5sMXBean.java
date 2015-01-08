@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.xharbor.relay;
+package org.jocean.xharbor.util;
 
 /**
  * @author isdom

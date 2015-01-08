@@ -36,6 +36,7 @@ import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.ValidationId;
 import org.jocean.idiom.block.Blob;
+import org.jocean.xharbor.relay.RelayContext.STATE;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -156,7 +157,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
 
             _watch4Step.start();
             _watch4Whole.start();
-            _relayCtx.memo().incObtainingHttpClient();
+            _relayCtx.memo().beginBizStep(STATE.OBTAINING_HTTPCLIENT);
             _httpRequest = httpRequest;
             updateTransferHttpRequestState(_httpRequest);
             
@@ -167,7 +168,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
         public void run() {
-            _relayCtx.memo().incSourceCanceled();
+            _relayCtx.memo().incBizResult(STATE.SOURCE_CANCELED, -1);
         }})))
     .freeze();
 
@@ -182,15 +183,15 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
         }
         
         @OnEvent(event = "onHttpClientObtained")
-        private BizStep onHttpObtained(final int guideId,
+        private BizStep onHttpObtained(
+                final int guideId,
                 final HttpClient httpclient) {
             if (!isValidGuideId(guideId)) {
                 return currentEventHandler();
             }
 
-            _relayCtx.memo().decObtainingHttpClient();
-            _relayCtx.memo().ttl4ObtainingHttpClient(
-                    _watch4Step.stopAndRestart());
+            _relayCtx.memo().endBizStep(STATE.OBTAINING_HTTPCLIENT, _watch4Step.stopAndRestart());
+            _relayCtx.memo().beginBizStep(STATE.TRANSFER_CONTENT);
             
             if (LOG.isDebugEnabled()) {
                 LOG.debug("send http request {} & contents size: {}", _httpRequest, _contents.size());
@@ -222,13 +223,12 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
             _contents.clear();
             
             if ( !_transferHttpRequestComplete ) {
-                _relayCtx.memo().incTransferContent();
                 return TRANSFERCONTENT;
             }
             else {
-                _relayCtx.memo().ttl4TransferContent(_watch4Step.stopAndRestart());
+                _relayCtx.memo().endBizStep(STATE.TRANSFER_CONTENT, _watch4Step.stopAndRestart());
                 tryStartForceFinishedTimer();
-                _relayCtx.memo().incRecvResp();
+                _relayCtx.memo().beginBizStep(STATE.RECV_RESP);
                 return RECVRESP;
             }
         }
@@ -236,20 +236,14 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
     .handler(handlersOf(new ONHTTPLOST(new Runnable() {
         @Override
         public void run() {
-            _relayCtx.memo().decObtainingHttpClient();
-            _relayCtx.memo().incConnectDestinationFailure();
-            
-            _relayCtx.memo().ttl4ConnectDestinationFailure(
-                    _watch4Whole.stopAndRestart());
+            _relayCtx.memo().endBizStep(STATE.OBTAINING_HTTPCLIENT, -1);
+            _relayCtx.memo().incBizResult(STATE.CONNECTDESTINATION_FAILURE, _watch4Whole.stopAndRestart());
         }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
         public void run() {
-            _relayCtx.memo().decObtainingHttpClient();
-            _relayCtx.memo().incSourceCanceled();
-            
-            _relayCtx.memo().ttl4SourceCanceled(
-                    _watch4Whole.stopAndRestart());
+            _relayCtx.memo().endBizStep(STATE.OBTAINING_HTTPCLIENT, -1);
+            _relayCtx.memo().incBizResult(STATE.SOURCE_CANCELED, -_watch4Whole.stopAndRestart());
         }})))
     .freeze();
 
@@ -273,10 +267,8 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
             }
             else {
                 tryStartForceFinishedTimer();
-                _relayCtx.memo().decTransferContent();
-                _relayCtx.memo().ttl4TransferContent(
-                        _watch4Step.stopAndRestart());
-                _relayCtx.memo().incRecvResp();
+                _relayCtx.memo().endBizStep(STATE.TRANSFER_CONTENT, _watch4Step.stopAndRestart());
+                _relayCtx.memo().beginBizStep(STATE.RECV_RESP);
                 return RECVRESP;
             }
         }
@@ -284,20 +276,14 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
     .handler(handlersOf(new ONHTTPLOST(new Runnable() {
         @Override
         public void run() {
-            _relayCtx.memo().decTransferContent();
-            _relayCtx.memo().incRelayFailure();
-            
-            _relayCtx.memo().ttl4RelayFailure(
-                    _watch4Whole.stopAndRestart());
+            _relayCtx.memo().endBizStep(STATE.TRANSFER_CONTENT, -1);
+            _relayCtx.memo().incBizResult(STATE.RELAY_FAILURE, _watch4Whole.stopAndRestart());
         }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
         public void run() {
-            _relayCtx.memo().decTransferContent();
-            _relayCtx.memo().incSourceCanceled();
-            
-            _relayCtx.memo().ttl4SourceCanceled(
-                    _watch4Whole.stopAndRestart());
+            _relayCtx.memo().endBizStep(STATE.TRANSFER_CONTENT, -1);
+            _relayCtx.memo().incBizResult(STATE.SOURCE_CANCELED, -_watch4Whole.stopAndRestart());
         }})))
     .freeze();
         
@@ -318,20 +304,14 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
     .handler(handlersOf(new ONHTTPLOST(new Runnable() {
         @Override
         public void run() {
-            _relayCtx.memo().decRecvResp();
-            _relayCtx.memo().incRelayFailure();
-            
-            _relayCtx.memo().ttl4RelayFailure(
-                    _watch4Whole.stopAndRestart());
+            _relayCtx.memo().endBizStep(STATE.RECV_RESP, -1);
+            _relayCtx.memo().incBizResult(STATE.RELAY_FAILURE, _watch4Whole.stopAndRestart());
         }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
         public void run() {
-            _relayCtx.memo().decRecvResp();
-            _relayCtx.memo().incSourceCanceled();
-            
-            _relayCtx.memo().ttl4SourceCanceled(
-                    _watch4Whole.stopAndRestart());
+            _relayCtx.memo().endBizStep(STATE.RECV_RESP, -1);
+            _relayCtx.memo().incBizResult(STATE.SOURCE_CANCELED, -_watch4Whole.stopAndRestart());
         }})))
     .freeze();
 
@@ -354,9 +334,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
                 return currentEventHandler();
             }
 
-            _relayCtx.memo().decRecvResp();
-            _relayCtx.memo().ttl4RecvResp(
-                    _watch4Step.stopAndRestart());
+            _relayCtx.memo().endBizStep(STATE.RECV_RESP, _watch4Step.stopAndRestart());
             
             //  release relay's http client
             safeDetachHttp();
@@ -366,9 +344,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
             if ( !HttpHeaders.isKeepAlive( _httpRequest ) ) {
                 future.addListener(ChannelFutureListener.CLOSE);
             }
-            _relayCtx.memo().incRelaySuccess();
-            
-            _relayCtx.memo().ttl4RelaySuccess(_watch4Whole.stopAndRestart());
+            _relayCtx.memo().incBizResult(STATE.RELAY_SUCCESS, _watch4Whole.stopAndRestart());
             return null;
         }
 
@@ -391,20 +367,14 @@ public class RelayFlow extends AbstractFlow<RelayFlow> {
     .handler(handlersOf(new ONHTTPLOST(new Runnable() {
         @Override
         public void run() {
-            _relayCtx.memo().decRecvResp();
-            _relayCtx.memo().incRelayFailure();
-            
-            _relayCtx.memo().ttl4RelayFailure(
-                    _watch4Whole.stopAndRestart());
+            _relayCtx.memo().endBizStep(STATE.RECV_RESP, -1);
+            _relayCtx.memo().incBizResult(STATE.RELAY_FAILURE, _watch4Whole.stopAndRestart());
         }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
         public void run() {
-            _relayCtx.memo().decRecvResp();
-            _relayCtx.memo().incSourceCanceled();
-            
-            _relayCtx.memo().ttl4SourceCanceled(
-                    _watch4Whole.stopAndRestart());
+            _relayCtx.memo().endBizStep(STATE.RECV_RESP, -1);
+            _relayCtx.memo().incBizResult(STATE.SOURCE_CANCELED, -_watch4Whole.stopAndRestart());
         }})))
     .freeze();
 

@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.xharbor.relay;
+package org.jocean.xharbor.util;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -15,7 +15,10 @@ public class TimeInterval10ms_100ms_500ms_1s_5sImpl implements
 
     @Override
     public void recordInterval(final long interval) {
-        this._counters[interval2idx(interval)].incrementAndGet();
+        final int idx = interval2idx(interval);
+        if ( idx >= 0) {
+            this._counters[idx].incrementAndGet();
+        }
     }
     
     @Override
@@ -49,7 +52,10 @@ public class TimeInterval10ms_100ms_500ms_1s_5sImpl implements
     }
 
     private int interval2idx(final long interval) {
-        if ( interval < 10L ) {
+        if ( interval < 0L ) {
+            return -1;
+        }
+        else if ( interval < 10L ) {
             return  0;
         }
         else if ( interval < 100L ) {
