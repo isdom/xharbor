@@ -18,6 +18,7 @@ import org.jocean.httpclient.HttpStack;
 import org.jocean.httpclient.impl.HttpUtils;
 import org.jocean.idiom.Function;
 import org.jocean.idiom.pool.Pools;
+import org.jocean.j2se.MBeanRegisterSupport;
 import org.jocean.netty.NettyClient;
 import org.jocean.xharbor.relay.RelayAgentImpl;
 import org.jocean.xharbor.relay.RelayContext;
@@ -33,6 +34,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
+
+import com.sun.jdmk.comm.HtmlAdaptorServer;
 
 /**
  * @author isdom
@@ -117,6 +120,12 @@ public class Main {
                 
             }});
         cache.start();
+        
+        final MBeanRegisterSupport register =
+                new MBeanRegisterSupport("org.jocean:name=htmladapter", null);
+        HtmlAdaptorServer adapter = new HtmlAdaptorServer(); 
+        register.registerMBean("port=8082", adapter);
+        adapter.start();
     }
 
 }
