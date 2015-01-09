@@ -5,7 +5,22 @@ package org.jocean.xharbor.util;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import javax.management.Attribute;
+import javax.management.AttributeList;
+import javax.management.AttributeNotFoundException;
+import javax.management.DynamicMBean;
+import javax.management.InvalidAttributeValueException;
+import javax.management.MBeanException;
+import javax.management.MBeanInfo;
+import javax.management.ReflectionException;
+import javax.management.openmbean.OpenMBeanAttributeInfoSupport;
+import javax.management.openmbean.OpenMBeanConstructorInfoSupport;
+import javax.management.openmbean.OpenMBeanInfoSupport;
+import javax.management.openmbean.OpenMBeanParameterInfoSupport;
+import javax.management.openmbean.SimpleType;
 
 import org.jocean.idiom.ExceptionUtils;
 import org.slf4j.Logger;
@@ -15,18 +30,22 @@ import org.slf4j.LoggerFactory;
  * @author isdom
  *
  */
-public abstract class BizMemoImpl<IMPL extends BizMemoImpl<?,STEP,RESULT>, 
-    STEP extends Enum<?>, RESULT extends Enum<?>> 
+public abstract class BizMemoImpl<IMPL extends BizMemoImpl<IMPL,STEP,RESULT>, 
+    STEP extends Enum<STEP>, RESULT extends Enum<RESULT>> 
     implements BizMemo<STEP,RESULT> {
     
     private static final Logger LOG = LoggerFactory
             .getLogger(BizMemoImpl.class);
     
     public BizMemoImpl(final Class<STEP> clsStep, final Class<RESULT> clsResult) {
-        this._stepCounters = new AtomicInteger[getValuesOf(clsStep).length];
-        this._stepMemos = new TimeIntervalMemo[this._stepCounters.length];
-        this._resultCounters = new AtomicInteger[getValuesOf(clsResult).length];
-        this._resultMemos = new TimeIntervalMemo[this._resultCounters.length];
+        this._clsStep = clsStep;
+        this._clsResult = clsResult;
+        this._steps = getValuesOf(clsStep);
+        this._stepCounters = new AtomicInteger[this._steps.length];
+        this._stepMemos = new TimeIntervalMemo[this._steps.length];
+        this._results = getValuesOf(clsResult);
+        this._resultCounters = new AtomicInteger[this._results.length];
+        this._resultMemos = new TimeIntervalMemo[this._results.length];
         initCountersAndMemos(this._stepCounters, this._stepMemos);
         initCountersAndMemos(this._resultCounters, this._resultMemos);
     }
@@ -90,8 +109,94 @@ public abstract class BizMemoImpl<IMPL extends BizMemoImpl<?,STEP,RESULT>,
         return (IMPL)this;
     }
     
+    @Override
+    public DynamicMBean createMBean() {
+        return new DynamicMBean() {
+
+            @Override
+            public Object getAttribute(final String attribute)
+                    throws AttributeNotFoundException, MBeanException,
+                    ReflectionException {
+                return name2Integer(attribute).get();
+            }
+
+            @Override
+            public void setAttribute(Attribute attribute)
+                    throws AttributeNotFoundException,
+                    InvalidAttributeValueException, MBeanException,
+                    ReflectionException {
+            }
+
+            @Override
+            public AttributeList getAttributes(String[] attributes) {
+                return null;
+            }
+
+            @Override
+            public AttributeList setAttributes(AttributeList attributes) {
+                return null;
+            }
+
+            @Override
+            public Object invoke(String actionName, Object[] params,
+                    String[] signature) throws MBeanException,
+                    ReflectionException {
+                return null;
+            }
+
+            @Override
+            public MBeanInfo getMBeanInfo() {
+                final OpenMBeanAttributeInfoSupport[] attributes = new ArrayList<OpenMBeanAttributeInfoSupport>() {
+                    private static final long serialVersionUID = 1L;
+                {
+                    for ( STEP step : _steps ) {
+                        this.add(new OpenMBeanAttributeInfoSupport(step.name(), 
+                            step.name(), SimpleType.INTEGER, true, false, 
+                            false));
+                    }
+                    for ( RESULT result : _results ) {
+                        this.add(new OpenMBeanAttributeInfoSupport(result.name(), 
+                            result.name(), SimpleType.INTEGER, true, false, 
+                            false));
+                    }
+                }}.toArray(new OpenMBeanAttributeInfoSupport[0]);
+             
+            //No arg constructor     
+                final OpenMBeanConstructorInfoSupport[] constructors = new OpenMBeanConstructorInfoSupport[]{
+                    new OpenMBeanConstructorInfoSupport("BizMemo", "Constructs a BizMemo instance.", 
+                            new OpenMBeanParameterInfoSupport[0])
+                };
+             
+            //Build the info 
+                return new OpenMBeanInfoSupport(BizMemoImpl.class.getName(), 
+                            "BizMemo - Open - MBean", attributes, constructors, 
+                            null, null);
+            }};
+    }
+    
+    private AtomicInteger name2Integer(final String name) {
+        final STEP step = enumOf( this._clsStep, name);
+        return ( null != step ) ? this._stepCounters[step.ordinal()] 
+                : this._resultCounters[enumOf(this._clsResult, name).ordinal()];
+    }
+    
+    private <E extends Enum<E>> E enumOf(
+            final Class<E> clsStepOrResult, 
+            final String name ) {
+        try {
+            return E.valueOf(clsStepOrResult, name);
+        }
+        catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+    
+    private final Class<STEP> _clsStep;
+    private final Class<RESULT> _clsResult;
+    private final STEP[] _steps;
+    private final RESULT[] _results;
     private final AtomicInteger[] _stepCounters;
     private final TimeIntervalMemo[] _stepMemos;
     private final AtomicInteger[] _resultCounters;
     private final TimeIntervalMemo[] _resultMemos;
-    }
+}

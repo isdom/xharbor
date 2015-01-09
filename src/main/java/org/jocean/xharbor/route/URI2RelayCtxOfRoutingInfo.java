@@ -27,7 +27,7 @@ import org.jocean.xharbor.util.TimeIntervalMemo;
 public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
 
     public URI2RelayCtxOfRoutingInfo() {
-        _mbeanSupport.registerMBean("name=relays", this._level0Memo);
+        _mbeanSupport.registerMBean("name=relays", this._level0Memo.createMBean());
     }
     
     @Override
@@ -59,49 +59,11 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
         }
     }
 
-    public static interface FunctionMXBean {
-        public int getObtainingHttpClient();
-        public int getTransferContent();
-        public int getRecvResp();
-        public int getRelaySuccess();
-        public int getRelayFailure();
-        public int getSourceCanceled();
-        public int getConnectDestinationFailure();
-    }
-    
     private static class MemoImpl extends BizMemoImpl<MemoImpl, STEP, RESULT> 
-        implements RelayMemo, FunctionMXBean {
+        implements RelayMemo {
         
         public MemoImpl() {
             super(STEP.class, RESULT.class);
-        }
-
-        public int getObtainingHttpClient() {
-            return this.step2Counter(STEP.OBTAINING_HTTPCLIENT).get();
-        }
-        
-        public int getTransferContent() {
-            return this.step2Counter(STEP.TRANSFER_CONTENT).get();
-        }
-        
-        public int getRecvResp() {
-            return this.step2Counter(STEP.RECV_RESP).get();
-        }
-        
-        public int getRelaySuccess() {
-            return this.result2Counter(RESULT.RELAY_SUCCESS).get();
-        }
-        
-        public int getRelayFailure() {
-            return this.result2Counter(RESULT.RELAY_FAILURE).get();
-        }
-        
-        public int getSourceCanceled() {
-            return this.result2Counter(RESULT.SOURCE_CANCELED).get();
-        }
-        
-        public int getConnectDestinationFailure() {
-            return this.result2Counter(RESULT.CONNECTDESTINATION_FAILURE).get();
         }
     }
     
@@ -169,7 +131,7 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
             _mbeanSupport.registerMBean(
                     "path=" + info.getPath() + ",method=" + info.getMethod() 
                     + ",dest=" + pair.getSecond().toString().replaceAll(":", "-"), 
-                    newMemo);
+                    newMemo.createMBean());
         }};
 
     private final SimpleCache<Pair<RoutingInfo, URI>, RelayMemo> _level3Memos = 
@@ -233,7 +195,7 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
                 throws Exception {
             _mbeanSupport.registerMBean(
                     "path=" + info.getPath() + ",method=" + info.getMethod(),
-                    newMemo);
+                    newMemo.createMBean());
         }};
             
     private final SimpleCache<RoutingInfo, RelayMemo> _level2Memos = 
@@ -294,7 +256,7 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
         @Override
         public void visit(final String path, final RelayMemo newMemo)
                 throws Exception {
-            _mbeanSupport.registerMBean("path=" + path, newMemo);
+            _mbeanSupport.registerMBean("path=" + path, newMemo.createMBean());
         }};
             
     private final SimpleCache<String, RelayMemo> _level1Memos = 
