@@ -109,7 +109,6 @@ public abstract class BizMemoImpl<IMPL extends BizMemoImpl<IMPL,STEP,RESULT>,
         return (IMPL)this;
     }
     
-    @Override
     public DynamicMBean createMBean() {
         return new DynamicMBean() {
 

@@ -101,10 +101,10 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
     private final SimpleCache<Triple<RoutingInfo, URI, RESULT>, TimeIntervalMemo> _level3ResultTTLMemos = 
             generateLevel3TTLMemo(RESULT.class);
     
-    private final Function<Pair<RoutingInfo, URI>, RelayMemo> _level3MemoMaker = 
-            new Function<Pair<RoutingInfo, URI>, RelayMemo>() {
+    private final Function<Pair<RoutingInfo, URI>, MemoImpl> _level3MemoMaker = 
+            new Function<Pair<RoutingInfo, URI>, MemoImpl>() {
         @Override
-        public RelayMemo apply(final Pair<RoutingInfo, URI> input) {
+        public MemoImpl apply(final Pair<RoutingInfo, URI> input) {
             return new MemoImpl()
                 .setTimeIntervalMemoOfStep(STEP.OBTAINING_HTTPCLIENT,
                     _level3StepTTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), STEP.OBTAINING_HTTPCLIENT)))
@@ -122,10 +122,10 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
                     _level3ResultTTLMemos.get(Triple.of(input.getFirst(), input.getSecond(), RESULT.RELAY_FAILURE)));
         }};
 
-    private final Visitor2<Pair<RoutingInfo,URI>, RelayMemo> _level3MemoRegister = 
-            new Visitor2<Pair<RoutingInfo,URI>, RelayMemo>() {
+    private final Visitor2<Pair<RoutingInfo,URI>, MemoImpl> _level3MemoRegister = 
+            new Visitor2<Pair<RoutingInfo,URI>, MemoImpl>() {
         @Override
-        public void visit(final Pair<RoutingInfo, URI> pair, final RelayMemo newMemo)
+        public void visit(final Pair<RoutingInfo, URI> pair, final MemoImpl newMemo)
                 throws Exception {
             final RoutingInfo info = pair.getFirst();
             _mbeanSupport.registerMBean(
@@ -134,8 +134,8 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
                     newMemo.createMBean());
         }};
 
-    private final SimpleCache<Pair<RoutingInfo, URI>, RelayMemo> _level3Memos = 
-            new SimpleCache<Pair<RoutingInfo, URI>, RelayMemo>(_level3MemoMaker, _level3MemoRegister);
+    private final SimpleCache<Pair<RoutingInfo, URI>, MemoImpl> _level3Memos = 
+            new SimpleCache<Pair<RoutingInfo, URI>, MemoImpl>(_level3MemoMaker, _level3MemoRegister);
         
     //  level2
     private <E extends Enum<?>> SimpleCache<Pair<RoutingInfo, E>, TimeIntervalMemo> generateLevel2TTLMemo(final Class<E> cls) {
@@ -167,10 +167,10 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
             generateLevel2TTLMemo(RESULT.class);
     
     
-    private final Function<RoutingInfo, RelayMemo> _level2MemoMaker = 
-            new Function<RoutingInfo, RelayMemo>() {
+    private final Function<RoutingInfo, MemoImpl> _level2MemoMaker = 
+            new Function<RoutingInfo, MemoImpl>() {
         @Override
-        public RelayMemo apply(final RoutingInfo input) {
+        public MemoImpl apply(final RoutingInfo input) {
             return new MemoImpl()
                 .setTimeIntervalMemoOfStep(STEP.OBTAINING_HTTPCLIENT,
                     _level2StepTTLMemos.get(Pair.of(input, STEP.OBTAINING_HTTPCLIENT)))
@@ -188,18 +188,18 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
                     _levelResult2TTLMemos.get(Pair.of(input, RESULT.RELAY_FAILURE)));
         }};
         
-    private final Visitor2<RoutingInfo, RelayMemo> _level2MemoRegister = 
-            new Visitor2<RoutingInfo, RelayMemo>() {
+    private final Visitor2<RoutingInfo, MemoImpl> _level2MemoRegister = 
+            new Visitor2<RoutingInfo, MemoImpl>() {
         @Override
-        public void visit(final RoutingInfo info, final RelayMemo newMemo)
+        public void visit(final RoutingInfo info, final MemoImpl newMemo)
                 throws Exception {
             _mbeanSupport.registerMBean(
                     "path=" + info.getPath() + ",method=" + info.getMethod(),
                     newMemo.createMBean());
         }};
             
-    private final SimpleCache<RoutingInfo, RelayMemo> _level2Memos = 
-            new SimpleCache<RoutingInfo, RelayMemo>(_level2MemoMaker, _level2MemoRegister);
+    private final SimpleCache<RoutingInfo, MemoImpl> _level2Memos = 
+            new SimpleCache<RoutingInfo, MemoImpl>(_level2MemoMaker, _level2MemoRegister);
     
     //  level1
     private <E extends Enum<?>> SimpleCache<Pair<String, E>, TimeIntervalMemo> generateLevel1TTLMemo(final Class<E> cls) {
@@ -230,10 +230,10 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
     private final SimpleCache<Pair<String, RESULT>, TimeIntervalMemo> _level1ResultTTLMemos = 
             generateLevel1TTLMemo(RESULT.class);
     
-    private final Function<String, RelayMemo> _level1MemoMaker = 
-            new Function<String, RelayMemo>() {
+    private final Function<String, MemoImpl> _level1MemoMaker = 
+            new Function<String, MemoImpl>() {
         @Override
-        public RelayMemo apply(final String path) {
+        public MemoImpl apply(final String path) {
             return new MemoImpl()
             .setTimeIntervalMemoOfStep(STEP.OBTAINING_HTTPCLIENT,
                     _level1StepTTLMemos.get(Pair.of(path, STEP.OBTAINING_HTTPCLIENT)))
@@ -251,16 +251,16 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
                     _level1ResultTTLMemos.get(Pair.of(path, RESULT.RELAY_FAILURE)));
         }};
         
-    private final Visitor2<String, RelayMemo> _level1MemoRegister = 
-            new Visitor2<String, RelayMemo>() {
+    private final Visitor2<String, MemoImpl> _level1MemoRegister = 
+            new Visitor2<String, MemoImpl>() {
         @Override
-        public void visit(final String path, final RelayMemo newMemo)
+        public void visit(final String path, final MemoImpl newMemo)
                 throws Exception {
             _mbeanSupport.registerMBean("path=" + path, newMemo.createMBean());
         }};
             
-    private final SimpleCache<String, RelayMemo> _level1Memos = 
-            new SimpleCache<String, RelayMemo>(_level1MemoMaker, _level1MemoRegister);
+    private final SimpleCache<String, MemoImpl> _level1Memos = 
+            new SimpleCache<String, MemoImpl>(_level1MemoMaker, _level1MemoRegister);
     
     //  level0
     private <E extends Enum<?>> SimpleCache<E, TimeIntervalMemo> generateLevel0TTLMemo(final Class<E> cls) {
@@ -288,7 +288,7 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
     private final SimpleCache<RESULT, TimeIntervalMemo> _level0ResultTTLMemos = 
             generateLevel0TTLMemo(RESULT.class);
 
-    private RelayMemo _level0Memo = new MemoImpl()
+    private MemoImpl _level0Memo = new MemoImpl()
             .setTimeIntervalMemoOfStep(STEP.OBTAINING_HTTPCLIENT,
                     _level0StepTTLMemos.get(STEP.OBTAINING_HTTPCLIENT))
             .setTimeIntervalMemoOfStep(STEP.TRANSFER_CONTENT,
