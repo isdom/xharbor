@@ -117,29 +117,44 @@ public abstract class BizMemoImpl<IMPL extends BizMemoImpl<IMPL,STEP,RESULT>,
             public Object getAttribute(final String attribute)
                     throws AttributeNotFoundException, MBeanException,
                     ReflectionException {
-                return name2Integer(attribute).get();
+                final String splited[] = attribute.split(":");
+                final String type = splited[0];
+                final String name = splited[1];
+                return name2Integer(type, name).get();
             }
 
             @Override
-            public void setAttribute(Attribute attribute)
+            public void setAttribute(final Attribute attribute)
                     throws AttributeNotFoundException,
                     InvalidAttributeValueException, MBeanException,
                     ReflectionException {
             }
 
             @Override
-            public AttributeList getAttributes(String[] attributes) {
+            public AttributeList getAttributes(final String[] attributes) {
+                return new AttributeList() {
+                    private static final long serialVersionUID = 1L;
+                    {
+                        for ( String attrname : attributes ) {
+                            try {
+                                this.add( new Attribute(attrname, getAttribute(attrname)));
+                            } catch (Exception e) {
+                                LOG.warn("exception when create Attribute({}), detail:{}", 
+                                        attrname, ExceptionUtils.exception2detail(e));
+                            }
+                        }
+                    }
+                };
+            }
+
+            @Override
+            public AttributeList setAttributes(final AttributeList attributes) {
                 return null;
             }
 
             @Override
-            public AttributeList setAttributes(AttributeList attributes) {
-                return null;
-            }
-
-            @Override
-            public Object invoke(String actionName, Object[] params,
-                    String[] signature) throws MBeanException,
+            public Object invoke(final String actionName, final Object[] params,
+                    final String[] signature) throws MBeanException,
                     ReflectionException {
                 return null;
             }
@@ -150,15 +165,23 @@ public abstract class BizMemoImpl<IMPL extends BizMemoImpl<IMPL,STEP,RESULT>,
                     private static final long serialVersionUID = 1L;
                 {
                     for ( STEP step : _steps ) {
-                        this.add(new OpenMBeanAttributeInfoSupport(step.name(), 
-                            step.name(), SimpleType.INTEGER, true, false, 
-                            false));
+                        this.add(createCountAttribute(step));
                     }
                     for ( RESULT result : _results ) {
-                        this.add(new OpenMBeanAttributeInfoSupport(result.name(), 
-                            result.name(), SimpleType.INTEGER, true, false, 
-                            false));
+                        this.add(createCountAttribute(result));
                     }
+                }
+                /**
+                 * @param stepOrResult
+                 * @return
+                 */
+                private OpenMBeanAttributeInfoSupport createCountAttribute(
+                        Enum<?> stepOrResult) {
+                    return new OpenMBeanAttributeInfoSupport(
+                        stepOrResult.getClass().getSimpleName() + ":" + stepOrResult.name(), 
+                        stepOrResult.getClass().getCanonicalName() + "." +stepOrResult.name(), 
+                        SimpleType.INTEGER, true, false, 
+                        false);
                 }}.toArray(new OpenMBeanAttributeInfoSupport[0]);
              
             //No arg constructor     
@@ -169,26 +192,22 @@ public abstract class BizMemoImpl<IMPL extends BizMemoImpl<IMPL,STEP,RESULT>,
              
             //Build the info 
                 return new OpenMBeanInfoSupport(BizMemoImpl.class.getName(), 
-                            "BizMemo - Open - MBean", attributes, constructors, 
+                            "BizMemo - Open MBean", attributes, constructors, 
                             null, null);
             }};
     }
     
-    private AtomicInteger name2Integer(final String name) {
-        final STEP step = enumOf( this._clsStep, name);
+    private AtomicInteger name2Integer(final String type, final String name) {
+        final STEP step = enumOf( this._clsStep, type, name);
         return ( null != step ) ? this._stepCounters[step.ordinal()] 
-                : this._resultCounters[enumOf(this._clsResult, name).ordinal()];
+                : this._resultCounters[enumOf(this._clsResult, type, name).ordinal()];
     }
     
     private <E extends Enum<E>> E enumOf(
-            final Class<E> clsStepOrResult, 
-            final String name ) {
-        try {
-            return E.valueOf(clsStepOrResult, name);
-        }
-        catch (IllegalArgumentException e) {
-            return null;
-        }
+            final Class<E> cls, 
+            final String type,
+             final String name ) {
+        return cls.getSimpleName().equals(type) ? E.valueOf(cls, name) : null;
     }
     
     private final Class<STEP> _clsStep;
