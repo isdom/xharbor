@@ -3,8 +3,6 @@
  */
 package org.jocean.xharbor.util;
 
-import java.lang.reflect.Array;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -23,6 +21,7 @@ import javax.management.openmbean.OpenMBeanParameterInfoSupport;
 import javax.management.openmbean.SimpleType;
 
 import org.jocean.idiom.ExceptionUtils;
+import org.jocean.idiom.ReflectUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,10 +39,10 @@ public abstract class BizMemoImpl<IMPL extends BizMemoImpl<IMPL,STEP,RESULT>,
     public BizMemoImpl(final Class<STEP> clsStep, final Class<RESULT> clsResult) {
         this._clsStep = clsStep;
         this._clsResult = clsResult;
-        this._steps = getValuesOf(clsStep);
+        this._steps = ReflectUtils.getValuesOf(clsStep);
         this._stepCounters = new AtomicInteger[this._steps.length];
         this._stepMemos = new TimeIntervalMemo[this._steps.length];
-        this._results = getValuesOf(clsResult);
+        this._results = ReflectUtils.getValuesOf(clsResult);
         this._resultCounters = new AtomicInteger[this._results.length];
         this._resultMemos = new TimeIntervalMemo[this._results.length];
         initCountersAndMemos(this._stepCounters, this._stepMemos);
@@ -56,19 +55,6 @@ public abstract class BizMemoImpl<IMPL extends BizMemoImpl<IMPL,STEP,RESULT>,
         for ( int idx = 0; idx < counters.length; idx++) {
             counters[idx] = new AtomicInteger(0);
             memos[idx] = TimeIntervalMemo.NOP;
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private static <T> T[] getValuesOf(final Class<T> cls) {
-        try {
-            final Method valuesMethod = cls.getDeclaredMethod("values");
-            final T[] values = (T[])valuesMethod.invoke(null);
-            return values;
-        } catch (Exception e) {
-            LOG.error("exception when invoke enum({})'s static method values, detail:{}",
-                    cls, ExceptionUtils.exception2detail(e));
-            return (T[]) Array.newInstance(cls, 0);
         }
     }
 
