@@ -36,8 +36,8 @@ import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.ValidationId;
 import org.jocean.idiom.block.Blob;
-import org.jocean.xharbor.relay.RelayContext.STEP;
 import org.jocean.xharbor.relay.RelayContext.RESULT;
+import org.jocean.xharbor.relay.RelayContext.STEP;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +56,7 @@ import org.slf4j.LoggerFactory;
  * |<---------------ttlRelayFailure--------------------------------->              |     +---> WHOLE time cost
  * |<------------------------------------ttlRelaySuccess-------------------------->|   --+
  */
-public class RelayFlow extends AbstractFlow<RelayFlow> {
+class RelayFlow extends AbstractFlow<RelayFlow> {
 
     private static final Logger LOG = LoggerFactory
             .getLogger(RelayFlow.class);
