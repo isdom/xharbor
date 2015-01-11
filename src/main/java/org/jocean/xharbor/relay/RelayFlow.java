@@ -16,6 +16,7 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.util.ReferenceCountUtil;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -159,7 +160,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             _watch4Step.start();
             _watch4Result.start();
             _relayCtx.memo().beginBizStep(STEP.OBTAINING_HTTPCLIENT);
-            _httpRequest = httpRequest;
+            _httpRequest = ReferenceCountUtil.retain(httpRequest);
             updateTransferHttpRequestState(_httpRequest);
             
             startObtainHttpClient();
@@ -177,7 +178,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
         @OnEvent(event = "sendHttpContent")
         private BizStep sendHttpContent(final HttpContent httpContent) {
 
-            _contents.add(httpContent);
+            _contents.add(ReferenceCountUtil.retain(httpContent));
             updateTransferHttpRequestState(httpContent);
             
             return currentEventHandler();
@@ -213,6 +214,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             for ( HttpContent content : _contents) {
                 try {
                     httpclient.sendHttpContent(content);
+                    ReferenceCountUtil.safeRelease(content);
                 }
                 catch (Exception e) {
                     LOG.error(
@@ -482,6 +484,10 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             if (null != flow._forceFinishedTimer) {
                 flow._forceFinishedTimer.detach();
                 flow._forceFinishedTimer = null;
+            }
+            ReferenceCountUtil.safeRelease(flow._httpRequest);
+            for (HttpContent content : flow._contents) {
+                ReferenceCountUtil.safeRelease(content);
             }
             flow._contents.clear();
         }
