@@ -22,9 +22,43 @@ import org.jocean.xharbor.spi.Router;
  * @author isdom
  *
  */
-public class RoutingInfo2URIs implements Router<RoutingInfo, URI[]>, RulesMXBean {
+public class RoutingInfo2URIs implements Cloneable, Router<RoutingInfo, URI[]>, RulesMXBean {
 
     private static final URI[] EMPTY_URIS = new URI[0];
+
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + ((_levels == null) ? 0 : _levels.hashCode());
+        return result;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        RoutingInfo2URIs other = (RoutingInfo2URIs) obj;
+        if (_levels == null) {
+            if (other._levels != null)
+                return false;
+        } else if (!_levels.equals(other._levels))
+            return false;
+        return true;
+    }
+
+    @Override
+    protected RoutingInfo2URIs clone() throws CloneNotSupportedException {
+        final RoutingInfo2URIs cloned = new RoutingInfo2URIs();
+        for ( Level level : this._levels ) {
+            cloned._levels.add(level.clone());
+        }
+        return cloned;
+    }
 
     @Override
     public String[] getRoutingRules() {
@@ -51,9 +85,29 @@ public class RoutingInfo2URIs implements Router<RoutingInfo, URI[]>, RulesMXBean
         return EMPTY_URIS;
     }
 
-    public void addRule(final int priority, final String uri, final RoutingInfo[] infoRegexs) 
+    public RoutingInfo2URIs freeze() {
+        this._isFrozen = true;
+        return  this;
+    }
+    
+    public RoutingInfo2URIs addOrUpdateRule(final int priority, final String uri, final RoutingInfo[] infoRegexs) 
             throws Exception {
-        getOrCreateLevel(priority).addRule(uri, infoRegexs);
+        if ( !this._isFrozen ) {
+            getOrCreateLevel(priority).addOrUpdateRule(uri, infoRegexs);
+            return  this;
+        } else {
+            return this.clone().addOrUpdateRule(priority, uri, infoRegexs);
+        }
+    }
+    
+    public RoutingInfo2URIs removeRule(final int priority, final String uri) 
+            throws Exception {
+        if ( !this._isFrozen ) {
+            getOrCreateLevel(priority).removeRule(uri);
+            return  this;
+        } else {
+            return this.clone().removeRule(priority, uri);
+        }
     }
     
     private Level getOrCreateLevel(final int priority) {
@@ -69,7 +123,14 @@ public class RoutingInfo2URIs implements Router<RoutingInfo, URI[]>, RulesMXBean
         return level;
     }
 
-    private static class Level implements Comparable<Level> {
+    static class Level implements Cloneable, Comparable<Level> {
+
+        @Override
+        public Level clone() throws CloneNotSupportedException {
+            final Level cloned = new Level(this._priority);
+            cloned._rules.putAll(this._rules);
+            return cloned;
+        }
 
         public Level(final int priority) {
             this._priority = priority;
@@ -114,7 +175,8 @@ public class RoutingInfo2URIs implements Router<RoutingInfo, URI[]>, RulesMXBean
             return this._priority;
         }
 
-        public void addRule(final String uri, final RoutingInfo[] infoRegexs) throws Exception {
+        public void addOrUpdateRule(final String uri, final RoutingInfo[] infoRegexs) 
+                throws Exception {
             final Pattern[] methodPatterns = new Pattern[infoRegexs.length];
             final Pattern[] pathPatterns = new Pattern[infoRegexs.length];
             for ( int idx = 0; idx < infoRegexs.length; idx++) {
@@ -122,6 +184,10 @@ public class RoutingInfo2URIs implements Router<RoutingInfo, URI[]>, RulesMXBean
                 pathPatterns[idx] = safeCompilePattern(infoRegexs[idx].getPath());
             }
             this._rules.put(new URI(uri), Pair.of(methodPatterns, pathPatterns));
+        }
+
+        public void removeRule(final String uri) throws Exception {
+            this._rules.remove(new URI(uri));
         }
 
         /**
@@ -178,8 +244,8 @@ public class RoutingInfo2URIs implements Router<RoutingInfo, URI[]>, RulesMXBean
         
         private final Map<URI, Pair<Pattern[],Pattern[]>> _rules = 
                 new HashMap<URI, Pair<Pattern[],Pattern[]>>();
-
     }
 
     private final SortedSet<Level> _levels = new TreeSet<Level>();
+    private transient boolean _isFrozen = false;
 }

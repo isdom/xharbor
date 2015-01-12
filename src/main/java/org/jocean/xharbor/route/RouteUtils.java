@@ -147,7 +147,7 @@ public class RouteUtils {
                     generateRule(client, pathToLevel + "/" + host, host);
             if ( null != rule ) {
                 try {
-                    router.addRule(priority, rule.getFirst(), rule.getSecond());
+                    router.addOrUpdateRule(priority, rule.getFirst(), rule.getSecond());
                 } catch (Exception e) {
                     LOG.warn("exception when add rule({}/{}) for level({}), detail:{}",
                             rule.getFirst(), Arrays.toString(rule.getSecond()), 
