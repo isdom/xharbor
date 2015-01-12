@@ -51,6 +51,7 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT>,
         this._implUpdater.updateImpl(routerImpl);
     }
 
+    @SuppressWarnings("unchecked")
     public CachedRouter(final EventReceiverSource source, 
             final CacheVisitor<INPUT, OUTPUT> cacheVisitor,
             final OnRouterUpdated<INPUT, OUTPUT> onRouterUpdated, 
