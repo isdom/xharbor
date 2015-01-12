@@ -19,6 +19,7 @@ import org.jocean.xharbor.spi.Router;
 import org.jocean.xharbor.util.BizMemoImpl;
 import org.jocean.xharbor.util.Rangeable;
 import org.jocean.xharbor.util.TIMemoImpl;
+import org.jocean.xharbor.util.TimeIntervalMemo;
 
 import com.google.common.collect.Range;
 
@@ -186,20 +187,11 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
         @Override
         public RelayMemoImpl apply(final Tuple tuple) {
             return new RelayMemoImpl()
-                .setTimeIntervalMemoOfStep(STEP.OBTAINING_HTTPCLIENT,
-                        _ttlMemos.get(tuple.append(STEP.OBTAINING_HTTPCLIENT)))
-                .setTimeIntervalMemoOfStep(STEP.TRANSFER_CONTENT,
-                        _ttlMemos.get(tuple.append(STEP.TRANSFER_CONTENT)))
-                .setTimeIntervalMemoOfStep(STEP.RECV_RESP,
-                        _ttlMemos.get(tuple.append(STEP.RECV_RESP)))
-                .setTimeIntervalMemoOfResult(RESULT.RELAY_SUCCESS,
-                        _ttlMemos.get(tuple.append(RESULT.RELAY_SUCCESS)))
-                .setTimeIntervalMemoOfResult(RESULT.SOURCE_CANCELED,
-                        _ttlMemos.get(tuple.append(RESULT.SOURCE_CANCELED)))
-                .setTimeIntervalMemoOfResult(RESULT.CONNECTDESTINATION_FAILURE,
-                        _ttlMemos.get(tuple.append(RESULT.CONNECTDESTINATION_FAILURE)))
-                .setTimeIntervalMemoOfResult(RESULT.RELAY_FAILURE,
-                        _ttlMemos.get(tuple.append(RESULT.RELAY_FAILURE)));
+                .fillTimeIntervalMemoWith(new Function<Enum<?>, TimeIntervalMemo>() {
+                    @Override
+                    public TimeIntervalMemo apply(final Enum<?> e) {
+                        return _ttlMemos.get(tuple.append(e));
+                    }});
         }};
 
     private final Visitor2<Tuple, RelayMemoImpl> _bizMemoRegister = 
@@ -250,19 +242,9 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
             new SimpleCache<Tuple, RelayMemoImpl>(this._bizMemoMaker, this._bizMemoRegister);
     
     private RelayMemoImpl _level0Memo = new RelayMemoImpl()
-            .setTimeIntervalMemoOfStep(STEP.OBTAINING_HTTPCLIENT,
-                    _ttlMemos.get(Tuple.of(STEP.OBTAINING_HTTPCLIENT)))
-            .setTimeIntervalMemoOfStep(STEP.TRANSFER_CONTENT,
-                    _ttlMemos.get(Tuple.of(STEP.TRANSFER_CONTENT)))
-            .setTimeIntervalMemoOfStep(STEP.RECV_RESP,
-                    _ttlMemos.get(Tuple.of(STEP.RECV_RESP)))
-            .setTimeIntervalMemoOfResult(RESULT.RELAY_SUCCESS,
-                    _ttlMemos.get(Tuple.of(RESULT.RELAY_SUCCESS)))
-            .setTimeIntervalMemoOfResult(RESULT.SOURCE_CANCELED,
-                    _ttlMemos.get(Tuple.of(RESULT.SOURCE_CANCELED)))
-            .setTimeIntervalMemoOfResult(RESULT.CONNECTDESTINATION_FAILURE,
-                    _ttlMemos.get(Tuple.of(RESULT.CONNECTDESTINATION_FAILURE)))
-            .setTimeIntervalMemoOfResult(RESULT.RELAY_FAILURE,
-                    _ttlMemos.get(Tuple.of(RESULT.RELAY_FAILURE)));
-
+        .fillTimeIntervalMemoWith(new Function<Enum<?>, TimeIntervalMemo>() {
+            @Override
+            public TimeIntervalMemo apply(final Enum<?> e) {
+                return _ttlMemos.get(Tuple.of(e));
+            }});
 }
