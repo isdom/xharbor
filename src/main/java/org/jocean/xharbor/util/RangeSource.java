@@ -9,6 +9,6 @@ import com.google.common.collect.Range;
  * @author isdom
  *
  */
-public interface Rangeable<C extends Comparable<C>> {
+public interface RangeSource<C extends Comparable<C>> {
     public Range<C> range();
 }

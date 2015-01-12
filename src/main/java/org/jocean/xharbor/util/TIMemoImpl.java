@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
  * @author isdom
  *
  */
-public class TIMemoImpl<R extends Enum<R> & Rangeable<Long>> implements TimeIntervalMemo {
+public class TIMemoImpl<R extends Enum<R> & RangeSource<Long>> implements TimeIntervalMemo {
 
     private static final Logger LOG = LoggerFactory
             .getLogger(TIMemoImpl.class);

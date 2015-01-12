@@ -17,7 +17,7 @@ import org.jocean.xharbor.relay.RelayContext.RelayMemo;
 import org.jocean.xharbor.relay.RelayContext.STEP;
 import org.jocean.xharbor.spi.Router;
 import org.jocean.xharbor.util.BizMemoImpl;
-import org.jocean.xharbor.util.Rangeable;
+import org.jocean.xharbor.util.RangeSource;
 import org.jocean.xharbor.util.TIMemoImpl;
 import org.jocean.xharbor.util.TimeIntervalMemo;
 
@@ -67,7 +67,7 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
         }
     }
 
-    private enum Range_10ms_100ms_500ms_1s_5s implements Rangeable<Long> {
+    private enum Range_10ms_100ms_500ms_1s_5s implements RangeSource<Long> {
         range_1_lt10ms(Range.closedOpen(0L, 10L)),
         range_2_lt100ms(Range.closedOpen(10L, 100L)),
         range_3_lt500ms(Range.closedOpen(100L, 500L)),
