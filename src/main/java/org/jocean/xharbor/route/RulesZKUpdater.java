@@ -35,7 +35,7 @@ public class RulesZKUpdater {
         this._zkCache = TreeCache.newBuilder(client, root).setCacheData(true).build();
         this._rules = new RoutingInfo2URIs();
         this._receiver = new UpdateImplFlow() {{
-            source.create(this, this.UPDATE);
+            source.create(this, this.UNINITIALIZED);
         }}.queryInterfaceInstance(EventReceiver.class);
         this._zkCache.getListenable().addListener(new TreeCacheListener() {
 
@@ -53,17 +53,15 @@ public class RulesZKUpdater {
     }
 
     private class UpdateImplFlow extends AbstractFlow<UpdateImplFlow> {
-        final BizStep UPDATE = new BizStep("routingrules.UPDATE") {
+        final BizStep UNINITIALIZED = new BizStep("updaterules.UNINITIALIZED") {
 
             @OnEvent(event = "NODE_ADDED")
             private BizStep nodeAdded(final TreeCacheEvent event) throws Exception {
-                final ChildData data = event.getData();
-                final Pair<Integer,String> pair = parseFromPath(data.getPath());
-                final RuleDesc desc = parseFromData(data.getData());
-                if (null != pair && null != desc ) {
-                    _rules = _rules.addOrUpdateRule(pair.getFirst(), desc.getScheme() + "://" + pair.getSecond(), 
-                            desc.getRegexs());
-//                    Arrays.asList( desc.getRegexs() ).toArray(new RoutingInfo[0])
+                try {
+                    addOrUpdateToRules(_rules, event);
+                } catch (Exception e) {
+                    LOG.warn("exception when addOrUpdateRules for event({}), detail:{}",
+                            event, ExceptionUtils.exception2detail(e));
                 }
                 
                 return currentEventHandler();
@@ -71,13 +69,54 @@ public class RulesZKUpdater {
             
             @OnEvent(event = "NODE_REMOVED")
             private BizStep nodeRemoved(final TreeCacheEvent event) throws Exception {
-                final ChildData data = event.getData();
-                final Pair<Integer,String> pair = parseFromPath(data.getPath());
-                if (null != pair ) {
-                    //  TODO add scheme info
-                    _rules = _rules.removeRule(pair.getFirst(), pair.getSecond());
-//                    Arrays.asList( desc.getRegexs() ).toArray(new RoutingInfo[0])
+                try {
+                    removeFromRules(_rules, event);
+                } catch (Exception e) {
+                    LOG.warn("exception when removeFromRules for event({}), detail:{}",
+                            event, ExceptionUtils.exception2detail(e));
                 }
+                
+                return currentEventHandler();
+            }
+            
+            @OnEvent(event = "NODE_UPDATED")
+            private BizStep nodeUpdated(final TreeCacheEvent event) throws Exception {
+                return nodeAdded(event);
+            }
+            
+            @OnEvent(event = "INITIALIZED")
+            private BizStep initialized(final TreeCacheEvent event) throws Exception {
+                updateRules(_rules.freeze());
+                return INITIALIZED;
+            }
+        }
+        .freeze();
+        
+        final BizStep INITIALIZED = new BizStep("updaterules.INITIALIZED") {
+
+            @OnEvent(event = "NODE_ADDED")
+            private BizStep nodeAdded(final TreeCacheEvent event) throws Exception {
+                try {
+                    _rules = addOrUpdateToRules(_rules, event);
+                    updateRules(_rules.freeze());
+                } catch (Exception e) {
+                    LOG.warn("exception when addOrUpdateRules for event({}), detail:{}",
+                            event, ExceptionUtils.exception2detail(e));
+                }
+                
+                return currentEventHandler();
+            }
+            
+            @OnEvent(event = "NODE_REMOVED")
+            private BizStep nodeRemoved(final TreeCacheEvent event) throws Exception {
+                try {
+                    _rules = removeFromRules(_rules, event);
+                    updateRules(_rules.freeze());
+                } catch (Exception e) {
+                    LOG.warn("exception when removeFromRules for event({}), detail:{}",
+                            event, ExceptionUtils.exception2detail(e));
+                }
+                
                 return currentEventHandler();
             }
             
@@ -87,6 +126,39 @@ public class RulesZKUpdater {
             }
         }
         .freeze();
+    }
+    
+    private RoutingInfo2URIs addOrUpdateToRules(
+            final RoutingInfo2URIs rules, 
+            final TreeCacheEvent event) throws Exception {
+        final ChildData data = event.getData();
+        final Pair<Integer,String> pair = parseFromPath(data.getPath());
+        final RuleDesc desc = parseFromData(data.getData());
+        if (null != pair && null != desc ) {
+            return rules.addOrUpdateRule(pair.getFirst(), pair.getSecond().replace(":||","://"), 
+                    desc.getRegexs());
+        }
+        return null;
+    }
+    
+    private RoutingInfo2URIs removeFromRules(
+            final RoutingInfo2URIs rules, 
+            final TreeCacheEvent event) throws Exception {
+        final ChildData data = event.getData();
+        final Pair<Integer,String> pair = parseFromPath(data.getPath());
+        if (null != pair ) {
+            return rules.removeRule(pair.getFirst(), pair.getSecond().replace(":||", "://"));
+        }
+        return null;
+    }
+    
+    private void updateRules(final RoutingInfo2URIs rules) {
+        try {
+            this._updateRules.visit(rules);
+        } catch (Exception e) {
+            LOG.warn("exception when update rules {} via ({}), detail:{}",
+                    rules, this._updateRules, ExceptionUtils.exception2detail(e));
+        }
     }
     
     public static class RuleDesc {
@@ -143,7 +215,10 @@ public class RulesZKUpdater {
     }
     
     private Pair<Integer, String> parseFromPath(final String path) {
-        final String pathToHost = path.substring(_root.length() + ( !_root.endsWith("/") ? 1 : 0 ));
+        if (path.length() <= this._root.length() ) {
+            return null;
+        }
+        final String pathToHost = path.substring(_root.length() + ( !this._root.endsWith("/") ? 1 : 0 ));
         final String[] arrays = pathToHost.split("/");
         if ( arrays.length != 2 ) {
             return null;
