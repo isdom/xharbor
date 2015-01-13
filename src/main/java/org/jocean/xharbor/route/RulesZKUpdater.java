@@ -34,8 +34,12 @@ public class RulesZKUpdater {
         this._root = root;
         this._zkCache = TreeCache.newBuilder(client, root).setCacheData(true).build();
         this._rules = new RoutingInfo2URIs();
+        this._source = source;
+    }
+    
+    public void start() {
         this._receiver = new ZKTreeWatcherFlow() {{
-            source.create(this, this.UNINITIALIZED);
+            _source.create(this, this.UNINITIALIZED);
         }}.queryInterfaceInstance(EventReceiver.class);
         this._zkCache.getListenable().addListener(new TreeCacheListener() {
 
@@ -280,5 +284,6 @@ public class RulesZKUpdater {
     private final TreeCache _zkCache;
     private final Visitor<RoutingInfo2URIs> _updateRules;
     private RoutingInfo2URIs _rules;
-    private final EventReceiver _receiver;
+    private EventReceiver _receiver;
+    private final EventReceiverSource _source;
 }

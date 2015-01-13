@@ -3,22 +3,18 @@
  */
 package org.jocean.xharbor;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import java.net.URI;
 
-import org.apache.curator.framework.CuratorFramework;
-import org.apache.curator.framework.CuratorFrameworkFactory;
-import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.jocean.event.api.EventReceiverSource;
 import org.jocean.event.extend.Runners;
 import org.jocean.event.extend.Services;
-import org.jocean.httpclient.HttpStack;
 import org.jocean.httpclient.impl.HttpUtils;
 import org.jocean.idiom.Function;
 import org.jocean.idiom.Visitor;
-import org.jocean.idiom.pool.Pools;
 import org.jocean.j2se.MBeanRegisterSupport;
-import org.jocean.netty.NettyClient;
-import org.jocean.xharbor.relay.RelayAgentImpl;
+import org.jocean.j2se.spring.BeanProxy;
 import org.jocean.xharbor.relay.RelayContext;
 import org.jocean.xharbor.route.CachedRouter;
 import org.jocean.xharbor.route.Request2RoutingInfo;
@@ -28,7 +24,6 @@ import org.jocean.xharbor.route.RoutingInfo2URIs;
 import org.jocean.xharbor.route.RulesZKUpdater;
 import org.jocean.xharbor.route.SelectURI;
 import org.jocean.xharbor.route.URI2RelayCtxOfRoutingInfo;
-import org.jocean.xharbor.spi.RelayAgent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.support.AbstractApplicationContext;
@@ -64,16 +59,18 @@ public class Main {
                     .executorSource(Services.lookupOrCreateFlowBasedExecutorSource("xharbor"))
                     );
         
-        final HttpStack httpStack = new HttpStack(
-                Pools.createCachedBytesPool(10240), 
-                source, 
-                new NettyClient(4), 
-                100);
+        ((BeanProxy<EventReceiverSource>) checkNotNull(ctx.getBean("&source", BeanProxy.class))).setImpl(source);
+        
+//        final HttpStack httpStack = new HttpStack(
+//                Pools.createCachedBytesPool(10240), 
+//                source, 
+//                new NettyClient(4), 
+//                100);
         
         final HttpGatewayServer<RelayContext> server = ctx.getBean(HttpGatewayServer.class);
         
-        final RelayAgent<RelayContext> agent = new RelayAgentImpl(httpStack, source);
-        server.setRelayAgent(agent);
+//        final RelayAgent<RelayContext> agent = new RelayAgentImpl(httpStack, source);
+//        server.setRelayAgent(agent);
         
         final CachedRouter<RoutingInfo, URI[]> cachedRouter = 
                 RouteUtils.buildCachedURIsRouter(
@@ -93,17 +90,27 @@ public class Main {
                 new URI2RelayCtxOfRoutingInfo()
                 ));
         
-        final CuratorFramework client = 
-                CuratorFrameworkFactory.newClient("121.41.45.51:2181", 
-                        new ExponentialBackoffRetry(1000, 3));
-        client.start();
+        ((BeanProxy<Visitor<RoutingInfo2URIs>>) checkNotNull(ctx.getBean("&updaterRules", BeanProxy.class)))
+            .setImpl(new Visitor<RoutingInfo2URIs>() {
+                @Override
+                public void visit(final RoutingInfo2URIs rules) throws Exception {
+                    cachedRouter.updateRouter(rules);
+                }});
         
-        final RulesZKUpdater updater = new RulesZKUpdater(source, client, "/demo", new Visitor<RoutingInfo2URIs>() {
-            @Override
-            public void visit(final RoutingInfo2URIs rules) throws Exception {
-                cachedRouter.updateRouter(rules);
-            }});
+//        final CuratorFramework client = 
+//                CuratorFrameworkFactory.newClient("121.41.45.51:2181", 
+//                        new ExponentialBackoffRetry(1000, 3));
+//        client.start();
+//        
+//        final RulesZKUpdater updater = new RulesZKUpdater(source, client, "/demo", new Visitor<RoutingInfo2URIs>() {
+//            @Override
+//            public void visit(final RoutingInfo2URIs rules) throws Exception {
+//                cachedRouter.updateRouter(rules);
+//            }});
+        final RulesZKUpdater updater = ctx.getBean(RulesZKUpdater.class);
         
+        updater.start();
+                
         final MBeanRegisterSupport register =
                 new MBeanRegisterSupport("org.jocean:name=htmladapter", null);
         HtmlAdaptorServer adapter = new HtmlAdaptorServer(); 
