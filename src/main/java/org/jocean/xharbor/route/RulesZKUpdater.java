@@ -34,7 +34,7 @@ public class RulesZKUpdater {
         this._root = root;
         this._zkCache = TreeCache.newBuilder(client, root).setCacheData(true).build();
         this._rules = new RoutingInfo2URIs();
-        this._receiver = new UpdateImplFlow() {{
+        this._receiver = new ZKTreeWatcherFlow() {{
             source.create(this, this.UNINITIALIZED);
         }}.queryInterfaceInstance(EventReceiver.class);
         this._zkCache.getListenable().addListener(new TreeCacheListener() {
@@ -52,11 +52,15 @@ public class RulesZKUpdater {
         }
     }
 
-    private class UpdateImplFlow extends AbstractFlow<UpdateImplFlow> {
+    private class ZKTreeWatcherFlow extends AbstractFlow<ZKTreeWatcherFlow> {
         final BizStep UNINITIALIZED = new BizStep("updaterules.UNINITIALIZED") {
 
             @OnEvent(event = "NODE_ADDED")
             private BizStep nodeAdded(final TreeCacheEvent event) throws Exception {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("handler ({}) with event ({}), try to add or update rule", 
+                            currentEventHandler(), event);
+                }
                 try {
                     addOrUpdateToRules(_rules, event);
                 } catch (Exception e) {
@@ -69,6 +73,10 @@ public class RulesZKUpdater {
             
             @OnEvent(event = "NODE_REMOVED")
             private BizStep nodeRemoved(final TreeCacheEvent event) throws Exception {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("handler ({}) with event ({}), try to remove rule", 
+                            currentEventHandler(), event);
+                }
                 try {
                     removeFromRules(_rules, event);
                 } catch (Exception e) {
@@ -86,7 +94,7 @@ public class RulesZKUpdater {
             
             @OnEvent(event = "INITIALIZED")
             private BizStep initialized(final TreeCacheEvent event) throws Exception {
-                updateRules(_rules.freeze());
+                updateRules(_rules);
                 return INITIALIZED;
             }
         }
@@ -96,9 +104,12 @@ public class RulesZKUpdater {
 
             @OnEvent(event = "NODE_ADDED")
             private BizStep nodeAdded(final TreeCacheEvent event) throws Exception {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("handler ({}) with event ({}), try to add or update rule", 
+                            currentEventHandler(), event);
+                }
                 try {
-                    _rules = addOrUpdateToRules(_rules, event);
-                    updateRules(_rules.freeze());
+                    updateRules(addOrUpdateToRules(_rules, event));
                 } catch (Exception e) {
                     LOG.warn("exception when addOrUpdateRules for event({}), detail:{}",
                             event, ExceptionUtils.exception2detail(e));
@@ -109,9 +120,12 @@ public class RulesZKUpdater {
             
             @OnEvent(event = "NODE_REMOVED")
             private BizStep nodeRemoved(final TreeCacheEvent event) throws Exception {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("handler ({}) with event ({}), try to remove rule", 
+                            currentEventHandler(), event);
+                }
                 try {
-                    _rules = removeFromRules(_rules, event);
-                    updateRules(_rules.freeze());
+                    updateRules(removeFromRules(_rules, event));
                 } catch (Exception e) {
                     LOG.warn("exception when removeFromRules for event({}), detail:{}",
                             event, ExceptionUtils.exception2detail(e));
@@ -135,8 +149,13 @@ public class RulesZKUpdater {
         final Pair<Integer,String> pair = parseFromPath(data.getPath());
         final RuleDesc desc = parseFromData(data.getData());
         if (null != pair && null != desc ) {
-            return rules.addOrUpdateRule(pair.getFirst(), pair.getSecond().replace(":||","://"), 
-                    desc.getRegexs());
+            final int priority = pair.getFirst();
+            final String uri = pair.getSecond().replace(":||","://");
+            if ( LOG.isDebugEnabled()) {
+                LOG.debug("add or update rule with {}/{}/{}", 
+                        priority, uri, Arrays.toString( desc.getRegexs()));
+            }
+            return rules.addOrUpdateRule(priority, uri, desc.getRegexs());
         }
         return null;
     }
@@ -147,17 +166,28 @@ public class RulesZKUpdater {
         final ChildData data = event.getData();
         final Pair<Integer,String> pair = parseFromPath(data.getPath());
         if (null != pair ) {
+            final int priority = pair.getFirst();
+            final String uri = pair.getSecond().replace(":||","://");
+            if ( LOG.isDebugEnabled()) {
+                LOG.debug("remove rule with {}/{}", priority, uri);
+            }
             return rules.removeRule(pair.getFirst(), pair.getSecond().replace(":||", "://"));
         }
         return null;
     }
     
-    private void updateRules(final RoutingInfo2URIs rules) {
-        try {
-            this._updateRules.visit(rules);
-        } catch (Exception e) {
-            LOG.warn("exception when update rules {} via ({}), detail:{}",
-                    rules, this._updateRules, ExceptionUtils.exception2detail(e));
+    private void updateRules(final RoutingInfo2URIs newRules) {
+        if ( null != newRules ) {
+            this._rules = newRules;
+            try {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("try to update rules for ({})", newRules);
+                }
+                this._updateRules.visit(this._rules.freeze());
+            } catch (Exception e) {
+                LOG.warn("exception when update rules {} via ({}), detail:{}",
+                        newRules, this._updateRules, ExceptionUtils.exception2detail(e));
+            }
         }
     }
     
