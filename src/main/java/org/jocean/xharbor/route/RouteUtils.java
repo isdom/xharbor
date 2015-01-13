@@ -53,7 +53,7 @@ public class RouteUtils {
         public String[] getRoutes();
     }
     
-    public static <INPUT> Router<INPUT, URI[]> buildCachedURIsRouter(
+    public static <INPUT> CachedRouter<INPUT, URI[]> buildCachedURIsRouter(
             final String prefix, 
             final EventReceiverSource source, 
             final Function<INPUT, String> input2objname) {

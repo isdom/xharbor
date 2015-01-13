@@ -15,7 +15,6 @@ import org.jocean.idiom.SimpleCache;
 import org.jocean.idiom.Visitor;
 import org.jocean.idiom.Visitor2;
 import org.jocean.xharbor.spi.Router;
-import org.jocean.xharbor.spi.RouterUpdatable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,8 +22,7 @@ import org.slf4j.LoggerFactory;
  * @author isdom
  *
  */
-public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT>, 
-    RouterUpdatable<INPUT, OUTPUT> {
+public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT> {
 
     private static final Logger LOG = LoggerFactory
             .getLogger(CachedRouter.class);
@@ -46,7 +44,6 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT>,
         return this._cache.get(input);
     }
 
-    @Override
     public void updateRouter(final Router<INPUT, OUTPUT> routerImpl) {
         this._implUpdater.updateImpl(routerImpl);
     }

@@ -20,6 +20,7 @@ import org.jocean.j2se.MBeanRegisterSupport;
 import org.jocean.netty.NettyClient;
 import org.jocean.xharbor.relay.RelayAgentImpl;
 import org.jocean.xharbor.relay.RelayContext;
+import org.jocean.xharbor.route.CachedRouter;
 import org.jocean.xharbor.route.Request2RoutingInfo;
 import org.jocean.xharbor.route.RouteUtils;
 import org.jocean.xharbor.route.RoutingInfo;
@@ -28,8 +29,6 @@ import org.jocean.xharbor.route.RulesZKUpdater;
 import org.jocean.xharbor.route.SelectURI;
 import org.jocean.xharbor.route.URI2RelayCtxOfRoutingInfo;
 import org.jocean.xharbor.spi.RelayAgent;
-import org.jocean.xharbor.spi.Router;
-import org.jocean.xharbor.spi.RouterUpdatable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.support.AbstractApplicationContext;
@@ -76,7 +75,7 @@ public class Main {
         final RelayAgent<RelayContext> agent = new RelayAgentImpl(httpStack, source);
         server.setRelayAgent(agent);
         
-        final Router<RoutingInfo, URI[]> cachedRouter = 
+        final CachedRouter<RoutingInfo, URI[]> cachedRouter = 
                 RouteUtils.buildCachedURIsRouter(
                         "org.jocean:type=router", 
                         source, 
@@ -102,7 +101,7 @@ public class Main {
         final RulesZKUpdater updater = new RulesZKUpdater(source, client, "/demo", new Visitor<RoutingInfo2URIs>() {
             @Override
             public void visit(final RoutingInfo2URIs rules) throws Exception {
-                ((RouterUpdatable<RoutingInfo, URI[]>)cachedRouter).updateRouter(rules);
+                cachedRouter.updateRouter(rules);
             }});
         
         final MBeanRegisterSupport register =
