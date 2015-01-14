@@ -61,12 +61,6 @@ public class Main {
         
         ((BeanProxy<EventReceiverSource>) checkNotNull(ctx.getBean("&source", BeanProxy.class))).setImpl(source);
         
-//        final HttpStack httpStack = new HttpStack(
-//                Pools.createCachedBytesPool(10240), 
-//                source, 
-//                new NettyClient(4), 
-//                100);
-        
         final HttpGatewayServer<RelayContext> server = ctx.getBean(HttpGatewayServer.class);
         
 //        final RelayAgent<RelayContext> agent = new RelayAgentImpl(httpStack, source);

@@ -6,7 +6,7 @@
     <bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
         <property name="locations">
             <list>
-                <value>classpath:xharbor.properties</value>
+                <value>classpath:${conf:xharbor}.properties</value>
             </list>
         </property>
         <property name="fileEncoding" value="UTF-8"/>
@@ -16,19 +16,27 @@
         <constructor-arg value="org.jocean.event.api.EventReceiverSource"/>
     </bean>
     
+    <bean id="bytesPool" class="org.jocean.idiom.pool.Pools" 
+        factory-method="createCachedBytesPool">
+        <constructor-arg value="${pool.bytes.blockSize:10240}"/>
+    </bean>
+ 
+<!--         final HttpStack httpStack = new HttpStack(
+              Pools.createCachedBytesPool(10240), 
+                source, 
+                new NettyClient(4), 
+                100);
+ -->
+ 
     <bean id="httpStack" class="org.jocean.httpclient.HttpStack">
-        <constructor-arg>
-            <bean class="org.jocean.idiom.pool.Pools" factory-method="createCachedBytesPool">
-                <constructor-arg value="10240"/>
-            </bean>
-        </constructor-arg>
+        <constructor-arg ref="bytesPool"/>
         <constructor-arg ref="source"/>
         <constructor-arg>
             <bean class="org.jocean.netty.NettyClient">
-                <constructor-arg value="4"/>
+                <constructor-arg value="${gateway.connector.processThreadNumber:4}"/>
             </bean>
         </constructor-arg>
-        <constructor-arg value="100"/>
+        <constructor-arg value="${gateway.connector.maxConnection:1000}"/>
     </bean>
     
     <bean id="relayAgent" class="org.jocean.xharbor.relay.RelayAgentImpl">
@@ -64,7 +72,7 @@
     <bean id="updater" class="org.jocean.xharbor.route.RulesZKUpdater">
         <constructor-arg ref="source"/>
         <constructor-arg ref="zkClient"/>
-        <constructor-arg value="${rules.path:/demo}"/>
+        <constructor-arg value="${zk.rules.path:/demo}"/>
         <constructor-arg ref="updaterRules"/>
     </bean>
     
@@ -79,5 +87,15 @@
                 cachedRouter.updateRouter(rules);
             }});
  -->
+
+    <bean id="exporter" class="org.springframework.jmx.export.MBeanExporter"
+          lazy-init="false">
+        <property name="beans">
+            <map>
+                <entry key="org.jocean:name=bytesPool" value-ref="bytesPool"/>
+                <entry key="org.jocean:name=httpStack" value-ref="httpStack"/>
+            </map>
+        </property>
+    </bean>
      
 </beans>
