@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <configuration scan="true" scanPeriod="5 seconds">
-    <contextName>http-gateway</contextName>
+    <contextName>xharbor</contextName>
     <jmxConfigurator/>
     <!-- direct log messages to stdout -->
     <appender name="stdout" class="ch.qos.logback.core.ConsoleAppender">
