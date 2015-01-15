@@ -300,7 +300,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("channel for {} recv response {}", _relayCtx.relayTo(), response);
             }
-            _channelCtx.write(response);
+            _channelCtx.write(ReferenceCountUtil.retain(response));
             return RECVCONTENT;
         }
     }
