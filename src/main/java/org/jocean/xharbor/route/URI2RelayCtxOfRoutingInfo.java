@@ -67,16 +67,18 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
         }
     }
 
-    private enum Range_10ms_100ms_500ms_1s_5s implements RangeSource<Long> {
+    private enum Range_10ms_30s implements RangeSource<Long> {
         range_1_lt10ms(Range.closedOpen(0L, 10L)),
         range_2_lt100ms(Range.closedOpen(10L, 100L)),
         range_3_lt500ms(Range.closedOpen(100L, 500L)),
         range_4_lt1s(Range.closedOpen(500L, 1000L)),
         range_5_lt5s(Range.closedOpen(1000L, 5000L)),
-        range_6_mt5s(Range.atLeast(5000L)),
+        range_6_lt10s(Range.closedOpen(5000L, 10000L)),
+        range_7_lt30s(Range.closedOpen(10000L, 30000L)),
+        range_8_mt30s(Range.atLeast(30000L)),
         ;
 
-        Range_10ms_100ms_500ms_1s_5s(final Range<Long> range) {
+        Range_10ms_30s(final Range<Long> range) {
             this._range = range;
         }
         
@@ -88,10 +90,10 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
         private final Range<Long> _range;
     }
     
-    private static class RelayTIMemoImpl extends TIMemoImpl<Range_10ms_100ms_500ms_1s_5s> {
+    private static class RelayTIMemoImpl extends TIMemoImpl<Range_10ms_30s> {
         
         public RelayTIMemoImpl() {
-            super(Range_10ms_100ms_500ms_1s_5s.class);
+            super(Range_10ms_30s.class);
         }
     }
     

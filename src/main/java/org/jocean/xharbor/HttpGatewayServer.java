@@ -61,17 +61,10 @@ public class HttpGatewayServer<RELAYCTX> {
     private TrafficCounterExt _trafficCounterExt;
     private boolean _logByteStream = false;
     private int _idleTimeSeconds = 180; //seconds  为了避免建立了过多的闲置连接 闲置180秒的连接主动关闭
-//    private int _chunkDataSzie = 1048576; //1024 * 1024
     
     private RelayAgent<RELAYCTX>  _relayAgent;
-//    private String _destUri = "http://127.0.0.1:8000";
     private Router<HttpRequest, RELAYCTX> _router;
     
-    /**
-     * 负责处理来自终端的request到AccessCenterBiz
-     * @author Bluces.Wang@sky-mobi.com
-     *
-     */
     @ChannelHandler.Sharable
     private class RelayHandler extends ChannelInboundHandlerAdapter{
         @Override
@@ -119,7 +112,9 @@ public class HttpGatewayServer<RELAYCTX> {
                     
                     final Map<String, Object> routectx = new HashMap<String, Object>();
                     
-                    final RELAYCTX relayCtx = _router.calculateRoute(request, new Router.Context() {
+                    final RELAYCTX relayCtx = _router.calculateRoute(request, 
+                            //  TODO, reuse Router.Context, not create per http message
+                            new Router.Context() {
                         
                         @Override
                         public <V> Context setProperty(final String key, final V obj) {
@@ -141,7 +136,9 @@ public class HttpGatewayServer<RELAYCTX> {
                     routectx.clear();
                     
                     if ( null == relayCtx ) {
-                        LOG.warn("can't found matched dest uri for request {}, just ignore", request);
+                        LOG.warn("can't found matched dest uri for request {}, just close client http connection", 
+                                request, ctx.channel());
+                        ctx.close();
                         return;
                     }
                     
