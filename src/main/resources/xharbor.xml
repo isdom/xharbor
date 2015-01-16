@@ -87,7 +87,15 @@
                 cachedRouter.updateRouter(rules);
             }});
  -->
- 
+
+    <bean id="jmxConnectorServer" 
+        class="org.springframework.jmx.support.ConnectorServerFactoryBean"  >
+        <property name="serviceUrl" value="service:jmx:jmxmp://0.0.0.0:${jmxmp.port:9876}" />
+        <property name="threaded"   value="true" />
+        <property name="daemon"     value="true" />
+        <property name="objectName" value="org.jocean:type=agent,name0=jmxmp" />
+    </bean>
+     
     <bean id="htmlAdaptorServer" class="com.sun.jdmk.comm.HtmlAdaptorServer" 
         init-method="start" destroy-method="stop"/>
 

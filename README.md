@@ -18,4 +18,6 @@ TODO:
   
   6、将计算路由的逻辑从HttpGatewayServer中迁移到RelayFlow中，路由计算所耗用的是异步事件线程池中的线程计算资源，
     可降低占用接收Client信息的 Netty 所管理线程池的计算开销
+    
+  7、增加 JMX ConnectServer using jmxmp protocol
      
