@@ -141,7 +141,7 @@ public class HttpGatewayServer<RELAYCTX> {
                     ctx.attr(ROUTERCTX).get().clear();
                     
                     if ( null == relayCtx ) {
-                        LOG.warn("can't found matched dest uri for request {}, just close client http connection", 
+                        LOG.warn("can't found matched dest uri for request {}, just close client http connection ({}).", 
                                 request, ctx.channel());
                         ctx.close();
                         return;
