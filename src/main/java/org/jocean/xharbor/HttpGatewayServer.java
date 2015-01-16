@@ -45,7 +45,33 @@ public class HttpGatewayServer<RELAYCTX> {
     private static final Logger LOG = LoggerFactory
             .getLogger(HttpGatewayServer.class);
 
+    private static class RouterCtxImpl implements Router.Context {
+        private final HashMap<String, Object> _map = new HashMap<String, Object>();
+        
+        @Override
+        public <V> Context setProperty(final String key, final V obj) {
+            _map.put(key, obj);
+            return this;
+        }
+        
+        @SuppressWarnings("unchecked")
+        @Override
+        public <V> V getProperty(String key) {
+            return (V)_map.get(key);
+        }
+        
+        @Override
+        public Map<String, Object> getProperties() {
+            return _map;
+        }
+        
+        public void clear() {
+            _map.clear();
+        }
+    }
+    
     public static final AttributeKey<RelayTask> RELAY = AttributeKey.valueOf("RELAY");
+    public static final AttributeKey<RouterCtxImpl> ROUTERCTX = AttributeKey.valueOf("ROUTERCTX");
     
     private static final int MAX_RETRY = 20;
     private static final long RETRY_TIMEOUT = 30 * 1000; // 30s
@@ -110,30 +136,9 @@ public class HttpGatewayServer<RELAYCTX> {
                         LOG.debug("messageReceived:{} default http request\n[{}]",ctx.channel(),request);
                     }
                     
-                    final Map<String, Object> routectx = new HashMap<String, Object>();
+                    final RELAYCTX relayCtx = _router.calculateRoute(request, ctx.attr(ROUTERCTX).get());
                     
-                    final RELAYCTX relayCtx = _router.calculateRoute(request, 
-                            //  TODO, reuse Router.Context, not create per http message
-                            new Router.Context() {
-                        
-                        @Override
-                        public <V> Context setProperty(final String key, final V obj) {
-                            routectx.put(key, obj);
-                            return this;
-                        }
-                        
-                        @Override
-                        public <V> V getProperty(String key) {
-                            return (V)routectx.get(key);
-                        }
-                        
-                        @Override
-                        public Map<String, Object> getProperties() {
-                            return routectx;
-                        }
-                    });
-                    
-                    routectx.clear();
+                    ctx.attr(ROUTERCTX).get().clear();
                     
                     if ( null == relayCtx ) {
                         LOG.warn("can't found matched dest uri for request {}, just close client http connection", 
@@ -174,10 +179,14 @@ public class HttpGatewayServer<RELAYCTX> {
         @Override
         public void channelInactive(ChannelHandlerContext ctx) throws Exception {
             detachCurrentTaskOf(ctx);
+            //  clear router ctx
+            ctx.attr(ROUTERCTX).set(null);
         }
 
         @Override
         public void channelActive(ChannelHandlerContext ctx) throws Exception {
+            //  init router ctx
+            ctx.attr(ROUTERCTX).set(new RouterCtxImpl());
         }
     }
     
