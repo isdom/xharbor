@@ -18,7 +18,7 @@ import org.jocean.xharbor.relay.RelayContext.STEP;
 import org.jocean.xharbor.spi.Router;
 import org.jocean.xharbor.util.BizMemoImpl;
 import org.jocean.xharbor.util.RangeSource;
-import org.jocean.xharbor.util.TIMemoImpl;
+import org.jocean.xharbor.util.TIMemoImplOfRanges;
 import org.jocean.xharbor.util.TimeIntervalMemo;
 
 import com.google.common.collect.Range;
@@ -90,11 +90,36 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
         private final Range<Long> _range;
     }
     
-    private static class RelayTIMemoImpl extends TIMemoImpl<Range_10ms_30s> {
-        
-        public RelayTIMemoImpl() {
-            super(Range_10ms_30s.class);
-        }
+//    private static class RelayTIMemoImpl extends TIMemoImpl<Range_10ms_30s> {
+//        
+//        public RelayTIMemoImpl() {
+//            super(Range_10ms_30s.class);
+//        }
+//    }
+    
+      private static class RelayTIMemoImpl extends TIMemoImplOfRanges {
+      
+          public RelayTIMemoImpl() {
+              super(new String[]{
+                      "lt10ms",
+                      "lt100ms",
+                      "lt500ms",
+                      "lt1s",
+                      "lt5s",
+                      "lt10s",
+                      "lt30s",
+                      "mt30s",
+                      },
+                      new Range[]{
+                      Range.closedOpen(0L, 10L),
+                      Range.closedOpen(10L, 100L),
+                      Range.closedOpen(100L, 500L),
+                      Range.closedOpen(500L, 1000L),
+                      Range.closedOpen(1000L, 5000L),
+                      Range.closedOpen(5000L, 10000L),
+                      Range.closedOpen(10000L, 30000L),
+                      Range.atLeast(30000L)});
+          }
     }
     
     private static class RelayMemoImpl extends BizMemoImpl<RelayMemoImpl, STEP, RESULT> 
