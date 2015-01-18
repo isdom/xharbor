@@ -21,7 +21,9 @@ import io.netty.util.ReferenceCountUtil;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.jocean.event.api.AbstractFlow;
 import org.jocean.event.api.BizStep;
@@ -39,6 +41,8 @@ import org.jocean.idiom.ValidationId;
 import org.jocean.idiom.block.Blob;
 import org.jocean.xharbor.relay.RelayContext.RESULT;
 import org.jocean.xharbor.relay.RelayContext.STEP;
+import org.jocean.xharbor.spi.Router;
+import org.jocean.xharbor.spi.Router.Context;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,10 +65,38 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
 
     private static final Logger LOG = LoggerFactory
             .getLogger(RelayFlow.class);
+    
+    private static class RouterCtxImpl implements Router.Context {
+        private final HashMap<String, Object> _map = new HashMap<String, Object>();
+        
+        @Override
+        public <V> Context setProperty(final String key, final V obj) {
+            _map.put(key, obj);
+            return this;
+        }
+        
+        @SuppressWarnings("unchecked")
+        @Override
+        public <V> V getProperty(String key) {
+            return (V)_map.get(key);
+        }
+        
+        @Override
+        public Map<String, Object> getProperties() {
+            return _map;
+        }
+        
+        public void clear() {
+            _map.clear();
+        }
+    }
 
-    public RelayFlow(final Guide guide, final RelayContext relayCtx, final ChannelHandlerContext channelCtx) {
+    public RelayFlow(
+            final Router<HttpRequest, RelayContext> router, 
+            final Guide guide, 
+            final ChannelHandlerContext channelCtx) {
         this._guide = guide;
-        this._relayCtx = relayCtx;
+        this._router = router;
         this._channelCtx = channelCtx;
         
         addFlowLifecycleListener(RELAY_LIFECYCLE_LISTENER);
@@ -159,6 +191,25 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
 
             _watch4Step.start();
             _watch4Result.start();
+            
+            final RouterCtxImpl reouterctx = new RouterCtxImpl();
+            _relayCtx = _router.calculateRoute(httpRequest, reouterctx);
+            reouterctx.clear();
+            
+            _relayCtx.memo().beginBizStep(STEP.ROUTING);
+            _relayCtx.memo().endBizStep(STEP.ROUTING, _watch4Step.stopAndRestart());
+            if ( null == _relayCtx.relayTo() ) {
+                LOG.warn("can't found matched dest uri for request {}, just close client http connection ({}).", 
+                        httpRequest, _channelCtx.channel());
+                _channelCtx.close();
+                _relayCtx.memo().incBizResult(RESULT.NO_ROUTING, _watch4Result.stopAndRestart());
+                return  null;
+            }
+            
+            if ( LOG.isDebugEnabled() ) {
+                LOG.debug("dispatch to ({}) for request({})", _relayCtx.relayTo(), httpRequest);
+            }
+            
             _relayCtx.memo().beginBizStep(STEP.OBTAINING_HTTPCLIENT);
             _httpRequest = ReferenceCountUtil.retain(httpRequest);
             updateTransferHttpRequestState(_httpRequest);
@@ -494,11 +545,12 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
     };
     
     private final Guide _guide;
-    private final RelayContext _relayCtx;
+    private final Router<HttpRequest, RelayContext> _router;
     private final ChannelHandlerContext _channelCtx;
-    
-    private HttpClient _httpClient;
     private HttpRequest _httpRequest;
+    
+    private RelayContext _relayCtx;
+    private HttpClient _httpClient;
     private final List<HttpContent> _contents = new ArrayList<HttpContent>();
     private boolean _transferHttpRequestComplete = false;
     

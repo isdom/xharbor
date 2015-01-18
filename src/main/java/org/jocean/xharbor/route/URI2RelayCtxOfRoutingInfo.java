@@ -17,7 +17,6 @@ import org.jocean.xharbor.relay.RelayContext.RelayMemo;
 import org.jocean.xharbor.relay.RelayContext.STEP;
 import org.jocean.xharbor.spi.Router;
 import org.jocean.xharbor.util.BizMemoImpl;
-import org.jocean.xharbor.util.RangeSource;
 import org.jocean.xharbor.util.TIMemoImplOfRanges;
 import org.jocean.xharbor.util.TimeIntervalMemo;
 
@@ -40,55 +39,55 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
     
     @Override
     public RelayContext calculateRoute(final URI uri, final Context routectx) {
-        if (null != uri) {
-            final RoutingInfo info = routectx.getProperty("routingInfo");
-            final RelayContext.RelayMemo memo = 
-                    InterfaceUtils.combineImpls(RelayContext.RelayMemo.class, 
-                    this._bizMemos.get(Tuple.of(info.getPath(), info.getMethod(), uri2value(uri))),
-                    this._bizMemos.get(Tuple.of(info.getPath(), info.getMethod())),
-                    this._bizMemos.get(Tuple.of(info.getPath())),
-                    this._level0Memo
-                    );
-            
-            return new RelayContext() {
+        final RoutingInfo info = routectx.getProperty("routingInfo");
+        final RelayContext.RelayMemo memoBase = 
+                InterfaceUtils.combineImpls(RelayContext.RelayMemo.class, 
+                this._level0Memo,
+                this._bizMemos.get(Tuple.of(info.getPath())),
+                this._bizMemos.get(Tuple.of(info.getPath(), info.getMethod()))
+                );
+        final RelayContext.RelayMemo memo = 
+                null != uri 
+                ? InterfaceUtils.combineImpls(RelayContext.RelayMemo.class, 
+                    memoBase,
+                    this._bizMemos.get(Tuple.of(info.getPath(), info.getMethod(), uri2value(uri))) )
+                : memoBase;
+        
+        return new RelayContext() {
 
-                @Override
-                public URI relayTo() {
-                    return uri;
-                }
+            @Override
+            public URI relayTo() {
+                return uri;
+            }
 
-                @Override
-                public RelayMemo memo() {
-                    return memo;
-                }};
-        }
-        else {
-            return null;
-        }
+            @Override
+            public RelayMemo memo() {
+                return memo;
+            }};
     }
 
-    private enum Range_10ms_30s implements RangeSource<Long> {
-        range_1_lt10ms(Range.closedOpen(0L, 10L)),
-        range_2_lt100ms(Range.closedOpen(10L, 100L)),
-        range_3_lt500ms(Range.closedOpen(100L, 500L)),
-        range_4_lt1s(Range.closedOpen(500L, 1000L)),
-        range_5_lt5s(Range.closedOpen(1000L, 5000L)),
-        range_6_lt10s(Range.closedOpen(5000L, 10000L)),
-        range_7_lt30s(Range.closedOpen(10000L, 30000L)),
-        range_8_mt30s(Range.atLeast(30000L)),
-        ;
-
-        Range_10ms_30s(final Range<Long> range) {
-            this._range = range;
-        }
-        
-        @Override
-        public Range<Long> range() {
-            return _range;
-        }
-        
-        private final Range<Long> _range;
-    }
+//    private enum Range_10ms_30s implements RangeSource<Long> {
+//        range_1_lt10ms(Range.closedOpen(0L, 10L)),
+//        range_2_lt100ms(Range.closedOpen(10L, 100L)),
+//        range_3_lt500ms(Range.closedOpen(100L, 500L)),
+//        range_4_lt1s(Range.closedOpen(500L, 1000L)),
+//        range_5_lt5s(Range.closedOpen(1000L, 5000L)),
+//        range_6_lt10s(Range.closedOpen(5000L, 10000L)),
+//        range_7_lt30s(Range.closedOpen(10000L, 30000L)),
+//        range_8_mt30s(Range.atLeast(30000L)),
+//        ;
+//
+//        Range_10ms_30s(final Range<Long> range) {
+//            this._range = range;
+//        }
+//        
+//        @Override
+//        public Range<Long> range() {
+//            return _range;
+//        }
+//        
+//        private final Range<Long> _range;
+//    }
     
 //    private static class RelayTIMemoImpl extends TIMemoImpl<Range_10ms_30s> {
 //        
@@ -99,7 +98,8 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
     
       private static class RelayTIMemoImpl extends TIMemoImplOfRanges {
       
-          public RelayTIMemoImpl() {
+          @SuppressWarnings("unchecked")
+        public RelayTIMemoImpl() {
               super(new String[]{
                       "lt10ms",
                       "lt100ms",

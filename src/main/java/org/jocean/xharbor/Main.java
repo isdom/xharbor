@@ -14,6 +14,7 @@ import org.jocean.httpclient.impl.HttpUtils;
 import org.jocean.idiom.Function;
 import org.jocean.idiom.Visitor;
 import org.jocean.j2se.spring.BeanProxy;
+import org.jocean.xharbor.relay.RelayAgentImpl;
 import org.jocean.xharbor.relay.RelayContext;
 import org.jocean.xharbor.route.CachedRouter;
 import org.jocean.xharbor.route.Request2RoutingInfo;
@@ -56,7 +57,7 @@ public class Main {
         
         ((BeanProxy<EventReceiverSource>) checkNotNull(ctx.getBean("&source", BeanProxy.class))).setImpl(source);
         
-        final HttpGatewayServer<RelayContext> server = ctx.getBean(HttpGatewayServer.class);
+        final RelayAgentImpl relayAgent = ctx.getBean(RelayAgentImpl.class);
         
         final CachedRouter<RoutingInfo, URI[]> cachedRouter = 
                 RouteUtils.buildCachedURIsRouter(
@@ -69,7 +70,7 @@ public class Main {
                             }});
        
         
-        server.setRouter(RouteUtils.buildCompositeRouter(
+        relayAgent.setRouter(RouteUtils.buildCompositeRouter(
                 new Request2RoutingInfo(), RelayContext.class,
                 cachedRouter,
                 new SelectURI(),

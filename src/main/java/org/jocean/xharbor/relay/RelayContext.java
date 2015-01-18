@@ -14,16 +14,18 @@ import org.jocean.xharbor.util.BizMemo;
 public interface RelayContext {
     
     public enum STEP { 
+        ROUTING,
         OBTAINING_HTTPCLIENT,
         TRANSFER_CONTENT,
         RECV_RESP,
     }
     
     public enum RESULT { 
+        NO_ROUTING,
+        CONNECTDESTINATION_FAILURE,
         RELAY_SUCCESS,
         RELAY_FAILURE,
         SOURCE_CANCELED,
-        CONNECTDESTINATION_FAILURE
     }
     
     public interface RelayMemo extends BizMemo<STEP, RESULT> {

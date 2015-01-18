@@ -24,15 +24,11 @@ import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.jocean.ext.netty.initializer.BaseInitializer;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.xharbor.spi.RelayAgent;
 import org.jocean.xharbor.spi.RelayAgent.RelayTask;
-import org.jocean.xharbor.spi.Router;
-import org.jocean.xharbor.spi.Router.Context;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,38 +36,12 @@ import org.slf4j.LoggerFactory;
  * @author isdom
  *
  */
-public class HttpGatewayServer<RELAYCTX> {
+public class HttpGatewayServer {
     
     private static final Logger LOG = LoggerFactory
             .getLogger(HttpGatewayServer.class);
 
-    private static class RouterCtxImpl implements Router.Context {
-        private final HashMap<String, Object> _map = new HashMap<String, Object>();
-        
-        @Override
-        public <V> Context setProperty(final String key, final V obj) {
-            _map.put(key, obj);
-            return this;
-        }
-        
-        @SuppressWarnings("unchecked")
-        @Override
-        public <V> V getProperty(String key) {
-            return (V)_map.get(key);
-        }
-        
-        @Override
-        public Map<String, Object> getProperties() {
-            return _map;
-        }
-        
-        public void clear() {
-            _map.clear();
-        }
-    }
-    
     public static final AttributeKey<RelayTask> RELAY = AttributeKey.valueOf("RELAY");
-    public static final AttributeKey<RouterCtxImpl> ROUTERCTX = AttributeKey.valueOf("ROUTERCTX");
     
     private static final int MAX_RETRY = 20;
     private static final long RETRY_TIMEOUT = 30 * 1000; // 30s
@@ -88,8 +58,7 @@ public class HttpGatewayServer<RELAYCTX> {
     private boolean _logByteStream = false;
     private int _idleTimeSeconds = 180; //seconds  为了避免建立了过多的闲置连接 闲置180秒的连接主动关闭
     
-    private RelayAgent<RELAYCTX>  _relayAgent;
-    private Router<HttpRequest, RELAYCTX> _router;
+    private RelayAgent  _relayAgent;
     
     @ChannelHandler.Sharable
     private class RelayHandler extends ChannelInboundHandlerAdapter{
@@ -136,24 +105,9 @@ public class HttpGatewayServer<RELAYCTX> {
                         LOG.debug("messageReceived:{} default http request\n[{}]",ctx.channel(),request);
                     }
                     
-                    final RELAYCTX relayCtx = _router.calculateRoute(request, ctx.attr(ROUTERCTX).get());
-                    
-                    ctx.attr(ROUTERCTX).get().clear();
-                    
-                    if ( null == relayCtx ) {
-                        LOG.warn("can't found matched dest uri for request {}, just close client http connection ({}).", 
-                                request, ctx.channel());
-                        ctx.close();
-                        return;
-                    }
-                    
-                    if ( LOG.isDebugEnabled() ) {
-                        LOG.debug("dispatch to ({}) for request({})", relayCtx, request);
-                    }
-                    
                     detachCurrentTaskOf(ctx);
                     
-                    final RelayTask newTask = _relayAgent.createRelayTask(relayCtx, ctx);
+                    final RelayTask newTask = _relayAgent.createRelayTask(ctx);
                     setRelayTaskOf(ctx, newTask);
                     newTask.sendHttpRequest(request);
                 }
@@ -179,14 +133,10 @@ public class HttpGatewayServer<RELAYCTX> {
         @Override
         public void channelInactive(ChannelHandlerContext ctx) throws Exception {
             detachCurrentTaskOf(ctx);
-            //  clear router ctx
-            ctx.attr(ROUTERCTX).set(null);
         }
 
         @Override
         public void channelActive(ChannelHandlerContext ctx) throws Exception {
-            //  init router ctx
-            ctx.attr(ROUTERCTX).set(new RouterCtxImpl());
         }
     }
     
@@ -349,12 +299,8 @@ public class HttpGatewayServer<RELAYCTX> {
     public void setTrafficCounterExt(TrafficCounterExt trafficCounterExt) {
         this._trafficCounterExt = trafficCounterExt;
     }
-
-    public void setRelayAgent(final RelayAgent<RELAYCTX> agent) {
-        this._relayAgent = agent;
-    }
     
-    public void setRouter(final Router<HttpRequest, RELAYCTX> router) {
-        this._router = router;
+    public void setRelayAgent(final RelayAgent relayAgent) {
+        this._relayAgent = relayAgent;
     }
 }

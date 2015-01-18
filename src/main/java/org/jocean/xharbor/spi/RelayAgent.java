@@ -14,7 +14,7 @@ import org.jocean.idiom.Detachable;
  * @author isdom
  *
  */
-public interface RelayAgent<RELAYCTX> {
+public interface RelayAgent {
     public interface RelayTask extends Detachable {
         @GuardPaired(paired={"org.jocean.netty.NettyUtils._NETTY_REFCOUNTED_GUARD"})
         public void sendHttpRequest(final HttpRequest httpRequest);
@@ -23,5 +23,5 @@ public interface RelayAgent<RELAYCTX> {
         public void sendHttpContent(final HttpContent httpContent);
     }
     
-    public RelayTask createRelayTask(final RELAYCTX relayCtx, final ChannelHandlerContext channelCtx);
+    public RelayTask createRelayTask(final ChannelHandlerContext channelCtx);
 }

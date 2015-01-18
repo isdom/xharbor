@@ -14,10 +14,12 @@ TODO:
 
   4、根据是否存在有效的转发规则，启动或停止 HttpGatewayServer 实例
 
-  5、对于没有匹配的转发地址的客户端，需要增加JMX MBean指标进行监控这样的请求个数
-  6、将计算路由的逻辑从HttpGatewayServer中迁移到RelayFlow中，路由计算所耗用的是异步事件线程池中的线程计算资源，
-    可降低占用接收Client信息的 Netty 所管理线程池的计算开销
+  5、~~对于没有匹配的转发地址的客户端，需要增加JMX MBean指标进行监控这样的请求个数~~
+  6、~~将计算路由的逻辑从HttpGatewayServer中迁移到RelayFlow中，路由计算所耗用的是异步事件线程池中的线程计算资源，
+    可降低占用接收Client信息的 Netty 所管理线程池的计算开销~~
     
-  5，6 需求可合并起来实现。
+  ~~5，6 需求可合并起来实现。~~ 2015-01-18已实现
 
   7、~~增加 JMX ConnectServer using jmxmp protocol~~
+  
+  8、Routing 计算是否可以异步化
