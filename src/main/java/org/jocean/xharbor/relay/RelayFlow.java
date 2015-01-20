@@ -56,6 +56,12 @@ import org.slf4j.LoggerFactory;
  */
 class RelayFlow extends AbstractFlow<RelayFlow> {
 
+    @Override
+    public String toString() {
+        return "RelayFlow [httpRequest=" + _httpRequest + ", guideId="
+                + _guideId + ", httpClientId=" + _httpClientId + "]";
+    }
+
     private static final Logger LOG = LoggerFactory
             .getLogger(RelayFlow.class);
     

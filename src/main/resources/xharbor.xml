@@ -98,10 +98,13 @@
     <bean id="htmlAdaptorServer" class="com.sun.jdmk.comm.HtmlAdaptorServer" 
         init-method="start" destroy-method="stop"/>
 
+    <bean id="directMemory" class="org.jocean.xharbor.DirectMemoryIndicator"/>
+    
     <bean id="exporter" class="org.springframework.jmx.export.MBeanExporter"
           lazy-init="false">
         <property name="beans">
             <map>
+                <entry key="org.jocean:name=directMemory" value-ref="directMemory"/>
                 <entry key="org.jocean:name=bytesPool" value-ref="bytesPool"/>
                 <entry key="org.jocean:name=httpStack" value-ref="httpStack"/>
                 <entry key="org.jocean:name=htmladapter,port=8082" value-ref="htmlAdaptorServer"/>

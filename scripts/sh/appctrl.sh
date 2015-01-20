@@ -17,6 +17,7 @@ fi
 
 HEAP_MEMORY=1024m
 PERM_MEMORY=128m
+DIRECT_MEMORY=512m
 JMX_PORT=8002
 SERVER_NAME=xharbor
 
@@ -27,7 +28,8 @@ start)
     echo  "Starting $SERVER_NAME ... "
 
     # -Djava.nio.channels.spi.SelectorProvider=sun.nio.ch.EPollSelectorProvider remove this flag for jdk 1.7 & mac
-    JAVA_OPTS="-server -XX:+HeapDumpOnOutOfMemoryError -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
+    JAVA_OPTS="-server -XX:+HeapDumpOnOutOfMemoryError"
+    JAVA_OPTS="${JAVA_OPTS} -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
     
     shift
     ARGS=($*)
@@ -36,10 +38,16 @@ start)
         -D*)    JAVA_OPTS="${JAVA_OPTS} ${ARGS[$i]}" ;;
         -Heap*) HEAP_MEMORY="${ARGS[$i+1]}" ;;
         -Perm*) PERM_MEMORY="${ARGS[$i+1]}" ;;
+        -Direct*) DIRECT_MEMORY="${ARGS[$i+1]}" ;;
         -JmxPort*)  JMX_PORT="${ARGS[$i+1]}" ;;
         esac
     done
-    JAVA_OPTS="${JAVA_OPTS} -Xms${HEAP_MEMORY} -Xmx${HEAP_MEMORY} -XX:+AlwaysPreTouch -XX:PermSize=${PERM_MEMORY} -XX:MaxPermSize=${PERM_MEMORY} -Dcom.sun.management.jmxremote.port=${JMX_PORT} -Duser.dir=${SERVER_HOME} -Dapp.name=$SERVER_NAME"
+    JAVA_OPTS="${JAVA_OPTS} -Dcom.sun.management.jmxremote.port=${JMX_PORT}"
+    JAVA_OPTS="${JAVA_OPTS} -Xms${HEAP_MEMORY} -Xmx${HEAP_MEMORY} -XX:PermSize=${PERM_MEMORY} -XX:MaxPermSize=${PERM_MEMORY}  "
+    JAVA_OPTS="${JAVA_OPTS} -XX:MaxDirectMemorySize=${DIRECT_MEMORY}"
+    JAVA_OPTS="${JAVA_OPTS} -XX:+AlwaysPreTouch"
+    JAVA_OPTS="${JAVA_OPTS} -Dio.netty.allocator.type=pooled"
+    JAVA_OPTS="${JAVA_OPTS} -Duser.dir=${SERVER_HOME} -Dapp.name=$SERVER_NAME"
     echo "start jvm args ${JAVA_OPTS}"
     nohup java $JAVA_OPTS -jar ${SERVER_HOME}/bin/$SERVER_NAME.jar >/dev/null &
     echo $! > $PIDFILE
