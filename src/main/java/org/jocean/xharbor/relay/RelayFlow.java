@@ -3,13 +3,9 @@
  */
 package org.jocean.xharbor.relay;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.DefaultHttpContent;
-import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaders;
@@ -18,8 +14,6 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.ReferenceCountUtil;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -38,7 +32,6 @@ import org.jocean.idiom.Detachable;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.ValidationId;
-import org.jocean.idiom.block.Blob;
 import org.jocean.xharbor.relay.RelayContext.RESULT;
 import org.jocean.xharbor.relay.RelayContext.STEP;
 import org.jocean.xharbor.spi.Router;
