@@ -372,18 +372,21 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
     private final BizStep RECVCONTENT = new BizStep("relay.RECVCONTENT") {
         @OnEvent(event = "onHttpContentReceived")
         private BizStep contentReceived(final int httpClientId,
-                final Blob contentBlob) throws Exception {
+                final HttpContent content) throws Exception {
             if (!isValidHttpClientId(httpClientId)) {
                 return currentEventHandler();
             }
             
-            _channelCtx.write(new DefaultHttpContent(blob2ByteBuf(contentBlob)));
+            // content 的内容仅保证在事件 onHttpContentReceived 处理方法中有效
+            // 而channelCtx.write完成后，会主动调用 ReferenceCountUtil.release 释放content
+            // 因此需要先使用 ReferenceCountUtil.retain 增加一次引用计数
+            _channelCtx.write(ReferenceCountUtil.retain(content));
             return RECVCONTENT;
         }
 
         @OnEvent(event = "onLastHttpContentReceived")
         private BizStep lastContentReceived(final int httpClientId,
-                final Blob contentBlob) throws Exception {
+                final LastHttpContent content) throws Exception {
             if (!isValidHttpClientId(httpClientId)) {
                 return currentEventHandler();
             }
@@ -393,29 +396,15 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             //  release relay's http client
             safeDetachHttp();
             
-            final ChannelFuture future = _channelCtx.writeAndFlush(
-                    new DefaultLastHttpContent(blob2ByteBuf(contentBlob)));
+            // content 的内容仅保证在事件 onLastHttpContentReceived 处理方法中有效
+            // 而channelCtx.writeAndFlush完成后，会主动调用 ReferenceCountUtil.release 释放content
+            // 因此需要先使用 ReferenceCountUtil.retain 增加一次引用计数
+            final ChannelFuture future = _channelCtx.writeAndFlush(ReferenceCountUtil.retain(content));
             if ( !HttpHeaders.isKeepAlive( _httpRequest ) ) {
                 future.addListener(ChannelFutureListener.CLOSE);
             }
             _relayCtx.memo().incBizResult(RESULT.RELAY_SUCCESS, _watch4Result.stopAndRestart());
             return null;
-        }
-
-        /**
-         * @param contentBlob
-         * @return
-         * @throws IOException
-         */
-        private ByteBuf blob2ByteBuf(final Blob contentBlob) throws IOException {
-            byte[] bytes = new byte[0];
-            if ( null != contentBlob ) {
-                final InputStream is = contentBlob.genInputStream();
-                bytes = new byte[is.available()];
-                is.read(bytes);
-                is.close();
-            }
-            return Unpooled.wrappedBuffer(bytes);
         }
     }
     .handler(handlersOf(new ONHTTPLOST(new Runnable() {
