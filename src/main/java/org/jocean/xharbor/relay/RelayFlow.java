@@ -379,7 +379,10 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             // content 的内容仅保证在事件 onHttpContentReceived 处理方法中有效
             // 而channelCtx.write完成后，会主动调用 ReferenceCountUtil.release 释放content
             // 因此需要先使用 ReferenceCountUtil.retain 增加一次引用计数
-            _channelCtx.write(ReferenceCountUtil.retain(content));
+            _channelCtx.write(
+                // TODO, for LEAK Detection
+                ReferenceCountUtil.retain(
+                    ReferenceCountUtil.retain(content)));
             return RECVCONTENT;
         }
 
