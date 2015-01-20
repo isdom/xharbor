@@ -29,7 +29,6 @@
  -->
  
     <bean id="httpStack" class="org.jocean.httpclient.HttpStack">
-        <constructor-arg ref="bytesPool"/>
         <constructor-arg ref="source"/>
         <constructor-arg>
             <bean class="org.jocean.netty.NettyClient">
