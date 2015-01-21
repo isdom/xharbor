@@ -24,9 +24,11 @@ public class RelayAgentImpl implements RelayAgent {
     }
     
     @Override
-    public RelayTask createRelayTask(final ChannelHandlerContext channelCtx) {
+    public RelayTask createRelayTask(
+            final ChannelHandlerContext channelCtx, 
+            final HttpRequest httpRequest) {
         final RelayFlow flow = 
-                new RelayFlow(_router, this._stack.createHttpClientGuide(), channelCtx);
+                new RelayFlow(_router, this._stack, channelCtx, httpRequest);
         
         this._source.create(flow, flow.WAIT);
         

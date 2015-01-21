@@ -19,12 +19,14 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 
 import org.jocean.event.api.AbstractFlow;
 import org.jocean.event.api.BizStep;
 import org.jocean.event.api.EventReceiver;
 import org.jocean.event.api.FlowLifecycleListener;
 import org.jocean.event.api.annotation.OnEvent;
+import org.jocean.httpclient.HttpStack;
 import org.jocean.httpclient.api.Guide;
 import org.jocean.httpclient.api.Guide.GuideReactor;
 import org.jocean.httpclient.api.HttpClient;
@@ -93,17 +95,21 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
 
     public RelayFlow(
             final Router<HttpRequest, RelayContext> router, 
-            final Guide guide, 
-            final ChannelHandlerContext channelCtx) {
-        this._guide = guide;
+            final HttpStack httpStack, 
+            final ChannelHandlerContext channelCtx,
+            final HttpRequest httpRequest
+            ) {
+        this._httpStack = httpStack;
         this._router = router;
+        this._httpRequest = ReferenceCountUtil.retain(httpRequest);
         this._channelCtx = channelCtx;
+        updateTransferHttpRequestState(this._httpRequest);
         
         addFlowLifecycleListener(RELAY_LIFECYCLE_LISTENER);
     }
 
     private final class ONHTTPLOST {
-        public ONHTTPLOST(final Runnable ifHttpLost) {
+        public ONHTTPLOST(final Callable<BizStep> ifHttpLost) {
             this._ifHttpLost = ifHttpLost;
         }
         
@@ -118,7 +124,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             }
             if (null != this._ifHttpLost) {
                 try {
-                    this._ifHttpLost.run();
+                    return this._ifHttpLost.call();
                 }
                 catch(Throwable e) {
                     LOG.warn("exception when invoke {}, detail: {}", 
@@ -135,7 +141,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             return null;
         }
         
-        private final Runnable _ifHttpLost;
+        private final Callable<BizStep> _ifHttpLost;
     }
     
     private void safeDetachHttp() {
@@ -147,7 +153,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
                         "exception when detach http handle for uri:{}, detail:{}",
                         this._relayCtx.relayTo(), ExceptionUtils.exception2detail(e));
             }
-//            this._guide = null;
+            this._guide = null;
         }
     }
 
@@ -184,48 +190,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
         private final Runnable _ifDetached;
     }
 
-    public final BizStep WAIT = new BizStep("relay.WAIT") {
-
-        @OnEvent(event = "sendHttpRequest")
-        private BizStep sendHttpRequest(final HttpRequest httpRequest) {
-
-            _watch4Step.start();
-            _watch4Result.start();
-            
-            final RouterCtxImpl reouterctx = new RouterCtxImpl();
-            _relayCtx = _router.calculateRoute(httpRequest, reouterctx);
-            reouterctx.clear();
-            
-            _relayCtx.memo().beginBizStep(STEP.ROUTING);
-            _relayCtx.memo().endBizStep(STEP.ROUTING, _watch4Step.stopAndRestart());
-            if ( null == _relayCtx.relayTo() ) {
-                LOG.warn("can't found matched dest uri for request {}, just close client http connection ({}).", 
-                        httpRequest, _channelCtx.channel());
-                _channelCtx.close();
-                _relayCtx.memo().incBizResult(RESULT.NO_ROUTING, _watch4Result.stopAndRestart());
-                return  null;
-            }
-            
-            if ( LOG.isDebugEnabled() ) {
-                LOG.debug("dispatch to ({}) for request({})", _relayCtx.relayTo(), httpRequest);
-            }
-            
-            _relayCtx.memo().beginBizStep(STEP.OBTAINING_HTTPCLIENT);
-            _httpRequest = ReferenceCountUtil.retain(httpRequest);
-            updateTransferHttpRequestState(_httpRequest);
-            
-            startObtainHttpClient();
-            return OBTAINING;
-        }
-    }
-    .handler(handlersOf(new ONDETACH(new Runnable() {
-        @Override
-        public void run() {
-            _relayCtx.memo().incBizResult(RESULT.SOURCE_CANCELED, -1);
-        }})))
-    .freeze();
-
-    private final BizStep OBTAINING = new BizStep("relay.OBTAINING") {
+    private final Object CACHE_HTTPCONTENT = new Object() {
         @OnEvent(event = "sendHttpContent")
         private BizStep sendHttpContent(final HttpContent httpContent) {
 
@@ -234,7 +199,48 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             
             return currentEventHandler();
         }
-        
+    };
+    
+    public final BizStep WAIT = new BizStep("relay.WAIT") {
+        @OnEvent(event = "startRelay")
+        private BizStep startRelay() {
+
+            _watch4Step.start();
+            _watch4Result.start();
+            
+            final RouterCtxImpl reouterctx = new RouterCtxImpl();
+            _relayCtx = _router.calculateRoute(_httpRequest, reouterctx);
+            reouterctx.clear();
+            
+            _relayCtx.memo().beginBizStep(STEP.ROUTING);
+            _relayCtx.memo().endBizStep(STEP.ROUTING, _watch4Step.stopAndRestart());
+            if ( null == _relayCtx.relayTo() ) {
+                LOG.warn("can't found matched dest uri for request {}, just close client http connection ({}).", 
+                        _httpRequest, _channelCtx.channel());
+                _channelCtx.close();
+                _relayCtx.memo().incBizResult(RESULT.NO_ROUTING, _watch4Result.stopAndRestart());
+                return  null;
+            }
+            
+            if ( LOG.isDebugEnabled() ) {
+                LOG.debug("dispatch to ({}) for request({})", _relayCtx.relayTo(), _httpRequest);
+            }
+            
+            _relayCtx.memo().beginBizStep(STEP.OBTAINING_HTTPCLIENT);
+            
+            startObtainHttpClient();
+            return OBTAINING;
+        }
+    }
+    .handler(handlersOf(CACHE_HTTPCONTENT))
+    .handler(handlersOf(new ONDETACH(new Runnable() {
+        @Override
+        public void run() {
+            _relayCtx.memo().incBizResult(RESULT.SOURCE_CANCELED, -1);
+        }})))
+    .freeze();
+
+    private final BizStep OBTAINING = new BizStep("relay.OBTAINING") {
         @OnEvent(event = "onHttpClientObtained")
         private BizStep onHttpObtained(
                 final int guideId,
@@ -265,7 +271,6 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             for (HttpContent content : _contents) {
                 try {
                     httpclient.sendHttpContent(content);
-//                    ReferenceCountUtil.safeRelease(content);
                 }
                 catch (Exception e) {
                     LOG.error(
@@ -274,7 +279,6 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
                             ExceptionUtils.exception2detail(e));
                 }
             }
-//            _contents.clear();
             
             if ( !isTransferHttpRequestComplete() ) {
                 return TRANSFERCONTENT;
@@ -287,11 +291,14 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             }
         }
     }
-    .handler(handlersOf(new ONHTTPLOST(new Runnable() {
+    .handler(handlersOf(CACHE_HTTPCONTENT))
+    .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
         @Override
-        public void run() {
+        public BizStep call() throws Exception {
             _relayCtx.memo().endBizStep(STEP.OBTAINING_HTTPCLIENT, -1);
             _relayCtx.memo().incBizResult(RESULT.CONNECTDESTINATION_FAILURE, _watch4Result.stopAndRestart());
+            selfEventReceiver().acceptEvent("startRelay");
+            return WAIT;
         }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
@@ -328,11 +335,13 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             }
         }
     }
-    .handler(handlersOf(new ONHTTPLOST(new Runnable() {
+    .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
         @Override
-        public void run() {
+        public BizStep call() throws Exception {
             _relayCtx.memo().endBizStep(STEP.TRANSFER_CONTENT, -1);
             _relayCtx.memo().incBizResult(RESULT.RELAY_FAILURE, _watch4Result.stopAndRestart());
+            selfEventReceiver().acceptEvent("startRelay");
+            return WAIT;
         }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
@@ -356,11 +365,13 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             return RECVCONTENT;
         }
     }
-    .handler(handlersOf(new ONHTTPLOST(new Runnable() {
+    .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
         @Override
-        public void run() {
+        public BizStep call() throws Exception {
             _relayCtx.memo().endBizStep(STEP.RECV_RESP, -1);
             _relayCtx.memo().incBizResult(RESULT.RELAY_FAILURE, _watch4Result.stopAndRestart());
+            selfEventReceiver().acceptEvent("startRelay");
+            return WAIT;
         }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
@@ -409,11 +420,19 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             return null;
         }
     }
-    .handler(handlersOf(new ONHTTPLOST(new Runnable() {
+    .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
         @Override
-        public void run() {
+        public BizStep call() {
             _relayCtx.memo().endBizStep(STEP.RECV_RESP, -1);
             _relayCtx.memo().incBizResult(RESULT.RELAY_FAILURE, _watch4Result.stopAndRestart());
+            try {
+                _channelCtx.close();
+            }
+            catch(Throwable e) {
+                LOG.warn("exception when close {}, detail: {}", 
+                        _channelCtx, ExceptionUtils.exception2detail(e));
+            }
+            return null;
         }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
@@ -455,6 +474,8 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
     }
 
     private void startObtainHttpClient() {
+        this._guide = this._httpStack.createHttpClientGuide();
+        
         this._guide.obtainHttpClient(
                 this._guideId.updateIdAndGet(),
                 genGuideReactor(),
@@ -517,6 +538,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
         public void afterEventReceiverCreated(
                 final RelayFlow flow, final EventReceiver receiver)
                 throws Exception {
+            receiver.acceptEvent("startRelay");
         }
 
         @Override
@@ -534,12 +556,13 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
         }
     };
     
-    private final Guide _guide;
+    private final HttpStack _httpStack;
+    private final HttpRequest _httpRequest;
     private final Router<HttpRequest, RelayContext> _router;
     private final ChannelHandlerContext _channelCtx;
-    private HttpRequest _httpRequest;
     
     private RelayContext _relayCtx;
+    private Guide _guide;
     private HttpClient _httpClient;
     private final List<HttpContent> _contents = new ArrayList<HttpContent>();
     private boolean _transferHttpRequestComplete = false;

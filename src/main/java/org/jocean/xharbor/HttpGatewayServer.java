@@ -107,9 +107,8 @@ public class HttpGatewayServer {
                     
                     detachCurrentTaskOf(ctx);
                     
-                    final RelayTask newTask = _relayAgent.createRelayTask(ctx);
+                    final RelayTask newTask = _relayAgent.createRelayTask(ctx, request);
                     setRelayTaskOf(ctx, newTask);
-                    newTask.sendHttpRequest(request);
                 }
                 else if (msg instanceof HttpContent) {
                     final RelayTask task = getRelayTaskOf(ctx);
