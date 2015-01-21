@@ -33,8 +33,12 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
     
     private static final String[] _OBJNAME_KEYS = new String[]{"path", "method", "dest"};
 
+    private static final String normalizeString(final String input) {
+        return input.replaceAll(":", "-");
+    }
+    
     private static final String uri2value(final URI uri) {
-        return uri.toString().replaceAll(":", "-");
+        return normalizeString(uri.toString());
     }
     
     @Override
@@ -50,7 +54,7 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
                 null != uri 
                 ? InterfaceUtils.combineImpls(RelayContext.RelayMemo.class, 
                     memoBase,
-                    this._bizMemos.get(Tuple.of(info.getPath(), info.getMethod(), uri2value(uri))) )
+                    this._bizMemos.get(Tuple.of(normalizeString(info.getPath()), info.getMethod(), uri2value(uri))) )
                 : memoBase;
         
         return new RelayContext() {
