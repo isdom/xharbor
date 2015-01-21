@@ -34,3 +34,4 @@ TODO:
   
   12、对转发失败的HttpRequest，增加一定次数的重新转发，包括重新转发完整的HttpContent(s)。
   
+  13、如转发成功，但返回得到的HttpResponse为异常状态码(4XX, 5XX)，则对转发路由进行权重降低？
