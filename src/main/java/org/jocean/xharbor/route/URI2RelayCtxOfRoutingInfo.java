@@ -47,8 +47,8 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
         final RelayContext.RelayMemo memoBase = 
                 InterfaceUtils.combineImpls(RelayContext.RelayMemo.class, 
                 this._level0Memo,
-                this._bizMemos.get(Tuple.of(info.getPath())),
-                this._bizMemos.get(Tuple.of(info.getPath(), info.getMethod()))
+                this._bizMemos.get(Tuple.of(normalizeString(info.getPath()))),
+                this._bizMemos.get(Tuple.of(normalizeString(info.getPath()), info.getMethod()))
                 );
         final RelayContext.RelayMemo memo = 
                 null != uri 
