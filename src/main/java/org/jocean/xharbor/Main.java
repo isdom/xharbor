@@ -5,8 +5,6 @@ package org.jocean.xharbor;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import java.net.URI;
-
 import org.jocean.event.api.EventReceiverSource;
 import org.jocean.event.extend.Runners;
 import org.jocean.event.extend.Services;
@@ -23,6 +21,7 @@ import org.jocean.xharbor.route.RoutingInfo;
 import org.jocean.xharbor.route.RoutingInfo2URIs;
 import org.jocean.xharbor.route.RulesZKUpdater;
 import org.jocean.xharbor.route.SelectURI;
+import org.jocean.xharbor.route.TargetSet;
 import org.jocean.xharbor.route.URI2RelayCtxOfRoutingInfo;
 import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
@@ -35,6 +34,10 @@ public class Main {
 //    private static final Logger LOG = LoggerFactory
 //            .getLogger(Main.class);
 
+    private static final String normalizeString(final String input) {
+        return input.replaceAll(":", "-");
+    }
+    
     /**
      * @param args
      * @throws Exception 
@@ -59,16 +62,15 @@ public class Main {
         
         final RelayAgentImpl relayAgent = ctx.getBean(RelayAgentImpl.class);
         
-        final CachedRouter<RoutingInfo, URI[]> cachedRouter = 
+        final CachedRouter<RoutingInfo, TargetSet> cachedRouter = 
                 RouteUtils.buildCachedURIsRouter(
                         "org.jocean:type=router", 
                         source, 
                         new Function<RoutingInfo,String>() {
                             @Override
                             public String apply(final RoutingInfo info) {
-                                return "path=" + info.getPath() + ",method=" + info.getMethod()+",name=routes";
+                                return "path=" + normalizeString(info.getPath()) + ",method=" + info.getMethod()+",name=routes";
                             }});
-       
         
         relayAgent.setRouter(RouteUtils.buildCompositeRouter(
                 new Request2RoutingInfo(), RelayContext.class,

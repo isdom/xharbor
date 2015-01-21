@@ -44,6 +44,7 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
     @Override
     public RelayContext calculateRoute(final URI uri, final Context routectx) {
         final RoutingInfo info = routectx.getProperty("routingInfo");
+        final TargetSet targetSet = routectx.getProperty("targetSet");
         final RelayContext.RelayMemo memoBase = 
                 InterfaceUtils.combineImpls(RelayContext.RelayMemo.class, 
                 this._level0Memo,
@@ -54,7 +55,26 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
                 null != uri 
                 ? InterfaceUtils.combineImpls(RelayContext.RelayMemo.class, 
                     memoBase,
-                    this._bizMemos.get(Tuple.of(normalizeString(info.getPath()), info.getMethod(), uri2value(uri))) )
+                    this._bizMemos.get(Tuple.of(normalizeString(info.getPath()), info.getMethod(), uri2value(uri))),
+                    new RelayContext.RelayMemo() {
+                        @Override
+                        public void beginBizStep(final STEP step) {
+                        }
+                        @Override
+                        public void endBizStep(final STEP step, final long ttl) {
+                            if ( step.equals(STEP.RECV_RESP) ) {
+                                //  < 500 ms
+                                if ( ttl < 500 ) {
+                                    targetSet.updateWeight(uri, 1);
+                                }
+                            }
+                        }
+                        @Override
+                        public void incBizResult(final RESULT result, final long ttl) {
+                            if ( result.equals(RESULT.CONNECTDESTINATION_FAILURE)) {
+                                targetSet.markTargetDown(uri);
+                            }
+                        }})
                 : memoBase;
         
         return new RelayContext() {

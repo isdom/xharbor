@@ -9,6 +9,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.LastHttpContent;
@@ -261,10 +262,10 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
                         currentEventHandler().getName(), currentEvent(),
                         ExceptionUtils.exception2detail(e));
             }
-            for ( HttpContent content : _contents) {
+            for (HttpContent content : _contents) {
                 try {
                     httpclient.sendHttpContent(content);
-                    ReferenceCountUtil.safeRelease(content);
+//                    ReferenceCountUtil.safeRelease(content);
                 }
                 catch (Exception e) {
                     LOG.error(
@@ -273,9 +274,9 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
                             ExceptionUtils.exception2detail(e));
                 }
             }
-            _contents.clear();
+//            _contents.clear();
             
-            if ( !_transferHttpRequestComplete ) {
+            if ( !isTransferHttpRequestComplete() ) {
                 return TRANSFERCONTENT;
             }
             else {
@@ -305,6 +306,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
         private BizStep sendHttpContent(final HttpContent httpContent) {
 
             try {
+                _contents.add(ReferenceCountUtil.retain(httpContent));
                 _httpClient.sendHttpContent(httpContent);
             }
             catch (Exception e) {
@@ -315,7 +317,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             }
             updateTransferHttpRequestState(httpContent);
             
-            if ( !_transferHttpRequestComplete ) {
+            if ( !isTransferHttpRequestComplete() ) {
                 return currentEventHandler();
             }
             else {
@@ -497,18 +499,17 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
         return ret;
     }
 
-    private void updateTransferHttpRequestState(final HttpRequest httpRequest) {
-        if ( httpRequest instanceof FullHttpRequest ) {
+    private void updateTransferHttpRequestState(final HttpObject httpObject) {
+        if ( (httpObject instanceof FullHttpRequest) 
+            || (httpObject instanceof LastHttpContent)) {
             this._transferHttpRequestComplete = true;
         }
     }
     
-    private void updateTransferHttpRequestState(final HttpContent content) {
-        if ( content instanceof LastHttpContent ) {
-            this._transferHttpRequestComplete = true;
-        }
+    private boolean isTransferHttpRequestComplete() {
+        return this._transferHttpRequestComplete;
     }
-    
+
     private static final FlowLifecycleListener<RelayFlow> RELAY_LIFECYCLE_LISTENER = 
             new FlowLifecycleListener<RelayFlow>() {
 

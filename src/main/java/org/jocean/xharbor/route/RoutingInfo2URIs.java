@@ -22,9 +22,10 @@ import org.jocean.xharbor.spi.Router;
  * @author isdom
  *
  */
-public class RoutingInfo2URIs implements Cloneable, Router<RoutingInfo, URI[]>, RulesMXBean {
+public class RoutingInfo2URIs implements Cloneable, Router<RoutingInfo, TargetSet>, RulesMXBean {
 
     private static final URI[] EMPTY_URIS = new URI[0];
+    private static final TargetSet EMPTY_TARGETSET = new TargetSet(EMPTY_URIS);
 
     @Override
     public int hashCode() {
@@ -73,16 +74,16 @@ public class RoutingInfo2URIs implements Cloneable, Router<RoutingInfo, URI[]>, 
     }
     
     @Override
-    public URI[] calculateRoute(final RoutingInfo info, final Context routectx) {
+    public TargetSet calculateRoute(final RoutingInfo info, final Context routectx) {
         final Iterator<Level> itr = _levels.iterator();
         while (itr.hasNext()) {
             final Level level = itr.next();
             final URI[] uris = level.match(info);
             if ( null != uris && uris.length > 0 ) {
-                return uris;
+                return new TargetSet(uris);
             }
         }
-        return EMPTY_URIS;
+        return EMPTY_TARGETSET;
     }
 
     public RoutingInfo2URIs freeze() {
