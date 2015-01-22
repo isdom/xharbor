@@ -50,7 +50,8 @@
         <property name="acceptIp" value="${gateway.ip:0.0.0.0}" />
         <property name="logByteStream" value="${gateway.log.byteStream:false}"/>
         <property name="idleTimeSeconds" value="${gateway.idleTimeSeconds:200}"/>
-     </bean>
+        <property name="checkAlivePath" value="${gateway.checkAlivePath:/}"/>
+    </bean>
      
     <bean id="zkClient" class="org.apache.curator.framework.CuratorFrameworkFactory" 
         factory-method="newClient"

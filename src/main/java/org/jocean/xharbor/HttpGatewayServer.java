@@ -6,6 +6,8 @@ package org.jocean.xharbor;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelException;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -14,11 +16,15 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpContentCompressor;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpRequestDecoder;
+import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseEncoder;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.traffic.TrafficCounterExt;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
@@ -59,6 +65,9 @@ public class HttpGatewayServer {
     private int _idleTimeSeconds = 180; //seconds  为了避免建立了过多的闲置连接 闲置180秒的连接主动关闭
     
     private RelayAgent  _relayAgent;
+    
+    //响应检查服务是否活着的请求
+    private String _checkAlivePath = "/";
     
     @ChannelHandler.Sharable
     private class RelayHandler extends ChannelInboundHandlerAdapter{
@@ -105,6 +114,10 @@ public class HttpGatewayServer {
                         LOG.debug("messageReceived:{} default http request\n[{}]",ctx.channel(),request);
                     }
                     
+                    if ( ifCheckAliveAndResponse(ctx, request) ) {
+                        return;
+                    }
+                    
                     detachCurrentTaskOf(ctx);
                     
                     final RelayTask newTask = _relayAgent.createRelayTask(ctx, request);
@@ -136,6 +149,29 @@ public class HttpGatewayServer {
 
         @Override
         public void channelActive(ChannelHandlerContext ctx) throws Exception {
+        }
+    }
+    
+    /**
+     * @param ctx
+     * @param request
+     */
+    private boolean ifCheckAliveAndResponse(
+            final ChannelHandlerContext ctx,
+            final HttpRequest request) {
+        if ( this._checkAlivePath.equalsIgnoreCase(request.getUri())) {
+            // deal with check alive
+            final HttpResponse response = new DefaultFullHttpResponse(
+                    request.getProtocolVersion(), HttpResponseStatus.OK);
+            HttpHeaders.setHeader(response, HttpHeaders.Names.CONTENT_LENGTH, 0);
+            final ChannelFuture future = ctx.writeAndFlush(response);
+            if ( !HttpHeaders.isKeepAlive( request ) ) {
+                future.addListener(ChannelFutureListener.CLOSE);
+            }
+            return true;
+        }
+        else {
+            return false;
         }
     }
     
@@ -301,5 +337,13 @@ public class HttpGatewayServer {
     
     public void setRelayAgent(final RelayAgent relayAgent) {
         this._relayAgent = relayAgent;
+    }
+
+    public String getCheckAlivePath() {
+        return this._checkAlivePath;
+    }
+
+    public void setCheckAlivePath(final String checkAlivePath) {
+        this._checkAlivePath = checkAlivePath;
     }
 }
