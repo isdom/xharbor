@@ -4,6 +4,8 @@
 package org.jocean.xharbor;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import io.netty.util.HashedWheelTimer;
+import io.netty.util.Timer;
 
 import org.jocean.event.api.EventReceiverSource;
 import org.jocean.event.extend.Runners;
@@ -71,11 +73,11 @@ public class Main {
                             public String apply(final RoutingInfo info) {
                                 return "path=" + normalizeString(info.getPath()) + ",method=" + info.getMethod()+",name=routes";
                             }});
-        
+        final Timer timer = new HashedWheelTimer();
         relayAgent.setRouter(RouteUtils.buildCompositeRouter(
                 new Request2RoutingInfo(), RelayContext.class,
                 cachedRouter,
-                new SelectURI(),
+                new SelectURI(timer),
                 new URI2RelayCtxOfRoutingInfo()
                 ));
         

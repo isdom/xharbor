@@ -45,6 +45,8 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
     public RelayContext calculateRoute(final URI uri, final Context routectx) {
         final RoutingInfo info = routectx.getProperty("routingInfo");
         final TargetSet targetSet = routectx.getProperty("targetSet");
+        final URISMemo urisMemo = routectx.getProperty("urisMemo");
+        
         final RelayContext.RelayMemo memoBase = 
                 InterfaceUtils.combineImpls(RelayContext.RelayMemo.class, 
                 this._level0Memo,
@@ -72,7 +74,11 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
                         @Override
                         public void incBizResult(final RESULT result, final long ttl) {
                             if ( result.equals(RESULT.CONNECTDESTINATION_FAILURE)) {
+                                urisMemo.markDownStatus(uri, true);
+                            }
+                            else if ( result.equals(RESULT.RELAY_FAILURE)) {
                                 targetSet.markTargetDown(uri);
+                                //  TODO mark targetSet's uri down for http response with 4xx/5xx
                             }
                         }})
                 : memoBase;

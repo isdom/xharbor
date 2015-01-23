@@ -5,6 +5,7 @@ package org.jocean.xharbor.route;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -15,8 +16,7 @@ public class TargetSet {
 
     private static final int MAX_EFFECTIVEWEIGHT = 1000;
     
-    public TargetSet(final URI[] uris, final URISMemo urisMemo) {
-        this._urisMemo = urisMemo;
+    public TargetSet(final URI[] uris) {
         this._targets = new ArrayList<Target>() {
             private static final long serialVersionUID = 1L;
         {
@@ -31,7 +31,7 @@ public class TargetSet {
             private static final long serialVersionUID = 1L;
         {
             for (Target peer : _targets) {
-                this.add(peer._uri.toString() + ":down(" + isTargetDown(peer) 
+                this.add(peer._uri.toString() + ":down(" + peer._down.get()
                         + "):effectiveWeight(" + peer._effectiveWeight.get()
                         + "):currentWeight(" + peer._currentWeight.get()
                         + ")"
@@ -40,11 +40,11 @@ public class TargetSet {
         }}.toArray(new String[0]);
     }
     
-    public URI selectTarget() {
+    public URI selectTarget(final URISMemo urisMemo) {
         int total = 0;
         Target best = null;
         for ( Target peer : this._targets ) {
-            if ( !isTargetDown(peer) ) {
+            if ( !isTargetDown(urisMemo, peer) ) {
                 // peer->current_weight += peer->effective_weight; 
                 final int effectiveWeight = peer._effectiveWeight.get();
                 final int currentWeight = peer._currentWeight.addAndGet( effectiveWeight );
@@ -79,19 +79,20 @@ public class TargetSet {
     }
     
     /**
+     * @param urisMemo 
      * @param peer
      * @return
      */
-    private boolean isTargetDown(Target peer) {
-        return this._urisMemo.isDown(peer._uri); // _down.get();
+    private boolean isTargetDown(final URISMemo urisMemo, final Target peer) {
+        return urisMemo.isDown(peer._uri) || peer._down.get();
     }
     
     public void markTargetDown(final URI uri) {
-        this._urisMemo.markDownStatus(uri, true);
-//        final Target target = uri2target(uri);
-//        if (null != target) {
-//            target._down.set(true);
-//        }
+        final Target target = uri2target(uri);
+        if (null != target) {
+            target._down.set(true);
+            //  TODO reset to false when timeout
+        }
     }
     
     private Target uri2target(final URI uri) {
@@ -111,9 +112,8 @@ public class TargetSet {
         public final URI _uri;
         private final AtomicInteger _currentWeight = new AtomicInteger(1);
         private final AtomicInteger _effectiveWeight = new AtomicInteger(1);
-//        private final AtomicBoolean _down = new AtomicBoolean(false);
+        private final AtomicBoolean _down = new AtomicBoolean(false);
     }
     
     private final Target[] _targets;
-    private final URISMemo _urisMemo;
 }
