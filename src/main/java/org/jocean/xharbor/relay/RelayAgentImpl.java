@@ -7,7 +7,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
 
 import org.jocean.event.api.EventReceiverSource;
-import org.jocean.httpclient.api.HttpClientPool;
+import org.jocean.httpclient.api.GuideBuilder;
 import org.jocean.xharbor.spi.RelayAgent;
 import org.jocean.xharbor.spi.Router;
 
@@ -17,9 +17,9 @@ import org.jocean.xharbor.spi.Router;
  */
 public class RelayAgentImpl implements RelayAgent {
     public RelayAgentImpl(
-            final HttpClientPool httpClientPool, 
+            final GuideBuilder guideBuilder, 
             final EventReceiverSource source) {
-        this._httpClientPool = httpClientPool;
+        this._guideBuilder = guideBuilder;
         this._source = source;
     }
     
@@ -28,7 +28,7 @@ public class RelayAgentImpl implements RelayAgent {
             final ChannelHandlerContext channelCtx, 
             final HttpRequest httpRequest) {
         final RelayFlow flow = 
-                new RelayFlow(_router, this._httpClientPool, channelCtx, httpRequest);
+                new RelayFlow(_router, this._guideBuilder, channelCtx, httpRequest);
         
         this._source.create(flow, flow.WAIT);
         
@@ -39,7 +39,7 @@ public class RelayAgentImpl implements RelayAgent {
         this._router = router;
     }
 
-    private final HttpClientPool _httpClientPool;
+    private final GuideBuilder _guideBuilder;
     private final EventReceiverSource _source;
     private Router<HttpRequest, RelayContext> _router;
 }

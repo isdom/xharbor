@@ -28,9 +28,9 @@ import org.jocean.event.api.FlowLifecycleListener;
 import org.jocean.event.api.annotation.OnEvent;
 import org.jocean.httpclient.api.Guide;
 import org.jocean.httpclient.api.Guide.GuideReactor;
+import org.jocean.httpclient.api.GuideBuilder;
 import org.jocean.httpclient.api.HttpClient;
 import org.jocean.httpclient.api.HttpClient.HttpReactor;
-import org.jocean.httpclient.api.HttpClientPool;
 import org.jocean.idiom.Detachable;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
@@ -95,11 +95,11 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
 
     public RelayFlow(
             final Router<HttpRequest, RelayContext> router, 
-            final HttpClientPool httpClientPool, 
+            final GuideBuilder guideBuilder, 
             final ChannelHandlerContext channelCtx,
             final HttpRequest httpRequest
             ) {
-        this._httpClientPool = httpClientPool;
+        this._guideBuilder = guideBuilder;
         this._router = router;
         this._httpRequest = ReferenceCountUtil.retain(httpRequest);
         this._channelCtx = channelCtx;
@@ -474,7 +474,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
     }
 
     private void startObtainHttpClient() {
-        this._guide = this._httpClientPool.createHttpClientGuide();
+        this._guide = this._guideBuilder.createHttpClientGuide();
         
         this._guide.obtainHttpClient(
                 this._guideId.updateIdAndGet(),
@@ -556,7 +556,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
         }
     };
     
-    private final HttpClientPool _httpClientPool;
+    private final GuideBuilder _guideBuilder;
     private final HttpRequest _httpRequest;
     private final Router<HttpRequest, RelayContext> _router;
     private final ChannelHandlerContext _channelCtx;

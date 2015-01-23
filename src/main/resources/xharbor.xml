@@ -28,7 +28,7 @@
                 100);
  -->
  
-    <bean id="httpStack" class="org.jocean.httpclient.impl.HttpStack">
+    <bean id="httpClientPool" class="org.jocean.httpclient.impl.HttpClientPool">
         <constructor-arg ref="source"/>
         <constructor-arg>
             <bean class="org.jocean.netty.NettyClient">
@@ -39,7 +39,7 @@
     </bean>
     
     <bean id="relayAgent" class="org.jocean.xharbor.relay.RelayAgentImpl">
-        <constructor-arg ref="httpStack" />
+        <constructor-arg ref="httpClientPool" />
         <constructor-arg ref="source" />
     </bean>
     
@@ -105,9 +105,9 @@
           lazy-init="false">
         <property name="beans">
             <map>
-                <entry key="org.jocean:name=directMemory" value-ref="directMemory"/>
-                <entry key="org.jocean:name=bytesPool" value-ref="bytesPool"/>
-                <entry key="org.jocean:name=httpStack" value-ref="httpStack"/>
+                <entry key="org.jocean:name=directMemory"   value-ref="directMemory"/>
+                <entry key="org.jocean:name=bytesPool"      value-ref="bytesPool"/>
+                <entry key="org.jocean:name=httpClientPool" value-ref="httpClientPool"/>
                 <entry key="org.jocean:name=htmladapter,port=8082" value-ref="htmlAdaptorServer"/>
             </map>
         </property>
