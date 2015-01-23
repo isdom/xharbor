@@ -28,7 +28,7 @@
                 100);
  -->
  
-    <bean id="httpStack" class="org.jocean.httpclient.HttpStack">
+    <bean id="httpStack" class="org.jocean.httpclient.impl.HttpStack">
         <constructor-arg ref="source"/>
         <constructor-arg>
             <bean class="org.jocean.netty.NettyClient">
