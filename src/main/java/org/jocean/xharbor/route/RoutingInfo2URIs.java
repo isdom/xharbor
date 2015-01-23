@@ -13,9 +13,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
+import org.jocean.idiom.Function;
 import org.jocean.idiom.Pair;
+import org.jocean.idiom.SimpleCache;
 import org.jocean.xharbor.spi.Router;
 
 /**
@@ -25,7 +28,7 @@ import org.jocean.xharbor.spi.Router;
 public class RoutingInfo2URIs implements Cloneable, Router<RoutingInfo, TargetSet>, RulesMXBean {
 
     private static final URI[] EMPTY_URIS = new URI[0];
-    private static final TargetSet EMPTY_TARGETSET = new TargetSet(EMPTY_URIS);
+    private static final TargetSet EMPTY_TARGETSET = new TargetSet(EMPTY_URIS, null);
 
     @Override
     public int hashCode() {
@@ -80,7 +83,7 @@ public class RoutingInfo2URIs implements Cloneable, Router<RoutingInfo, TargetSe
             final Level level = itr.next();
             final URI[] uris = level.match(info);
             if ( null != uris && uris.length > 0 ) {
-                return new TargetSet(uris);
+                return new TargetSet(uris, this._urisMemo);
             }
         }
         return EMPTY_TARGETSET;
@@ -249,4 +252,25 @@ public class RoutingInfo2URIs implements Cloneable, Router<RoutingInfo, TargetSe
 
     private final SortedSet<Level> _levels = new TreeSet<Level>();
     private transient boolean _isFrozen = false;
+    
+    private static class MemoImpl implements URISMemo {
+
+        @Override
+        public boolean isDown(final URI uri) {
+            return this._statusCache.get(uri).get();
+        }
+
+        @Override
+        public void markDownStatus(final URI uri, final boolean isDown) {
+            this._statusCache.get(uri).set(isDown);
+        }
+        
+        private final SimpleCache<URI, AtomicBoolean> _statusCache = 
+                new SimpleCache<URI, AtomicBoolean>(new Function<URI, AtomicBoolean>() {
+                    @Override
+                    public AtomicBoolean apply(final URI input) {
+                        return new AtomicBoolean(false);
+                    }});
+    }
+    private final URISMemo _urisMemo = new MemoImpl();
 }

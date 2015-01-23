@@ -41,3 +41,7 @@ TODO:
       
   15、增加 BeanShell via JMX 方式对 xharbor 的运行时刻 灵活控制。 
   
+  16、对 NO_ROUTING 的HttpRequest不再注册一组独立的 MBean，而是统一到一个记录NoRouting的MBean中，String形式 或 Map 形式呈现，无效URI/请求次数 信息对
+     减少无效MBean的无效信息呈现
+     
+  
