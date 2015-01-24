@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.jocean.xharbor.util.URISMemo;
+
 /**
  * @author isdom
  *

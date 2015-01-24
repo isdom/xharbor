@@ -4,8 +4,6 @@
 package org.jocean.xharbor;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import io.netty.util.HashedWheelTimer;
-import io.netty.util.Timer;
 
 import org.jocean.event.api.EventReceiverSource;
 import org.jocean.event.extend.Runners;
@@ -25,6 +23,7 @@ import org.jocean.xharbor.route.RulesZKUpdater;
 import org.jocean.xharbor.route.SelectURI;
 import org.jocean.xharbor.route.TargetSet;
 import org.jocean.xharbor.route.URI2RelayCtxOfRoutingInfo;
+import org.jocean.xharbor.util.URISMemo;
 import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 
@@ -73,11 +72,11 @@ public class Main {
                             public String apply(final RoutingInfo info) {
                                 return "path=" + normalizeString(info.getPath()) + ",method=" + info.getMethod()+",name=routes";
                             }});
-        final Timer timer = new HashedWheelTimer();
+        
         relayAgent.setRouter(RouteUtils.buildCompositeRouter(
                 new Request2RoutingInfo(), RelayContext.class,
                 cachedRouter,
-                new SelectURI(timer),
+                new SelectURI(ctx.getBean(URISMemo.class)),
                 new URI2RelayCtxOfRoutingInfo()
                 ));
         

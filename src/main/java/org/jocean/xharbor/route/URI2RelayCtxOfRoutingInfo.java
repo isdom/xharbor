@@ -19,6 +19,7 @@ import org.jocean.xharbor.spi.Router;
 import org.jocean.xharbor.util.BizMemoImpl;
 import org.jocean.xharbor.util.TIMemoImplOfRanges;
 import org.jocean.xharbor.util.TimeIntervalMemo;
+import org.jocean.xharbor.util.URISMemo;
 
 import com.google.common.collect.Range;
 

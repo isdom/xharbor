@@ -88,6 +88,12 @@
             }});
  -->
 
+    <bean id="timer" class="io.netty.util.HashedWheelTimer" />
+
+    <bean id="urismemo" class="org.jocean.xharbor.util.URISMemoImpl">
+        <constructor-arg ref="timer"/>
+    </bean>
+    
     <bean id="jmxConnectorServer" 
         class="org.springframework.jmx.support.ConnectorServerFactoryBean"  >
         <property name="serviceUrl" value="service:jmx:jmxmp://0.0.0.0:${jmxmp.port:9876}" />
