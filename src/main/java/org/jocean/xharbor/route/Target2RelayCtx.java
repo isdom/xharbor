@@ -3,12 +3,7 @@
  */
 package org.jocean.xharbor.route;
 
-import io.netty.util.Timeout;
-import io.netty.util.Timer;
-import io.netty.util.TimerTask;
-
 import java.net.URI;
-import java.util.concurrent.TimeUnit;
 
 import org.jocean.idiom.Function;
 import org.jocean.idiom.InterfaceUtils;
@@ -34,11 +29,16 @@ import com.google.common.collect.Range;
  */
 public class Target2RelayCtx implements Router<Target, RelayContext> {
 
+    @SuppressWarnings("unused")
     private static final Logger LOG = LoggerFactory
             .getLogger(Target2RelayCtx.class);
     
-    public Target2RelayCtx(final Timer timer) {
-        this._timer = timer;
+    public interface RelayMemoBuilder {
+        public RelayContext.RelayMemo build(final Target target, final RoutingInfo info);
+    }
+    
+    public Target2RelayCtx(final RelayMemoBuilder builder) {
+        this._builder = builder;
         _mbeanSupport.registerMBean("name=relays", this._level0Memo.createMBean());
     }
     
@@ -64,61 +64,7 @@ public class Target2RelayCtx implements Router<Target, RelayContext> {
                 );
         final RelayContext.RelayMemo memo = 
                 null != target 
-                ? InterfaceUtils.combineImpls(RelayContext.RelayMemo.class, 
-                    memoBase,
-                    this._bizMemos.get(Tuple.of(normalizeString(info.getPath()), info.getMethod(), uri2value(target.serviceUri()))),
-                    new RelayContext.RelayMemo() {
-                        @Override
-                        public void beginBizStep(final STEP step) {
-                        }
-                        @Override
-                        public void endBizStep(final STEP step, final long ttl) {
-                            if ( step.equals(STEP.RECV_RESP) ) {
-                                //  < 500 ms
-                                if ( ttl < 500 ) {
-                                    final int weight = target.addWeight(1);
-                                    if ( LOG.isDebugEnabled() ) {
-                                        LOG.debug("endBizStep for RECV_RESP with ttl < 500ms, so add weight with 1 to {}",
-                                                weight);
-                                    }
-                                }
-                            }
-                        }
-                        @Override
-                        public void incBizResult(final RESULT result, final long ttl) {
-                            if ( result.equals(RESULT.CONNECTDESTINATION_FAILURE)) {
-                                final long period = 60L;
-                                target.markServiceDownStatus(true);
-                                LOG.warn("relay failed for CONNECTDESTINATION_FAILURE, so mark service {} down.",
-                                        target.serviceUri());
-                                _timer.newTimeout(new TimerTask() {
-                                    @Override
-                                    public void run(final Timeout timeout) throws Exception {
-                                        // reset down flag
-                                        target.markServiceDownStatus(false);
-                                        LOG.info("reset service {} down flag after {} second.",
-                                                target.serviceUri(), period);
-                                    }
-                                }, period, TimeUnit.SECONDS);
-                            }
-                            else if ( result.equals(RESULT.RELAY_FAILURE)) {
-                                final long period = 60L;
-                                target.markAPIDownStatus(true);
-                                LOG.warn("relay failed for RELAY_FAILURE, so mark service {}'s API {} down.",
-                                        target.serviceUri(), info);
-                                _timer.newTimeout(new TimerTask() {
-                                    @Override
-                                    public void run(final Timeout timeout) throws Exception {
-                                        // reset down flag
-                                        target.markAPIDownStatus(false);
-                                        LOG.info("reset service {}'s API {} down flag after {} second.",
-                                                target.serviceUri(), info, period);
-                                    }
-                                }, period, TimeUnit.SECONDS);
-                                //  TODO mark targetSet's uri down for http response with 4xx/5xx
-                                
-                            }
-                        }})
+                ? compositeRelayMemo(target, info, memoBase)
                 : memoBase;
         
         return new RelayContext() {
@@ -134,39 +80,38 @@ public class Target2RelayCtx implements Router<Target, RelayContext> {
             }};
     }
 
-//    private enum Range_10ms_30s implements RangeSource<Long> {
-//        range_1_lt10ms(Range.closedOpen(0L, 10L)),
-//        range_2_lt100ms(Range.closedOpen(10L, 100L)),
-//        range_3_lt500ms(Range.closedOpen(100L, 500L)),
-//        range_4_lt1s(Range.closedOpen(500L, 1000L)),
-//        range_5_lt5s(Range.closedOpen(1000L, 5000L)),
-//        range_6_lt10s(Range.closedOpen(5000L, 10000L)),
-//        range_7_lt30s(Range.closedOpen(10000L, 30000L)),
-//        range_8_mt30s(Range.atLeast(30000L)),
-//        ;
-//
-//        Range_10ms_30s(final Range<Long> range) {
-//            this._range = range;
-//        }
-//        
-//        @Override
-//        public Range<Long> range() {
-//            return _range;
-//        }
-//        
-//        private final Range<Long> _range;
-//    }
-    
-//    private static class RelayTIMemoImpl extends TIMemoImpl<Range_10ms_30s> {
-//        
-//        public RelayTIMemoImpl() {
-//            super(Range_10ms_30s.class);
-//        }
-//    }
-    
-      private static class RelayTIMemoImpl extends TIMemoImplOfRanges {
+    /**
+     * @param target
+     * @param info
+     * @param base
+     * @return
+     */
+    private RelayMemo compositeRelayMemo(
+            final Target target,
+            final RoutingInfo info, 
+            final RelayContext.RelayMemo base) {
+        if ( null != this._builder) {
+            final RelayMemo memo = this._builder.build(target, info);
+            if ( null != memo ) {
+                return InterfaceUtils.combineImpls(RelayContext.RelayMemo.class, 
+                    base,
+                    this._bizMemos.get(Tuple.of(
+                            normalizeString(info.getPath()), info.getMethod(), uri2value(target.serviceUri()))),
+                    memo
+                    );
+            }
+        }
+        // others
+        return InterfaceUtils.combineImpls(RelayContext.RelayMemo.class, 
+            base,
+            this._bizMemos.get(Tuple.of(
+                    normalizeString(info.getPath()), info.getMethod(), uri2value(target.serviceUri())))
+            );
+    }
+
+    private static class RelayTIMemoImpl extends TIMemoImplOfRanges {
       
-          @SuppressWarnings("unchecked")
+        @SuppressWarnings("unchecked")
         public RelayTIMemoImpl() {
               super(new String[]{
                       "lt10ms",
@@ -198,7 +143,7 @@ public class Target2RelayCtx implements Router<Target, RelayContext> {
         }
     }
     
-    private final Timer _timer;
+    private final RelayMemoBuilder _builder;
     
     private final MBeanRegisterSupport _mbeanSupport = 
             new MBeanRegisterSupport("org.jocean:type=router", null);

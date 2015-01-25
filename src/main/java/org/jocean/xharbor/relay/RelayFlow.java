@@ -354,13 +354,30 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
     private final BizStep RECVRESP = new BizStep("relay.RECVRESP") {
         @OnEvent(event = "onHttpResponseReceived")
         private BizStep responseReceived(final int httpClientId,
-                final HttpResponse response) {
+                final HttpResponse response) throws Exception {
             if (!isValidHttpClientId(httpClientId)) {
                 return currentEventHandler();
             }
             if (LOG.isDebugEnabled()) {
                 LOG.debug("channel for {} recv response {}", _relayCtx.relayTo(), response);
             }
+            
+            if (isHttpClientError(response)) {
+                _relayCtx.memo().endBizStep(STEP.RECV_RESP, _watch4Step.stopAndRestart());
+                _relayCtx.memo().incBizResult(RESULT.HTTP_CLIENT_ERROR, _watch4Result.stopAndRestart());
+                safeDetachHttp();
+                selfEventReceiver().acceptEvent("startRelay");
+                return WAIT;
+            }
+            
+            if (isHttpServerError(response)) {
+                _relayCtx.memo().endBizStep(STEP.RECV_RESP, _watch4Step.stopAndRestart());
+                _relayCtx.memo().incBizResult(RESULT.HTTP_SERVER_ERROR, _watch4Result.stopAndRestart());
+                safeDetachHttp();
+                selfEventReceiver().acceptEvent("startRelay");
+                return WAIT;
+            }
+            
             _channelCtx.write(ReferenceCountUtil.retain(response));
             return RECVCONTENT;
         }
@@ -531,6 +548,24 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
         return this._transferHttpRequestComplete;
     }
 
+    /**
+     * @param response
+     * @return
+     */
+    private static boolean isHttpClientError(final HttpResponse response) {
+        return response.getStatus().code() >= 400 
+            && response.getStatus().code() < 500;
+    }
+
+    /**
+     * @param response
+     * @return
+     */
+    private static boolean isHttpServerError(final HttpResponse response) {
+        return response.getStatus().code() >= 500 
+            && response.getStatus().code() < 600;
+    }
+    
     private static final FlowLifecycleListener<RelayFlow> RELAY_LIFECYCLE_LISTENER = 
             new FlowLifecycleListener<RelayFlow>() {
 

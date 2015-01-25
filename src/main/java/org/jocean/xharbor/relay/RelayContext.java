@@ -24,6 +24,8 @@ public interface RelayContext {
         NO_ROUTING,
         CONNECTDESTINATION_FAILURE,
         RELAY_SUCCESS,
+        HTTP_CLIENT_ERROR,
+        HTTP_SERVER_ERROR,
         RELAY_FAILURE,
         SOURCE_CANCELED,
     }

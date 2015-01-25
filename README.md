@@ -35,7 +35,8 @@ TODO:
     
   12、对转发失败的HttpRequest，增加一定次数的重新转发，包括重新转发完整的HttpContent(s)。TODO 并记录重新转发次数。
   
-  13、TODO 如转发成功，但返回得到的HttpResponse为异常状态码(4XX, 5XX)，则对转发路由进行权重降低？或者标志位该目的地的该接口无效。
+  13、如转发成功，但返回得到的HttpResponse为异常状态码(4XX, 5XX)，则对转发路由进行权重降低？或者标识该目的地的特定接口(API)无效。
+      (done, 增加 Result(HTTP_CLIENT_ERROR/HTTP_SERVER_ERROR)，并根据这两个Result结果，标识特定接口无效，并尝试再次转发)
   
   14、对已经标志为down机的服务，设置定时器动作进行定期重置down机标志为false，当有匹配业务需要转发时，则可再次重新尝试该路由目的地。
       让曾经down机服务在恢复后，有机会再次成为有效的转发目的地 (done)。
