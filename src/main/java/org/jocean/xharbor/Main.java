@@ -4,6 +4,7 @@
 package org.jocean.xharbor;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import io.netty.util.Timer;
 
 import org.jocean.event.api.EventReceiverSource;
 import org.jocean.event.extend.Runners;
@@ -18,12 +19,12 @@ import org.jocean.xharbor.route.CachedRouter;
 import org.jocean.xharbor.route.Request2RoutingInfo;
 import org.jocean.xharbor.route.RouteUtils;
 import org.jocean.xharbor.route.RoutingInfo;
-import org.jocean.xharbor.route.RoutingInfo2URIs;
+import org.jocean.xharbor.route.RoutingInfo2Targets;
 import org.jocean.xharbor.route.RulesZKUpdater;
-import org.jocean.xharbor.route.SelectURI;
+import org.jocean.xharbor.route.SelectTarget;
 import org.jocean.xharbor.route.TargetSet;
-import org.jocean.xharbor.route.URI2RelayCtxOfRoutingInfo;
-import org.jocean.xharbor.util.URISMemo;
+import org.jocean.xharbor.route.Target2RelayCtx;
+import org.jocean.xharbor.util.ServiceMemo;
 import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 
@@ -76,26 +77,20 @@ public class Main {
         relayAgent.setRouter(RouteUtils.buildCompositeRouter(
                 new Request2RoutingInfo(), RelayContext.class,
                 cachedRouter,
-                new SelectURI(ctx.getBean(URISMemo.class)),
-                new URI2RelayCtxOfRoutingInfo()
+                new SelectTarget(ctx.getBean(ServiceMemo.class)),
+                new Target2RelayCtx(ctx.getBean(Timer.class))
                 ));
         
-        ((BeanProxy<Visitor<RoutingInfo2URIs>>) checkNotNull(ctx.getBean("&updaterRules", BeanProxy.class)))
-            .setImpl(new Visitor<RoutingInfo2URIs>() {
+        ((BeanProxy<Visitor<RoutingInfo2Targets>>) checkNotNull(ctx.getBean("&updaterRules", BeanProxy.class)))
+            .setImpl(new Visitor<RoutingInfo2Targets>() {
                 @Override
-                public void visit(final RoutingInfo2URIs rules) throws Exception {
+                public void visit(final RoutingInfo2Targets rules) throws Exception {
                     cachedRouter.updateRouter(rules);
                 }});
         
         final RulesZKUpdater updater = ctx.getBean(RulesZKUpdater.class);
         
         updater.start();
-                
-//        final MBeanRegisterSupport register =
-//                new MBeanRegisterSupport("org.jocean:name=htmladapter", null);
-//        HtmlAdaptorServer adapter = new HtmlAdaptorServer(); 
-//        register.registerMBean("port=8082", adapter);
-//        adapter.start();
     }
 
 }

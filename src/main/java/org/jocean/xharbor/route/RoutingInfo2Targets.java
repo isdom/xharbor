@@ -22,7 +22,7 @@ import org.jocean.xharbor.spi.Router;
  * @author isdom
  *
  */
-public class RoutingInfo2URIs implements Cloneable, Router<RoutingInfo, TargetSet>, RulesMXBean {
+public class RoutingInfo2Targets implements Cloneable, Router<RoutingInfo, TargetSet>, RulesMXBean {
 
     private static final URI[] EMPTY_URIS = new URI[0];
     private static final TargetSet EMPTY_TARGETSET = new TargetSet(EMPTY_URIS);
@@ -43,7 +43,7 @@ public class RoutingInfo2URIs implements Cloneable, Router<RoutingInfo, TargetSe
             return false;
         if (getClass() != obj.getClass())
             return false;
-        RoutingInfo2URIs other = (RoutingInfo2URIs) obj;
+        RoutingInfo2Targets other = (RoutingInfo2Targets) obj;
         if (_levels == null) {
             if (other._levels != null)
                 return false;
@@ -53,8 +53,8 @@ public class RoutingInfo2URIs implements Cloneable, Router<RoutingInfo, TargetSe
     }
 
     @Override
-    protected RoutingInfo2URIs clone() throws CloneNotSupportedException {
-        final RoutingInfo2URIs cloned = new RoutingInfo2URIs();
+    protected RoutingInfo2Targets clone() throws CloneNotSupportedException {
+        final RoutingInfo2Targets cloned = new RoutingInfo2Targets();
         for ( Level level : this._levels ) {
             cloned._levels.add(level.clone());
         }
@@ -86,12 +86,12 @@ public class RoutingInfo2URIs implements Cloneable, Router<RoutingInfo, TargetSe
         return EMPTY_TARGETSET;
     }
 
-    public RoutingInfo2URIs freeze() {
+    public RoutingInfo2Targets freeze() {
         this._isFrozen = true;
         return  this;
     }
     
-    public RoutingInfo2URIs addOrUpdateRule(final int priority, final String uri, final RoutingInfo[] infoRegexs) 
+    public RoutingInfo2Targets addOrUpdateRule(final int priority, final String uri, final RoutingInfo[] infoRegexs) 
             throws Exception {
         if ( !this._isFrozen ) {
             getOrCreateLevel(priority).addOrUpdateRule(uri, infoRegexs);
@@ -101,7 +101,7 @@ public class RoutingInfo2URIs implements Cloneable, Router<RoutingInfo, TargetSe
         }
     }
     
-    public RoutingInfo2URIs removeRule(final int priority, final String uri) 
+    public RoutingInfo2Targets removeRule(final int priority, final String uri) 
             throws Exception {
         if ( !this._isFrozen ) {
             getOrCreateLevel(priority).removeRule(uri);

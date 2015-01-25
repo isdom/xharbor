@@ -113,7 +113,7 @@ public class RouteUtils {
     public static Router<RoutingInfo, ?> buildRoutingInfoRouterFromZK(
             final CuratorFramework client, final String path) 
             throws Exception {
-        final RoutingInfo2URIs router = new RoutingInfo2URIs();
+        final RoutingInfo2Targets router = new RoutingInfo2Targets();
         final List<String> levels = client.getChildren().forPath(path);
         for ( String priority : levels ) {
             try {
@@ -129,7 +129,7 @@ public class RouteUtils {
 
     private static void addRules(
             final CuratorFramework client, 
-            final RoutingInfo2URIs router,
+            final RoutingInfo2Targets router,
             final String pathToLevel,
             final int priority) throws Exception {
         final List<String> hosts = client.getChildren().forPath(pathToLevel);

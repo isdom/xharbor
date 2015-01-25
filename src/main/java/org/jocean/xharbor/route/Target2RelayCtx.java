@@ -3,7 +3,12 @@
  */
 package org.jocean.xharbor.route;
 
+import io.netty.util.Timeout;
+import io.netty.util.Timer;
+import io.netty.util.TimerTask;
+
 import java.net.URI;
+import java.util.concurrent.TimeUnit;
 
 import org.jocean.idiom.Function;
 import org.jocean.idiom.InterfaceUtils;
@@ -19,16 +24,21 @@ import org.jocean.xharbor.spi.Router;
 import org.jocean.xharbor.util.BizMemoImpl;
 import org.jocean.xharbor.util.TIMemoImplOfRanges;
 import org.jocean.xharbor.util.TimeIntervalMemo;
-import org.jocean.xharbor.util.URISMemo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Range;
 
 /**
  * @author isdom
  */
-public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
+public class Target2RelayCtx implements Router<Target, RelayContext> {
 
-    public URI2RelayCtxOfRoutingInfo() {
+    private static final Logger LOG = LoggerFactory
+            .getLogger(Target2RelayCtx.class);
+    
+    public Target2RelayCtx(final Timer timer) {
+        this._timer = timer;
         _mbeanSupport.registerMBean("name=relays", this._level0Memo.createMBean());
     }
     
@@ -43,10 +53,8 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
     }
     
     @Override
-    public RelayContext calculateRoute(final URI uri, final Context routectx) {
+    public RelayContext calculateRoute(final Target target, final Context routectx) {
         final RoutingInfo info = routectx.getProperty("routingInfo");
-        final TargetSet targetSet = routectx.getProperty("targetSet");
-        final URISMemo urisMemo = routectx.getProperty("urisMemo");
         
         final RelayContext.RelayMemo memoBase = 
                 InterfaceUtils.combineImpls(RelayContext.RelayMemo.class, 
@@ -55,10 +63,10 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
                 this._bizMemos.get(Tuple.of(normalizeString(info.getPath()), info.getMethod()))
                 );
         final RelayContext.RelayMemo memo = 
-                null != uri 
+                null != target 
                 ? InterfaceUtils.combineImpls(RelayContext.RelayMemo.class, 
                     memoBase,
-                    this._bizMemos.get(Tuple.of(normalizeString(info.getPath()), info.getMethod(), uri2value(uri))),
+                    this._bizMemos.get(Tuple.of(normalizeString(info.getPath()), info.getMethod(), uri2value(target.serviceUri()))),
                     new RelayContext.RelayMemo() {
                         @Override
                         public void beginBizStep(final STEP step) {
@@ -68,18 +76,47 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
                             if ( step.equals(STEP.RECV_RESP) ) {
                                 //  < 500 ms
                                 if ( ttl < 500 ) {
-                                    targetSet.updateWeight(uri, 1);
+                                    final int weight = target.addWeight(1);
+                                    if ( LOG.isDebugEnabled() ) {
+                                        LOG.debug("endBizStep for RECV_RESP with ttl < 500ms, so add weight with 1 to {}",
+                                                weight);
+                                    }
                                 }
                             }
                         }
                         @Override
                         public void incBizResult(final RESULT result, final long ttl) {
                             if ( result.equals(RESULT.CONNECTDESTINATION_FAILURE)) {
-                                urisMemo.markDownStatus(uri, true);
+                                final long period = 60L;
+                                target.markServiceDownStatus(true);
+                                LOG.warn("relay failed for CONNECTDESTINATION_FAILURE, so mark service {} down.",
+                                        target.serviceUri());
+                                _timer.newTimeout(new TimerTask() {
+                                    @Override
+                                    public void run(final Timeout timeout) throws Exception {
+                                        // reset down flag
+                                        target.markServiceDownStatus(false);
+                                        LOG.info("reset service {} down flag after {} second.",
+                                                target.serviceUri(), period);
+                                    }
+                                }, period, TimeUnit.SECONDS);
                             }
                             else if ( result.equals(RESULT.RELAY_FAILURE)) {
-                                targetSet.markTargetDown(uri);
+                                final long period = 60L;
+                                target.markAPIDownStatus(true);
+                                LOG.warn("relay failed for RELAY_FAILURE, so mark service {}'s API {} down.",
+                                        target.serviceUri(), info);
+                                _timer.newTimeout(new TimerTask() {
+                                    @Override
+                                    public void run(final Timeout timeout) throws Exception {
+                                        // reset down flag
+                                        target.markAPIDownStatus(false);
+                                        LOG.info("reset service {}'s API {} down flag after {} second.",
+                                                target.serviceUri(), info, period);
+                                    }
+                                }, period, TimeUnit.SECONDS);
                                 //  TODO mark targetSet's uri down for http response with 4xx/5xx
+                                
                             }
                         }})
                 : memoBase;
@@ -88,7 +125,7 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
 
             @Override
             public URI relayTo() {
-                return uri;
+                return null != target ? target.serviceUri() : null;
             }
 
             @Override
@@ -160,6 +197,8 @@ public class URI2RelayCtxOfRoutingInfo implements Router<URI, RelayContext> {
             super(STEP.class, RESULT.class);
         }
     }
+    
+    private final Timer _timer;
     
     private final MBeanRegisterSupport _mbeanSupport = 
             new MBeanRegisterSupport("org.jocean:type=router", null);

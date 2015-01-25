@@ -90,9 +90,7 @@
 
     <bean id="timer" class="io.netty.util.HashedWheelTimer" />
 
-    <bean id="urismemo" class="org.jocean.xharbor.util.URISMemoImpl">
-        <constructor-arg ref="timer"/>
-    </bean>
+    <bean id="serviceMemo" class="org.jocean.xharbor.util.ServiceMemoImpl"/>
     
     <bean id="jmxConnectorServer" 
         class="org.springframework.jmx.support.ConnectorServerFactoryBean"  >
@@ -114,6 +112,7 @@
                 <entry key="org.jocean:name=directMemory"   value-ref="directMemory"/>
                 <entry key="org.jocean:name=bytesPool"      value-ref="bytesPool"/>
                 <entry key="org.jocean:name=httpClientPool" value-ref="httpClientPool"/>
+                <entry key="org.jocean:name=serviceMemo"   value-ref="serviceMemo"/>
                 <entry key="org.jocean:name=htmladapter,port=8082" value-ref="htmlAdaptorServer"/>
             </map>
         </property>

@@ -29,11 +29,11 @@ public class RulesZKUpdater {
             final EventReceiverSource source,
             final CuratorFramework client, 
             final String root, 
-            final Visitor<RoutingInfo2URIs> updateRules) {
+            final Visitor<RoutingInfo2Targets> updateRules) {
         this._updateRules = updateRules;
         this._root = root;
         this._zkCache = TreeCache.newBuilder(client, root).setCacheData(true).build();
-        this._rules = new RoutingInfo2URIs();
+        this._rules = new RoutingInfo2Targets();
         this._source = source;
     }
     
@@ -146,8 +146,8 @@ public class RulesZKUpdater {
         .freeze();
     }
     
-    private RoutingInfo2URIs addOrUpdateToRules(
-            final RoutingInfo2URIs rules, 
+    private RoutingInfo2Targets addOrUpdateToRules(
+            final RoutingInfo2Targets rules, 
             final TreeCacheEvent event) throws Exception {
         final ChildData data = event.getData();
         final Pair<Integer,String> pair = parseFromPath(data.getPath());
@@ -164,8 +164,8 @@ public class RulesZKUpdater {
         return null;
     }
     
-    private RoutingInfo2URIs removeFromRules(
-            final RoutingInfo2URIs rules, 
+    private RoutingInfo2Targets removeFromRules(
+            final RoutingInfo2Targets rules, 
             final TreeCacheEvent event) throws Exception {
         final ChildData data = event.getData();
         final Pair<Integer,String> pair = parseFromPath(data.getPath());
@@ -180,7 +180,7 @@ public class RulesZKUpdater {
         return null;
     }
     
-    private void updateRules(final RoutingInfo2URIs newRules) {
+    private void updateRules(final RoutingInfo2Targets newRules) {
         if ( null != newRules ) {
             this._rules = newRules;
             try {
@@ -282,8 +282,8 @@ public class RulesZKUpdater {
 
     private final String _root;
     private final TreeCache _zkCache;
-    private final Visitor<RoutingInfo2URIs> _updateRules;
-    private RoutingInfo2URIs _rules;
+    private final Visitor<RoutingInfo2Targets> _updateRules;
+    private RoutingInfo2Targets _rules;
     private EventReceiver _receiver;
     private final EventReceiverSource _source;
 }

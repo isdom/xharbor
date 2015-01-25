@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.jocean.xharbor.util.URISMemo;
+import org.jocean.xharbor.util.ServiceMemo;
 
 /**
  * @author isdom
@@ -19,20 +19,20 @@ public class TargetSet {
     private static final int MAX_EFFECTIVEWEIGHT = 1000;
     
     public TargetSet(final URI[] uris) {
-        this._targets = new ArrayList<Target>() {
+        this._targets = new ArrayList<TargetImpl>() {
             private static final long serialVersionUID = 1L;
         {
             for ( URI uri : uris) {
-                this.add(new Target(uri));
+                this.add(new TargetImpl(uri));
             }
-        }}.toArray(new Target[0]);
+        }}.toArray(new TargetImpl[0]);
     }
     
     public String[] getStatus() {
         return new ArrayList<String>() {
             private static final long serialVersionUID = 1L;
         {
-            for (Target peer : _targets) {
+            for (TargetImpl peer : _targets) {
                 this.add(peer._uri.toString() + ":down(" + peer._down.get()
                         + "):effectiveWeight(" + peer._effectiveWeight.get()
                         + "):currentWeight(" + peer._currentWeight.get()
@@ -42,11 +42,11 @@ public class TargetSet {
         }}.toArray(new String[0]);
     }
     
-    public URI selectTarget(final URISMemo urisMemo) {
+    public Target selectTarget(final ServiceMemo serviceMemo) {
         int total = 0;
-        Target best = null;
-        for ( Target peer : this._targets ) {
-            if ( !isTargetDown(urisMemo, peer) ) {
+        TargetImpl best = null;
+        for ( TargetImpl peer : this._targets ) {
+            if ( !isTargetDown(serviceMemo, peer) ) {
                 // peer->current_weight += peer->effective_weight; 
                 final int effectiveWeight = peer._effectiveWeight.get();
                 final int currentWeight = peer._currentWeight.addAndGet( effectiveWeight );
@@ -67,47 +67,66 @@ public class TargetSet {
         
 //        best->current_weight -= total;
         best._currentWeight.addAndGet(-total);
+        final Target selected = best;
         
-        return best._uri;
+        return new Target() {
+
+            @Override
+            public URI serviceUri() {
+                return selected.serviceUri();
+            }
+
+            @Override
+            public int addWeight(int deltaWeight) {
+                return selected.addWeight(deltaWeight);
+            }
+
+            @Override
+            public void markServiceDownStatus(final boolean isDown) {
+                serviceMemo.markServiceDownStatus(selected.serviceUri(), isDown);
+            }
+
+            @Override
+            public void markAPIDownStatus(boolean isDown) {
+                selected.markAPIDownStatus(isDown);
+            }};
     }
 
-    public void updateWeight(final URI uri, final int deltaWeight) {
-        final Target target = uri2target(uri);
-        if (null != target) {
-            if ( target._effectiveWeight.addAndGet(deltaWeight) > MAX_EFFECTIVEWEIGHT ) {
-                target._effectiveWeight.addAndGet(-deltaWeight);
-            }
-        }
-    }
-    
     /**
-     * @param urisMemo 
+     * @param serviceMemo 
      * @param peer
      * @return
      */
-    private boolean isTargetDown(final URISMemo urisMemo, final Target peer) {
-        return urisMemo.isDown(peer._uri) || peer._down.get();
+    private boolean isTargetDown(final ServiceMemo serviceMemo, final TargetImpl peer) {
+        return serviceMemo.isServiceDown(peer._uri) || peer._down.get();
     }
     
-    public void markTargetDown(final URI uri) {
-        final Target target = uri2target(uri);
-        if (null != target) {
-            target._down.set(true);
-            //  TODO reset to false when timeout
+    private static class TargetImpl implements Target {
+        @Override
+        public URI serviceUri() {
+            return this._uri;
         }
-    }
-    
-    private Target uri2target(final URI uri) {
-        for ( Target peer : this._targets ) {
-            if ( peer._uri.equals(uri)) {
-                return peer;
+        
+        @Override
+        public int addWeight(final int deltaWeight) {
+            int weight = this._effectiveWeight.addAndGet(deltaWeight);
+            if ( weight > MAX_EFFECTIVEWEIGHT ) {
+                weight = this._effectiveWeight.addAndGet(-deltaWeight);
             }
+            return weight;
         }
-        return null;
-    }
-
-    private static class Target {
-        Target(final URI uri) {
+        
+        @Override
+        public void markAPIDownStatus(final boolean isDown) {
+            this._down.set(isDown);
+        }
+        
+        @Override
+        public void markServiceDownStatus(final boolean isDown) {
+            // just ignore
+        }
+        
+        TargetImpl(final URI uri) {
             this._uri = uri;
         }
         
@@ -117,5 +136,5 @@ public class TargetSet {
         private final AtomicBoolean _down = new AtomicBoolean(false);
     }
     
-    private final Target[] _targets;
+    private final TargetImpl[] _targets;
 }
