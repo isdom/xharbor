@@ -296,9 +296,9 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
         @Override
         public BizStep call() throws Exception {
             _relayCtx.memo().endBizStep(STEP.OBTAINING_HTTPCLIENT, -1);
-            _relayCtx.memo().incBizResult(RESULT.CONNECTDESTINATION_FAILURE, _watch4Result.stopAndRestart());
-            selfEventReceiver().acceptEvent("startRelay");
-            return WAIT;
+            final long ttl = _watch4Result.stopAndRestart();
+            _relayCtx.memo().incBizResult(RESULT.CONNECTDESTINATION_FAILURE, ttl);
+            return launchRetry(ttl);
         }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
@@ -339,9 +339,9 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
         @Override
         public BizStep call() throws Exception {
             _relayCtx.memo().endBizStep(STEP.TRANSFER_CONTENT, -1);
-            _relayCtx.memo().incBizResult(RESULT.RELAY_FAILURE, _watch4Result.stopAndRestart());
-            selfEventReceiver().acceptEvent("startRelay");
-            return WAIT;
+            final long ttl = _watch4Result.stopAndRestart();
+            _relayCtx.memo().incBizResult(RESULT.RELAY_FAILURE, ttl);
+            return launchRetry(ttl);
         }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
@@ -363,32 +363,36 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             }
             
             if (isHttpClientError(response)) {
-                _relayCtx.memo().endBizStep(STEP.RECV_RESP, _watch4Step.stopAndRestart());
-                _relayCtx.memo().incBizResult(RESULT.HTTP_CLIENT_ERROR, _watch4Result.stopAndRestart());
-                safeDetachHttp();
-                selfEventReceiver().acceptEvent("startRelay");
-                return WAIT;
+                return retryFor(RESULT.HTTP_CLIENT_ERROR);
             }
             
             if (isHttpServerError(response)) {
-                _relayCtx.memo().endBizStep(STEP.RECV_RESP, _watch4Step.stopAndRestart());
-                _relayCtx.memo().incBizResult(RESULT.HTTP_SERVER_ERROR, _watch4Result.stopAndRestart());
-                safeDetachHttp();
-                selfEventReceiver().acceptEvent("startRelay");
-                return WAIT;
+                return retryFor(RESULT.HTTP_SERVER_ERROR);
             }
             
             _channelCtx.write(ReferenceCountUtil.retain(response));
             return RECVCONTENT;
+        }
+
+        /**
+         * @return
+         * @throws Exception
+         */
+        private BizStep retryFor(final RESULT result) throws Exception {
+            safeDetachHttp();
+            _relayCtx.memo().endBizStep(STEP.RECV_RESP, _watch4Step.stopAndRestart());
+            final long ttl = _watch4Result.stopAndRestart();
+            _relayCtx.memo().incBizResult(result, ttl);
+            return launchRetry(ttl);
         }
     }
     .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
         @Override
         public BizStep call() throws Exception {
             _relayCtx.memo().endBizStep(STEP.RECV_RESP, -1);
-            _relayCtx.memo().incBizResult(RESULT.RELAY_FAILURE, _watch4Result.stopAndRestart());
-            selfEventReceiver().acceptEvent("startRelay");
-            return WAIT;
+            final long ttl = _watch4Result.stopAndRestart();
+            _relayCtx.memo().incBizResult(RESULT.RELAY_FAILURE, ttl);
+            return launchRetry(ttl);
         }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
@@ -546,6 +550,17 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
     
     private boolean isTransferHttpRequestComplete() {
         return this._transferHttpRequestComplete;
+    }
+
+    /**
+     * @param ttl
+     * @return
+     * @throws Exception
+     */
+    private BizStep launchRetry(final long ttl) throws Exception {
+        _relayCtx.memo().incBizResult(RESULT.RELAY_RETRY, ttl);
+        selfEventReceiver().acceptEvent("startRelay");
+        return WAIT;
     }
 
     /**
