@@ -17,6 +17,7 @@ import org.jocean.idiom.Pair;
 import org.jocean.idiom.SimpleCache;
 import org.jocean.j2se.MBeanRegisterSupport;
 import org.jocean.xharbor.spi.Router;
+import org.jocean.xharbor.spi.RoutingInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,8 +33,9 @@ public class RouteUtils {
             .getLogger(RouteUtils.class);
 
     @SuppressWarnings("rawtypes")
-    public static <I, O> Router<I, O> buildCompositeRouter(
-            final Router<I,?> inRouter, final Class<O> clsO,
+    public static <I, O> Router<I, O> compositeRouter(
+            final Class<O> clsO,
+            final Router<I,?> inRouter, 
             final Router ... routers) {
         return new Router<I, O>() {
 
@@ -52,7 +54,12 @@ public class RouteUtils {
         public String[] getRoutes();
     }
     
-    public static <INPUT> CachedRouter<INPUT, TargetSet> buildCachedURIsRouter(
+    //  TODO replace this to RoutesMXBean
+    public interface RouteMXBean {
+        public String getRoutes();
+    }
+    
+    public static <INPUT, OUTPUT> CachedRouter<INPUT, OUTPUT> buildCachedRouter(
             final String prefix, 
             final EventReceiverSource source, 
             final Function<INPUT, String> input2objname) {
@@ -62,10 +69,10 @@ public class RouteUtils {
         final MBeanRegisterSupport urisMBeanSupport =
                 new MBeanRegisterSupport(prefix, null);
       
-        return new CachedRouter<INPUT, TargetSet>(source, 
-                new CachedRouter.CacheVisitor<INPUT, TargetSet>() {
+        return new CachedRouter<INPUT, OUTPUT>(source, 
+                new CachedRouter.CacheVisitor<INPUT, OUTPUT>() {
                     @Override
-                    public void visit(final SimpleCache<INPUT, TargetSet> cache)
+                    public void visit(final SimpleCache<INPUT, OUTPUT> cache)
                             throws Exception {
                         routerMbeanSupport.registerMBean("name=routes", new RoutesMXBean() {
                       @Override
@@ -73,18 +80,18 @@ public class RouteUtils {
                           return new ArrayList<String>() {
                               private static final long serialVersionUID = 1L;
                           {
-                              final Iterator<Map.Entry<INPUT, TargetSet>> itr = cache.snapshot().entrySet().iterator();
+                              final Iterator<Map.Entry<INPUT, OUTPUT>> itr = cache.snapshot().entrySet().iterator();
                               while (itr.hasNext()) {
-                                  final Map.Entry<INPUT, TargetSet> entry = itr.next();
-                                  this.add(entry.getKey() + "-->" + Arrays.toString( entry.getValue().getStatus() ));
+                                  final Map.Entry<INPUT, OUTPUT> entry = itr.next();
+                                  this.add(entry.getKey() + "-->" + entry.getValue().toString());
                               }
                           }}.toArray(new String[0]);
                       }});
                     }
                 },
-                new CachedRouter.OnRouterUpdated<INPUT, TargetSet>() {
+                new CachedRouter.OnRouterUpdated<INPUT, OUTPUT>() {
                     @Override
-                    public void visit(final Router<INPUT, TargetSet> prevImpl, final Router<INPUT, TargetSet> newImpl)
+                    public void visit(final Router<INPUT, OUTPUT> prevImpl, final Router<INPUT, OUTPUT> newImpl)
                             throws Exception {
                       if ( null != prevImpl ) {
                           routerMbeanSupport.unregisterMBean("name=rules");
@@ -93,16 +100,16 @@ public class RouteUtils {
                       urisMBeanSupport.unregisterAllMBeans();
                         
                     }}, 
-                new CachedRouter.OnRouted<INPUT, TargetSet>() {
+                new CachedRouter.OnRouted<INPUT, OUTPUT>() {
                     @Override
-                    public void visit(final INPUT input, final TargetSet targetSet) throws Exception {
+                    public void visit(final INPUT input, final OUTPUT output) throws Exception {
                         final String objname = input2objname.apply(input);
                         if (!urisMBeanSupport.isRegistered(objname)) {
                             urisMBeanSupport.registerMBean(objname,
-                                    new RoutesMXBean() {
+                                    new RouteMXBean() {
                                         @Override
-                                        public String[] getRoutes() {
-                                            return targetSet.getStatus();
+                                        public String getRoutes() {
+                                            return output.toString();
                                         }
                                     });
                         }
@@ -113,7 +120,7 @@ public class RouteUtils {
     public static Router<RoutingInfo, ?> buildRoutingInfoRouterFromZK(
             final CuratorFramework client, final String path) 
             throws Exception {
-        final RoutingInfo2Targets router = new RoutingInfo2Targets();
+        final RoutingInfo2Dispatcher router = new RoutingInfo2Dispatcher();
         final List<String> levels = client.getChildren().forPath(path);
         for ( String priority : levels ) {
             try {
@@ -129,7 +136,7 @@ public class RouteUtils {
 
     private static void addRules(
             final CuratorFramework client, 
-            final RoutingInfo2Targets router,
+            final RoutingInfo2Dispatcher router,
             final String pathToLevel,
             final int priority) throws Exception {
         final List<String> hosts = client.getChildren().forPath(pathToLevel);

@@ -1,4 +1,4 @@
-package org.jocean.xharbor.route;
+package org.jocean.xharbor.util;
 
 import java.util.Arrays;
 
@@ -15,6 +15,8 @@ import org.jocean.event.api.annotation.OnEvent;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.Pair;
 import org.jocean.idiom.Visitor;
+import org.jocean.xharbor.route.RoutingInfo2Dispatcher;
+import org.jocean.xharbor.spi.RoutingInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,11 +31,11 @@ public class RulesZKUpdater {
             final EventReceiverSource source,
             final CuratorFramework client, 
             final String root, 
-            final Visitor<RoutingInfo2Targets> updateRules) {
+            final Visitor<RoutingInfo2Dispatcher> updateRules) {
         this._updateRules = updateRules;
         this._root = root;
         this._zkCache = TreeCache.newBuilder(client, root).setCacheData(true).build();
-        this._rules = new RoutingInfo2Targets();
+        this._rules = new RoutingInfo2Dispatcher();
         this._source = source;
     }
     
@@ -146,8 +148,8 @@ public class RulesZKUpdater {
         .freeze();
     }
     
-    private RoutingInfo2Targets addOrUpdateToRules(
-            final RoutingInfo2Targets rules, 
+    private RoutingInfo2Dispatcher addOrUpdateToRules(
+            final RoutingInfo2Dispatcher rules, 
             final TreeCacheEvent event) throws Exception {
         final ChildData data = event.getData();
         final Pair<Integer,String> pair = parseFromPath(data.getPath());
@@ -164,8 +166,8 @@ public class RulesZKUpdater {
         return null;
     }
     
-    private RoutingInfo2Targets removeFromRules(
-            final RoutingInfo2Targets rules, 
+    private RoutingInfo2Dispatcher removeFromRules(
+            final RoutingInfo2Dispatcher rules, 
             final TreeCacheEvent event) throws Exception {
         final ChildData data = event.getData();
         final Pair<Integer,String> pair = parseFromPath(data.getPath());
@@ -180,7 +182,7 @@ public class RulesZKUpdater {
         return null;
     }
     
-    private void updateRules(final RoutingInfo2Targets newRules) {
+    private void updateRules(final RoutingInfo2Dispatcher newRules) {
         if ( null != newRules ) {
             this._rules = newRules;
             try {
@@ -282,8 +284,8 @@ public class RulesZKUpdater {
 
     private final String _root;
     private final TreeCache _zkCache;
-    private final Visitor<RoutingInfo2Targets> _updateRules;
-    private RoutingInfo2Targets _rules;
+    private final Visitor<RoutingInfo2Dispatcher> _updateRules;
+    private RoutingInfo2Dispatcher _rules;
     private EventReceiver _receiver;
     private final EventReceiverSource _source;
 }

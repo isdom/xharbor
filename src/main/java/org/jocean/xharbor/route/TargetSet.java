@@ -5,20 +5,24 @@ package org.jocean.xharbor.route;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.jocean.xharbor.util.ServiceMemo;
+import org.jocean.xharbor.spi.Dispatcher;
+import org.jocean.xharbor.spi.ServiceMemo;
+import org.jocean.xharbor.spi.Target;
 
 /**
  * @author isdom
  *
  */
-public class TargetSet {
+class TargetSet implements Dispatcher {
 
     private static final int MAX_EFFECTIVEWEIGHT = 1000;
     
-    public TargetSet(final URI[] uris) {
+    public TargetSet(final URI[] uris, final ServiceMemo serviceMemo) {
+        this._serviceMemo = serviceMemo;
         this._targets = new ArrayList<TargetImpl>() {
             private static final long serialVersionUID = 1L;
         {
@@ -28,25 +32,27 @@ public class TargetSet {
         }}.toArray(new TargetImpl[0]);
     }
     
-    public String[] getStatus() {
-        return new ArrayList<String>() {
+    @Override
+    public String toString() {
+        return Arrays.toString( new ArrayList<String>() {
             private static final long serialVersionUID = 1L;
         {
             for (TargetImpl peer : _targets) {
-                this.add(peer._uri.toString() + ":down(" + peer._down.get()
+                this.add(peer._uri.toString() + ":down(" + isTargetDown(peer)
                         + "):effectiveWeight(" + peer._effectiveWeight.get()
                         + "):currentWeight(" + peer._currentWeight.get()
                         + ")"
                         );
             }
-        }}.toArray(new String[0]);
+        }}.toArray(new String[0]) );
     }
-    
-    public Target selectTarget(final ServiceMemo serviceMemo) {
+
+    @Override
+    public Target dispatch() {
         int total = 0;
         TargetImpl best = null;
         for ( TargetImpl peer : this._targets ) {
-            if ( !isTargetDown(serviceMemo, peer) ) {
+            if ( !isTargetDown(peer) ) {
                 // peer->current_weight += peer->effective_weight; 
                 final int effectiveWeight = peer._effectiveWeight.get();
                 final int currentWeight = peer._currentWeight.addAndGet( effectiveWeight );
@@ -67,41 +73,19 @@ public class TargetSet {
         
 //        best->current_weight -= total;
         best._currentWeight.addAndGet(-total);
-        final Target selected = best;
         
-        return new Target() {
-
-            @Override
-            public URI serviceUri() {
-                return selected.serviceUri();
-            }
-
-            @Override
-            public int addWeight(int deltaWeight) {
-                return selected.addWeight(deltaWeight);
-            }
-
-            @Override
-            public void markServiceDownStatus(final boolean isDown) {
-                serviceMemo.markServiceDownStatus(selected.serviceUri(), isDown);
-            }
-
-            @Override
-            public void markAPIDownStatus(boolean isDown) {
-                selected.markAPIDownStatus(isDown);
-            }};
+        return best;
     }
-
+    
     /**
-     * @param serviceMemo 
      * @param peer
      * @return
      */
-    private boolean isTargetDown(final ServiceMemo serviceMemo, final TargetImpl peer) {
-        return serviceMemo.isServiceDown(peer._uri) || peer._down.get();
+    private boolean isTargetDown(final TargetImpl peer) {
+        return this._serviceMemo.isServiceDown(peer._uri) || peer._down.get();
     }
     
-    private static class TargetImpl implements Target {
+    private class TargetImpl implements Target {
         @Override
         public URI serviceUri() {
             return this._uri;
@@ -123,7 +107,7 @@ public class TargetSet {
         
         @Override
         public void markServiceDownStatus(final boolean isDown) {
-            // just ignore
+            _serviceMemo.markServiceDownStatus(this._uri, isDown);
         }
         
         TargetImpl(final URI uri) {
@@ -136,5 +120,6 @@ public class TargetSet {
         private final AtomicBoolean _down = new AtomicBoolean(false);
     }
     
+    private final ServiceMemo _serviceMemo;
     private final TargetImpl[] _targets;
 }

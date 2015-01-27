@@ -16,16 +16,19 @@ import java.util.TreeSet;
 import java.util.regex.Pattern;
 
 import org.jocean.idiom.Pair;
+import org.jocean.xharbor.spi.Dispatcher;
 import org.jocean.xharbor.spi.Router;
+import org.jocean.xharbor.spi.RoutingInfo;
+import org.jocean.xharbor.spi.ServiceMemo;
 
 /**
  * @author isdom
  *
  */
-public class RoutingInfo2Targets implements Cloneable, Router<RoutingInfo, TargetSet>, RulesMXBean {
+public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Dispatcher>, RulesMXBean {
 
     private static final URI[] EMPTY_URIS = new URI[0];
-    private static final TargetSet EMPTY_TARGETSET = new TargetSet(EMPTY_URIS);
+    private static final TargetSet EMPTY_TARGETSET = new TargetSet(EMPTY_URIS, null);
 
     @Override
     public int hashCode() {
@@ -43,7 +46,7 @@ public class RoutingInfo2Targets implements Cloneable, Router<RoutingInfo, Targe
             return false;
         if (getClass() != obj.getClass())
             return false;
-        RoutingInfo2Targets other = (RoutingInfo2Targets) obj;
+        RoutingInfo2Dispatcher other = (RoutingInfo2Dispatcher) obj;
         if (_levels == null) {
             if (other._levels != null)
                 return false;
@@ -53,8 +56,8 @@ public class RoutingInfo2Targets implements Cloneable, Router<RoutingInfo, Targe
     }
 
     @Override
-    protected RoutingInfo2Targets clone() throws CloneNotSupportedException {
-        final RoutingInfo2Targets cloned = new RoutingInfo2Targets();
+    protected RoutingInfo2Dispatcher clone() throws CloneNotSupportedException {
+        final RoutingInfo2Dispatcher cloned = new RoutingInfo2Dispatcher();
         for ( Level level : this._levels ) {
             cloned._levels.add(level.clone());
         }
@@ -74,24 +77,25 @@ public class RoutingInfo2Targets implements Cloneable, Router<RoutingInfo, Targe
     }
     
     @Override
-    public TargetSet calculateRoute(final RoutingInfo info, final Context routectx) {
+    public Dispatcher calculateRoute(final RoutingInfo info, final Context routectx) {
+        final ServiceMemo memo = routectx.getProperty("serviceMemo");
         final Iterator<Level> itr = _levels.iterator();
         while (itr.hasNext()) {
             final Level level = itr.next();
             final URI[] uris = level.match(info);
             if ( null != uris && uris.length > 0 ) {
-                return new TargetSet(uris);
+                return new TargetSet(uris, memo);
             }
         }
         return EMPTY_TARGETSET;
     }
 
-    public RoutingInfo2Targets freeze() {
+    public RoutingInfo2Dispatcher freeze() {
         this._isFrozen = true;
         return  this;
     }
     
-    public RoutingInfo2Targets addOrUpdateRule(final int priority, final String uri, final RoutingInfo[] infoRegexs) 
+    public RoutingInfo2Dispatcher addOrUpdateRule(final int priority, final String uri, final RoutingInfo[] infoRegexs) 
             throws Exception {
         if ( !this._isFrozen ) {
             getOrCreateLevel(priority).addOrUpdateRule(uri, infoRegexs);
@@ -101,7 +105,7 @@ public class RoutingInfo2Targets implements Cloneable, Router<RoutingInfo, Targe
         }
     }
     
-    public RoutingInfo2Targets removeRule(final int priority, final String uri) 
+    public RoutingInfo2Dispatcher removeRule(final int priority, final String uri) 
             throws Exception {
         if ( !this._isFrozen ) {
             getOrCreateLevel(priority).removeRule(uri);

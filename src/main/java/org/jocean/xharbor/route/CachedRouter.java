@@ -27,6 +27,8 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT> {
     private static final Logger LOG = LoggerFactory
             .getLogger(CachedRouter.class);
     
+    private static final ThreadLocal<Context> _CTX = new ThreadLocal<Context>();
+    
     public interface CacheVisitor<I, O> extends 
         Visitor<SimpleCache<I, O>> {
     }
@@ -41,7 +43,13 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT> {
     
     @Override
     public OUTPUT calculateRoute(final INPUT input, final Context routectx) {
-        return this._cache.get(input);
+        _CTX.set(routectx);
+        
+        try {
+            return this._cache.get(input);
+        } finally {
+            _CTX.remove();
+        }
     }
 
     public void updateRouter(final Router<INPUT, OUTPUT> routerImpl) {
@@ -131,7 +139,7 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT> {
             new Function<INPUT, OUTPUT>() {
                 @Override
                 public OUTPUT apply(final INPUT input) {
-                    return _implRef.get().calculateRoute(input, null);
+                    return _implRef.get().calculateRoute(input, _CTX.get());
                 }
             },
             //  ifAssociated

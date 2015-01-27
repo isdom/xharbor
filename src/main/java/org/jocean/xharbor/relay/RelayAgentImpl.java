@@ -6,20 +6,17 @@ package org.jocean.xharbor.relay;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
 
+import java.lang.reflect.Field;
+
 import org.jocean.event.api.EventReceiverSource;
-import org.jocean.httpclient.api.GuideBuilder;
 import org.jocean.xharbor.spi.RelayAgent;
-import org.jocean.xharbor.spi.Router;
 
 /**
  * @author isdom
  *
  */
-public class RelayAgentImpl implements RelayAgent {
-    public RelayAgentImpl(
-            final GuideBuilder guideBuilder, 
-            final EventReceiverSource source) {
-        this._guideBuilder = guideBuilder;
+public abstract class RelayAgentImpl implements RelayAgent {
+    public RelayAgentImpl(final EventReceiverSource source) {
         this._source = source;
     }
     
@@ -27,19 +24,30 @@ public class RelayAgentImpl implements RelayAgent {
     public RelayTask createRelayTask(
             final ChannelHandlerContext channelCtx, 
             final HttpRequest httpRequest) {
-        final RelayFlow flow = 
-                new RelayFlow(_router, this._guideBuilder, channelCtx, httpRequest);
+        final RelayFlow flow = createRelayFlow().attach(channelCtx, httpRequest);
+        
+        try {
+            final Field field = flow.WAIT.getClass().getDeclaredField("this$0");
+            final Object outer = field.get(flow.WAIT);
+            System.out.print(outer);
+        } catch (NoSuchFieldException e) {
+            e.printStackTrace();
+        } catch (SecurityException e) {
+            e.printStackTrace();
+        } catch (IllegalArgumentException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
         
         this._source.create(flow, flow.WAIT);
         
         return flow.queryInterfaceInstance(RelayTask.class);
     }
     
-    public void setRouter(final Router<HttpRequest, RelayContext> router) {
-        this._router = router;
-    }
-
-    private final GuideBuilder _guideBuilder;
+    protected abstract RelayFlow createRelayFlow();
+    
     private final EventReceiverSource _source;
-    private Router<HttpRequest, RelayContext> _router;
 }

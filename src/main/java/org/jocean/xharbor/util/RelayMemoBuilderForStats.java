@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.xharbor.route;
+package org.jocean.xharbor.util;
 
 import java.net.URI;
 
@@ -11,37 +11,36 @@ import org.jocean.idiom.SimpleCache;
 import org.jocean.idiom.Tuple;
 import org.jocean.idiom.Visitor2;
 import org.jocean.j2se.MBeanRegisterSupport;
-import org.jocean.xharbor.relay.RelayContext;
-import org.jocean.xharbor.relay.RelayContext.RESULT;
-import org.jocean.xharbor.relay.RelayContext.RelayMemo;
-import org.jocean.xharbor.relay.RelayContext.STEP;
-import org.jocean.xharbor.spi.Router;
-import org.jocean.xharbor.util.BizMemoImpl;
-import org.jocean.xharbor.util.TIMemoImplOfRanges;
-import org.jocean.xharbor.util.TimeIntervalMemo;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.jocean.xharbor.spi.RelayMemo;
+import org.jocean.xharbor.spi.RelayMemo.RESULT;
+import org.jocean.xharbor.spi.RelayMemo.STEP;
+import org.jocean.xharbor.spi.RoutingInfo;
+import org.jocean.xharbor.spi.Target;
 
 import com.google.common.collect.Range;
 
 /**
  * @author isdom
+ *
  */
-public class Target2RelayCtx implements Router<Target, RelayContext> {
+public class RelayMemoBuilderForStats implements RelayMemo.Builder {
 
-    @SuppressWarnings("unused")
-    private static final Logger LOG = LoggerFactory
-            .getLogger(Target2RelayCtx.class);
-    
-    public interface RelayMemoBuilder {
-        public RelayContext.RelayMemo build(final Target target, final RoutingInfo info);
+    public RelayMemoBuilderForStats() {
+        this._mbeanSupport.registerMBean("name=relays", this._level0Memo.createMBean());
     }
     
-    public Target2RelayCtx(final RelayMemoBuilder builder) {
-        this._builder = builder;
-        _mbeanSupport.registerMBean("name=relays", this._level0Memo.createMBean());
+    @Override
+    public RelayMemo build(final Target target, final RoutingInfo info) {
+        return InterfaceUtils.combineImpls(
+            RelayMemo.class, 
+            this._level0Memo,
+            this._bizMemos.get(Tuple.of(normalizeString(info.getPath()))),
+            this._bizMemos.get(Tuple.of(normalizeString(info.getPath()), info.getMethod())),
+            this._bizMemos.get(Tuple.of(normalizeString(info.getPath()), info.getMethod(), 
+                    uri2value(target.serviceUri())))
+            );
     }
-    
+
     private static final String[] _OBJNAME_KEYS = new String[]{"path", "method", "dest"};
 
     private static final String normalizeString(final String input) {
@@ -52,65 +51,8 @@ public class Target2RelayCtx implements Router<Target, RelayContext> {
         return normalizeString(uri.toString());
     }
     
-    @Override
-    public RelayContext calculateRoute(final Target target, final Context routectx) {
-        final RoutingInfo info = routectx.getProperty("routingInfo");
-        
-        final RelayContext.RelayMemo memoBase = 
-                InterfaceUtils.combineImpls(RelayContext.RelayMemo.class, 
-                this._level0Memo,
-                this._bizMemos.get(Tuple.of(normalizeString(info.getPath()))),
-                this._bizMemos.get(Tuple.of(normalizeString(info.getPath()), info.getMethod()))
-                );
-        final RelayContext.RelayMemo memo = 
-                null != target 
-                ? compositeRelayMemo(target, info, memoBase)
-                : memoBase;
-        
-        return new RelayContext() {
-
-            @Override
-            public URI relayTo() {
-                return null != target ? target.serviceUri() : null;
-            }
-
-            @Override
-            public RelayMemo memo() {
-                return memo;
-            }};
-    }
-
-    /**
-     * @param target
-     * @param info
-     * @param base
-     * @return
-     */
-    private RelayMemo compositeRelayMemo(
-            final Target target,
-            final RoutingInfo info, 
-            final RelayContext.RelayMemo base) {
-        if ( null != this._builder) {
-            final RelayMemo memo = this._builder.build(target, info);
-            if ( null != memo ) {
-                return InterfaceUtils.combineImpls(RelayContext.RelayMemo.class, 
-                    base,
-                    this._bizMemos.get(Tuple.of(
-                            normalizeString(info.getPath()), info.getMethod(), uri2value(target.serviceUri()))),
-                    memo
-                    );
-            }
-        }
-        // others
-        return InterfaceUtils.combineImpls(RelayContext.RelayMemo.class, 
-            base,
-            this._bizMemos.get(Tuple.of(
-                    normalizeString(info.getPath()), info.getMethod(), uri2value(target.serviceUri())))
-            );
-    }
-
     private static class RelayTIMemoImpl extends TIMemoImplOfRanges {
-      
+        
         @SuppressWarnings("unchecked")
         public RelayTIMemoImpl() {
               super(new String[]{
@@ -142,8 +84,6 @@ public class Target2RelayCtx implements Router<Target, RelayContext> {
             super(STEP.class, RESULT.class);
         }
     }
-    
-    private final RelayMemoBuilder _builder;
     
     private final MBeanRegisterSupport _mbeanSupport = 
             new MBeanRegisterSupport("org.jocean:type=router", null);

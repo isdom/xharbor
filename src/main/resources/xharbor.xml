@@ -12,6 +12,11 @@
         <property name="fileEncoding" value="UTF-8"/>
     </bean>
     
+    <bean id="httpTransportLogStatus" class="org.jocean.httpclient.impl.HttpUtils"
+        factory-method="enableHttpTransportLog">
+        <constructor-arg value="${gateway.httpTransportLogEnabled:true}"/>
+    </bean>
+    
     <bean id="source" class="org.jocean.j2se.spring.BeanProxy">
         <constructor-arg value="org.jocean.event.api.EventReceiverSource"/>
     </bean>
@@ -38,9 +43,30 @@
         <constructor-arg value="${gateway.connector.maxConnection:1000}"/>
     </bean>
     
-    <bean id="relayAgent" class="org.jocean.xharbor.relay.RelayAgentImpl">
+    <bean id="router" class="org.jocean.j2se.spring.BeanProxy">
+        <constructor-arg value="org.jocean.xharbor.spi.Router"/>
+    </bean>
+   
+    <bean id="memoBuilder" class="org.jocean.j2se.spring.BeanProxy">
+        <constructor-arg value="org.jocean.xharbor.spi.RelayMemo.Builder"/>
+    </bean>
+    
+    <bean id="serviceMemo" class="org.jocean.xharbor.util.ServiceMemoImpl"/>
+    
+    <bean id="noRoutingMemo" class="org.jocean.xharbor.util.RoutingInfoMemoImpl"/>
+   
+    <bean id="relayFlow" class="org.jocean.xharbor.relay.RelayFlow" 
+        scope="prototype">
+        <constructor-arg ref="router" />
+        <constructor-arg ref="memoBuilder" />
+        <constructor-arg ref="serviceMemo" />
+        <constructor-arg ref="noRoutingMemo" />
         <constructor-arg ref="httpClientPool" />
+    </bean>
+    
+    <bean id="relayAgent" class="org.jocean.xharbor.relay.RelayAgentImpl">
         <constructor-arg ref="source" />
+        <lookup-method name="createRelayFlow" bean="relayFlow"/>
     </bean>
     
     <bean id="httpServer" class="org.jocean.xharbor.HttpGatewayServer"
@@ -69,7 +95,7 @@
         <constructor-arg value="org.jocean.idiom.Visitor"/>
     </bean>
     
-    <bean id="updater" class="org.jocean.xharbor.route.RulesZKUpdater">
+    <bean id="updater" class="org.jocean.xharbor.util.RulesZKUpdater">
         <constructor-arg ref="source"/>
         <constructor-arg ref="zkClient"/>
         <constructor-arg value="${zk.rules.path:/demo}"/>
@@ -90,8 +116,6 @@
 
     <bean id="timer" class="io.netty.util.HashedWheelTimer" />
 
-    <bean id="serviceMemo" class="org.jocean.xharbor.util.ServiceMemoImpl"/>
-    
     <bean id="jmxConnectorServer" 
         class="org.springframework.jmx.support.ConnectorServerFactoryBean"  >
         <property name="serviceUrl" value="service:jmx:jmxmp://0.0.0.0:${jmxmp.port:9876}" />
@@ -113,6 +137,7 @@
                 <entry key="org.jocean:name=bytesPool"      value-ref="bytesPool"/>
                 <entry key="org.jocean:name=httpClientPool" value-ref="httpClientPool"/>
                 <entry key="org.jocean:name=serviceMemo"   value-ref="serviceMemo"/>
+                <entry key="org.jocean:name=noRouting"   value-ref="noRoutingMemo"/>
                 <entry key="org.jocean:name=htmladapter,port=8082" value-ref="htmlAdaptorServer"/>
             </map>
         </property>

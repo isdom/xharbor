@@ -7,6 +7,7 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.QueryStringDecoder;
 
 import org.jocean.xharbor.spi.Router;
+import org.jocean.xharbor.spi.RoutingInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,7 +69,7 @@ public class Request2RoutingInfo implements Router<HttpRequest, RoutingInfo> {
 
         @Override
         public String toString() {
-            return "RoutingInfo [" + _method + " " + _path + "]";
+            return "[" + _method + " " + _path + "]";
         }
 
         private final String _method;
