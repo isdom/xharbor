@@ -43,8 +43,6 @@ public class Main {
     @SuppressWarnings("unchecked")
     public static void main(String[] args) throws Exception {
         
-//        HttpUtils.enableHttpTransportLog(true);
-        
         @SuppressWarnings("resource")
         final AbstractApplicationContext ctx =
                 new ClassPathXmlApplicationContext(
