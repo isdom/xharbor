@@ -2,8 +2,8 @@ package org.jocean.xharbor.route;
 
 import static org.junit.Assert.*;
 
+import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.route.RoutingInfo2Dispatcher.Level;
-import org.jocean.xharbor.spi.RoutingInfo;
 import org.junit.Test;
 
 public class RoutingInfo2DispatcherTestCase {

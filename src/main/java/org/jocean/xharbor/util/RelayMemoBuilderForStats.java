@@ -11,11 +11,11 @@ import org.jocean.idiom.SimpleCache;
 import org.jocean.idiom.Tuple;
 import org.jocean.idiom.Visitor2;
 import org.jocean.j2se.MBeanRegisterSupport;
-import org.jocean.xharbor.spi.RelayMemo;
-import org.jocean.xharbor.spi.RelayMemo.RESULT;
-import org.jocean.xharbor.spi.RelayMemo.STEP;
-import org.jocean.xharbor.spi.RoutingInfo;
-import org.jocean.xharbor.spi.Target;
+import org.jocean.xharbor.api.RelayMemo;
+import org.jocean.xharbor.api.RoutingInfo;
+import org.jocean.xharbor.api.Target;
+import org.jocean.xharbor.api.RelayMemo.RESULT;
+import org.jocean.xharbor.api.RelayMemo.STEP;
 
 import com.google.common.collect.Range;
 
@@ -53,6 +53,15 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
     
     private static class RelayTIMemoImpl extends TIMemoImplOfRanges {
         
+        private static final Range<Long> MT30S = Range.atLeast(30000L);
+        private static final Range<Long> LT30S = Range.closedOpen(10000L, 30000L);
+        private static final Range<Long> LT10S = Range.closedOpen(5000L, 10000L);
+        private static final Range<Long> LT5S = Range.closedOpen(1000L, 5000L);
+        private static final Range<Long> LT1S = Range.closedOpen(500L, 1000L);
+        private static final Range<Long> LT500MS = Range.closedOpen(100L, 500L);
+        private static final Range<Long> LS100MS = Range.closedOpen(10L, 100L);
+        private static final Range<Long> LT10MS = Range.closedOpen(0L, 10L);
+
         @SuppressWarnings("unchecked")
         public RelayTIMemoImpl() {
               super(new String[]{
@@ -66,14 +75,14 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
                       "mt30s",
                       },
                       new Range[]{
-                      Range.closedOpen(0L, 10L),
-                      Range.closedOpen(10L, 100L),
-                      Range.closedOpen(100L, 500L),
-                      Range.closedOpen(500L, 1000L),
-                      Range.closedOpen(1000L, 5000L),
-                      Range.closedOpen(5000L, 10000L),
-                      Range.closedOpen(10000L, 30000L),
-                      Range.atLeast(30000L)});
+                      LT10MS,
+                      LS100MS,
+                      LT500MS,
+                      LT1S,
+                      LT5S,
+                      LT10S,
+                      LT30S,
+                      MT30S});
           }
     }
     

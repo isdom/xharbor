@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.xharbor.route;
+package org.jocean.xharbor.util;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -9,15 +9,15 @@ import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.jocean.xharbor.spi.Dispatcher;
-import org.jocean.xharbor.spi.ServiceMemo;
-import org.jocean.xharbor.spi.Target;
+import org.jocean.xharbor.api.Dispatcher;
+import org.jocean.xharbor.api.ServiceMemo;
+import org.jocean.xharbor.api.Target;
 
 /**
  * @author isdom
  *
  */
-class TargetSet implements Dispatcher {
+public class TargetSet implements Dispatcher {
 
     private static final int MAX_EFFECTIVEWEIGHT = 1000;
     
@@ -77,6 +77,11 @@ class TargetSet implements Dispatcher {
         return best;
     }
     
+    @Override
+    public boolean IsValid() {
+        return this._targets.length > 0;
+    }
+
     /**
      * @param peer
      * @return

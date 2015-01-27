@@ -23,7 +23,9 @@ TODO:
 
   7、~~增加 JMX ConnectServer using jmxmp protocol~~
   
-  8、Routing 计算是否可以异步化？
+  // TODO
+  8、Routing 计算是否可以异步化？可行，改进Router的接口定义，允许较为耗时的 routing 动作 异步化进行，在RelayFlow中增加"ROUTING"状态, 
+    标识 异步化计算路由的阶段。
   
   9、~~在有限次转发失败后，暂时屏蔽该达到转发失败次数上限的特定转发路由~~， 目前功能是 单次转发失败（连接失败）后，即标识为down机。
   

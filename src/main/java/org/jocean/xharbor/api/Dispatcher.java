@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.xharbor.spi;
+package org.jocean.xharbor.api;
 
 /**
  * @author isdom
@@ -9,4 +9,5 @@ package org.jocean.xharbor.spi;
  */
 public interface Dispatcher {
     public Target dispatch();
+    public boolean IsValid();
 }

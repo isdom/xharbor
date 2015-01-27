@@ -8,7 +8,7 @@ import io.netty.handler.codec.http.HttpRequest;
 
 import org.jocean.event.api.EventReceiverSource;
 import org.jocean.event.api.EventUtils;
-import org.jocean.xharbor.spi.RelayAgent;
+import org.jocean.xharbor.api.RelayAgent;
 
 /**
  * @author isdom

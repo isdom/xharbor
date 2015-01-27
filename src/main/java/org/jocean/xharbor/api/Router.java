@@ -1,4 +1,4 @@
-package org.jocean.xharbor.spi;
+package org.jocean.xharbor.api;
 
 import org.jocean.idiom.Propertyable;
 

@@ -17,21 +17,32 @@
         <constructor-arg value="${gateway.httpTransportLogEnabled:true}"/>
     </bean>
     
-    <bean id="source" class="org.jocean.j2se.spring.BeanProxy">
-        <constructor-arg value="org.jocean.event.api.EventReceiverSource"/>
+    <bean id="source" class="org.jocean.event.extend.Runners"
+        factory-method="build">
+        <constructor-arg>
+            <bean class="org.jocean.event.extend.Runners.Config">
+                <constructor-arg value="org.jocean:type=xharbor"/>
+                <constructor-arg value="xharbor"/>
+                <constructor-arg>
+                    <bean class="org.jocean.event.extend.Services" 
+                        factory-method="lookupOrCreateTimerService">
+                        <constructor-arg value="xharbor"/>
+                    </bean>
+                </constructor-arg>
+                <constructor-arg>
+                    <bean class="org.jocean.event.extend.Services" 
+                        factory-method="lookupOrCreateFlowBasedExecutorSource">
+                        <constructor-arg value="xharbor"/>
+                    </bean>
+                </constructor-arg>
+            </bean>
+        </constructor-arg>
     </bean>
     
     <bean id="bytesPool" class="org.jocean.idiom.pool.Pools" 
         factory-method="createCachedBytesPool">
         <constructor-arg value="${pool.bytes.blockSize:10240}"/>
     </bean>
- 
-<!--         final HttpStack httpStack = new HttpStack(
-              Pools.createCachedBytesPool(10240), 
-                source, 
-                new NettyClient(4), 
-                100);
- -->
  
     <bean id="httpClientPool" class="org.jocean.httpclient.impl.HttpClientPool">
         <constructor-arg ref="source"/>
@@ -43,12 +54,42 @@
         <constructor-arg value="${gateway.connector.maxConnection:1000}"/>
     </bean>
     
-    <bean id="router" class="org.jocean.j2se.spring.BeanProxy">
-        <constructor-arg value="org.jocean.xharbor.spi.Router"/>
+    <bean id="genObjname" class="org.jocean.j2se.spring.BeanProxy">
+        <constructor-arg value="org.jocean.idiom.Function"/>
     </bean>
-   
-    <bean id="memoBuilder" class="org.jocean.j2se.spring.BeanProxy">
-        <constructor-arg value="org.jocean.xharbor.spi.RelayMemo.Builder"/>
+    
+    <bean id="cachedRouter" class="org.jocean.xharbor.route.RouteUtils" 
+        factory-method="buildCachedRouter">
+        <constructor-arg value="${router.objname:org.jocean:type=router}"/>
+        <constructor-arg ref="source"/>
+        <constructor-arg ref="genObjname"/>
+    </bean>
+    
+    <bean id="router" class="org.jocean.xharbor.route.RouteUtils" 
+        factory-method="compositeRouter">
+        <constructor-arg value="org.jocean.xharbor.api.Dispatcher"/>
+        <constructor-arg>
+            <bean class="org.jocean.xharbor.route.Request2RoutingInfo"/>
+        </constructor-arg>
+        <constructor-arg>
+            <array>
+                <ref bean="cachedRouter"/>
+            </array>
+        </constructor-arg>
+    </bean>
+    
+    <bean id="timer" class="io.netty.util.HashedWheelTimer" />
+
+    <bean id="memoBuilder" class="org.jocean.xharbor.api.RelayMemo.Utils" 
+        factory-method="compositeBuilder">
+        <constructor-arg>
+            <array>
+                <bean class="org.jocean.xharbor.util.RelayMemoBuilderForStats"/>
+                <bean class="org.jocean.xharbor.util.RelayMemoBuilderForDispatchFeedback">
+                    <constructor-arg ref="timer"/>
+                </bean>
+            </array>
+        </constructor-arg>
     </bean>
     
     <bean id="serviceMemo" class="org.jocean.xharbor.util.ServiceMemoImpl"/>
@@ -114,8 +155,6 @@
             }});
  -->
 
-    <bean id="timer" class="io.netty.util.HashedWheelTimer" />
-
     <bean id="jmxConnectorServer" 
         class="org.springframework.jmx.support.ConnectorServerFactoryBean"  >
         <property name="serviceUrl" value="service:jmx:jmxmp://0.0.0.0:${jmxmp.port:9876}" />
@@ -127,7 +166,7 @@
     <bean id="htmlAdaptorServer" class="com.sun.jdmk.comm.HtmlAdaptorServer" 
         init-method="start" destroy-method="stop"/>
 
-    <bean id="directMemory" class="org.jocean.xharbor.DirectMemoryIndicator"/>
+    <bean id="directMemory" class="org.jocean.xharbor.util.DirectMemoryIndicator"/>
     
     <bean id="exporter" class="org.springframework.jmx.export.MBeanExporter"
           lazy-init="false">

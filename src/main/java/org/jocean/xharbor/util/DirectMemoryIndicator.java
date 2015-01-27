@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.xharbor;
+package org.jocean.xharbor.util;
 
 import java.lang.reflect.Field;
 

@@ -16,8 +16,8 @@ import org.jocean.idiom.Function;
 import org.jocean.idiom.Pair;
 import org.jocean.idiom.SimpleCache;
 import org.jocean.j2se.MBeanRegisterSupport;
-import org.jocean.xharbor.spi.Router;
-import org.jocean.xharbor.spi.RoutingInfo;
+import org.jocean.xharbor.api.Router;
+import org.jocean.xharbor.api.RoutingInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,7 +62,7 @@ public class RouteUtils {
     public static <INPUT, OUTPUT> CachedRouter<INPUT, OUTPUT> buildCachedRouter(
             final String prefix, 
             final EventReceiverSource source, 
-            final Function<INPUT, String> input2objname) {
+            final Function<Pair<INPUT,OUTPUT>, String> genobjname) {
         final MBeanRegisterSupport routerMbeanSupport = 
                 new MBeanRegisterSupport(prefix, null);
 
@@ -98,13 +98,12 @@ public class RouteUtils {
                       }
                       routerMbeanSupport.registerMBean("name=rules", newImpl);
                       urisMBeanSupport.unregisterAllMBeans();
-                        
                     }}, 
                 new CachedRouter.OnRouted<INPUT, OUTPUT>() {
                     @Override
                     public void visit(final INPUT input, final OUTPUT output) throws Exception {
-                        final String objname = input2objname.apply(input);
-                        if (!urisMBeanSupport.isRegistered(objname)) {
+                        final String objname = genobjname.apply(Pair.of(input, output));
+                        if (null != objname && !urisMBeanSupport.isRegistered(objname)) {
                             urisMBeanSupport.registerMBean(objname,
                                     new RouteMXBean() {
                                         @Override
@@ -113,7 +112,6 @@ public class RouteUtils {
                                         }
                                     });
                         }
-                        
                     }});
     }
     

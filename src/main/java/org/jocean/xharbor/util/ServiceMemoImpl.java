@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jocean.idiom.Function;
 import org.jocean.idiom.SimpleCache;
-import org.jocean.xharbor.spi.ServiceMemo;
+import org.jocean.xharbor.api.ServiceMemo;
 
 /**
  * @author isdom

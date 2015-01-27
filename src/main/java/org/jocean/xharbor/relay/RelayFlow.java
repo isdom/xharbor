@@ -35,15 +35,15 @@ import org.jocean.idiom.Detachable;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.ValidationId;
-import org.jocean.xharbor.spi.Dispatcher;
-import org.jocean.xharbor.spi.RelayMemo;
-import org.jocean.xharbor.spi.RelayMemo.RESULT;
-import org.jocean.xharbor.spi.RelayMemo.STEP;
-import org.jocean.xharbor.spi.Router;
-import org.jocean.xharbor.spi.RoutingInfo;
-import org.jocean.xharbor.spi.RoutingInfoMemo;
-import org.jocean.xharbor.spi.ServiceMemo;
-import org.jocean.xharbor.spi.Target;
+import org.jocean.xharbor.api.Dispatcher;
+import org.jocean.xharbor.api.RelayMemo;
+import org.jocean.xharbor.api.Router;
+import org.jocean.xharbor.api.RoutingInfo;
+import org.jocean.xharbor.api.RoutingInfoMemo;
+import org.jocean.xharbor.api.ServiceMemo;
+import org.jocean.xharbor.api.Target;
+import org.jocean.xharbor.api.RelayMemo.RESULT;
+import org.jocean.xharbor.api.RelayMemo.STEP;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -230,7 +230,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             final RoutingInfo info = routectx.getProperty("routingInfo");
             routectx.clear();
             
-            _target  = dispatcher.dispatch();
+            _target = null != dispatcher ? dispatcher.dispatch() : null;
             
             if ( null == _target ) {
                 LOG.warn("can't found matched target service for request {}, just close client http connection ({}).", 
