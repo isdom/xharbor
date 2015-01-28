@@ -59,7 +59,7 @@ stop)
     echo "Stopping $SERVER_NAME ... "
     if [ ! -f $PIDFILE ]
     then
-        echo "error: count not find file $PIDFILE"
+        echo "error: could not find file $PIDFILE"
         exit 1
     else
         kill -9 $(cat $PIDFILE)
