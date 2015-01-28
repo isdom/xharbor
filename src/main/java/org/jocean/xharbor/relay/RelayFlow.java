@@ -68,15 +68,15 @@ import org.slf4j.LoggerFactory;
  */
 class RelayFlow extends AbstractFlow<RelayFlow> {
 
+    private static final Logger LOG = LoggerFactory
+            .getLogger(RelayFlow.class);
+    
     @Override
     public String toString() {
         return "RelayFlow [httpRequest=" + _httpRequest + ", guideId="
                 + _guideId + ", httpClientId=" + _httpClientId + "]";
     }
 
-    private static final Logger LOG = LoggerFactory
-            .getLogger(RelayFlow.class);
-    
     private static class RouterCtxImpl implements Router.Context {
         private final HashMap<String, Object> _map = new HashMap<String, Object>();
         
@@ -108,8 +108,10 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             final ServiceMemo       serviceMemo, 
             final RoutingInfoMemo   noRoutingMemo,
             final GuideBuilder      guideBuilder,
+            final boolean           checkResponseStatus,
             final HttpRequestTransformer.Builder transformerBuilder
             ) {
+        this._checkResponseStatus = checkResponseStatus;
         this._router = router;
         this._memoBuilder = memoBuilder;
         this._serviceMemo = serviceMemo;
@@ -381,12 +383,14 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
                 LOG.debug("channel for {} recv response {}", _target.serviceUri(), response);
             }
             
-            if (isHttpClientError(response)) {
-                return retryFor(RESULT.HTTP_CLIENT_ERROR);
-            }
-            
-            if (isHttpServerError(response)) {
-                return retryFor(RESULT.HTTP_SERVER_ERROR);
+            if ( _checkResponseStatus ) {
+                if (isHttpClientError(response)) {
+                    return retryFor(RESULT.HTTP_CLIENT_ERROR);
+                }
+                
+                if (isHttpServerError(response)) {
+                    return retryFor(RESULT.HTTP_SERVER_ERROR);
+                }
             }
             
             _channelCtx.write(ReferenceCountUtil.retain(response));
@@ -723,6 +727,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
         }
     };
     
+    private final boolean _checkResponseStatus;
     private final GuideBuilder _guideBuilder;
     private final RelayMemo.Builder _memoBuilder;
     private final ServiceMemo _serviceMemo; 
