@@ -96,6 +96,17 @@
     
     <bean id="noRoutingMemo" class="org.jocean.xharbor.util.RoutingInfoMemoImpl"/>
    
+    <bean id="transformBuilder" class="org.jocean.xharbor.transform.ApplyUrlencode4Post">
+        <constructor-arg value="${patch.urlencode.path}"/>
+        <constructor-arg value="${patch.urlencode.noapplyFeature}"/>
+        <constructor-arg>
+            <bean class="org.springframework.util.StringUtils"
+                factory-method="commaDelimitedListToStringArray">
+               <constructor-arg value="${patch.urlencode.applyKeys:}"/>
+            </bean>
+        </constructor-arg>
+    </bean>
+    
     <bean id="relayFlow" class="org.jocean.xharbor.relay.RelayFlow" 
         scope="prototype">
         <constructor-arg ref="router" />
@@ -103,9 +114,8 @@
         <constructor-arg ref="serviceMemo" />
         <constructor-arg ref="noRoutingMemo" />
         <constructor-arg ref="httpClientPool" />
-        <constructor-arg>
-             <null/>
-        </constructor-arg>
+        <constructor-arg value="${relay.checkResponseStatus:true}"/>
+        <constructor-arg ref="transformBuilder"/>
     </bean>
     
     <bean id="relayAgent" class="org.jocean.xharbor.relay.RelayAgentImpl">
