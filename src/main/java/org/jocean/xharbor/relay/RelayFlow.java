@@ -3,6 +3,8 @@
  */
 package org.jocean.xharbor.relay;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
@@ -37,13 +39,15 @@ import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.ValidationId;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.RelayMemo;
+import org.jocean.xharbor.api.RelayMemo.RESULT;
+import org.jocean.xharbor.api.RelayMemo.STEP;
 import org.jocean.xharbor.api.Router;
 import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.api.RoutingInfoMemo;
 import org.jocean.xharbor.api.ServiceMemo;
 import org.jocean.xharbor.api.Target;
-import org.jocean.xharbor.api.RelayMemo.RESULT;
-import org.jocean.xharbor.api.RelayMemo.STEP;
+import org.jocean.xharbor.spi.HttpRequestTransformer;
+import org.jocean.xharbor.spi.HttpRequestTransformer.Builder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -103,13 +107,15 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             final RelayMemo.Builder memoBuilder,
             final ServiceMemo       serviceMemo, 
             final RoutingInfoMemo   noRoutingMemo,
-            final GuideBuilder guideBuilder
+            final GuideBuilder      guideBuilder,
+            final HttpRequestTransformer.Builder transformerBuilder
             ) {
         this._router = router;
         this._memoBuilder = memoBuilder;
         this._serviceMemo = serviceMemo;
         this._noRoutingMemo = noRoutingMemo;
         this._guideBuilder = guideBuilder;
+        this._transformerBuilder = transformerBuilder;
         
         addFlowLifecycleListener(RELAY_LIFECYCLE_LISTENER);
     }
@@ -119,7 +125,10 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             final HttpRequest httpRequest) {
         this._httpRequest = ReferenceCountUtil.retain(httpRequest);
         this._channelCtx = channelCtx;
-        updateTransferHttpRequestState(this._httpRequest);
+        updateRecvHttpRequestState(this._httpRequest);
+        if (null != this._transformerBuilder) {
+            this._transformer = this._transformerBuilder.build(httpRequest);
+        }
         return this;
     }
 
@@ -207,10 +216,10 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
 
     private final Object CACHE_HTTPCONTENT = new Object() {
         @OnEvent(event = "sendHttpContent")
-        private BizStep sendHttpContent(final HttpContent httpContent) {
+        private BizStep onSendHttpContent(final HttpContent httpContent) {
 
+            updateRecvHttpRequestState(httpContent);
             _contents.add(ReferenceCountUtil.retain(httpContent));
-            updateTransferHttpRequestState(httpContent);
             
             return currentEventHandler();
         }
@@ -281,29 +290,18 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             
             _httpClient = httpclient;
             
-            try {
-                httpclient.sendHttpRequest(_httpClientId.updateIdAndGet(),
-                        _httpRequest, genHttpReactor());
-            }
-            catch (Exception e) {
-                LOG.error(
-                        "state({})/{}: exception when sendHttpRequest, detail:{}",
-                        currentEventHandler().getName(), currentEvent(),
-                        ExceptionUtils.exception2detail(e));
-            }
-            for (HttpContent content : _contents) {
-                try {
-                    httpclient.sendHttpContent(content);
+            if (needTransformHttpRequest()) {
+                if (isRecvHttpRequestComplete() ) {
+                    tryTransformAndReplaceHttpRequestOnce();
                 }
-                catch (Exception e) {
-                    LOG.error(
-                            "state({})/{}: exception when sendHttpContent, detail:{}",
-                            currentEventHandler().getName(), currentEvent(),
-                            ExceptionUtils.exception2detail(e));
+                else {
+                    return TRANSFERCONTENT;
                 }
             }
             
-            if ( !isTransferHttpRequestComplete() ) {
+            transferHttpRequestAndContents();
+            
+            if ( !isRecvHttpRequestComplete() ) {
                 return TRANSFERCONTENT;
             }
             else {
@@ -333,24 +331,22 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
 
     private final BizStep TRANSFERCONTENT = new BizStep("relay.TRANSFERCONTENT") {
         @OnEvent(event = "sendHttpContent")
-        private BizStep sendHttpContent(final HttpContent httpContent) {
+        private BizStep onSendHttpContent(final HttpContent httpContent) {
 
-            try {
-                _contents.add(ReferenceCountUtil.retain(httpContent));
-                _httpClient.sendHttpContent(httpContent);
+            updateRecvHttpRequestState(httpContent);
+            _contents.add(ReferenceCountUtil.retain(httpContent));
+            if (!needTransformHttpRequest()) {
+                transferHttpContent(httpContent);
             }
-            catch (Exception e) {
-                LOG.error(
-                        "state({})/{}: exception when sendHttpContent, detail:{}",
-                        currentEventHandler().getName(), currentEvent(),
-                        ExceptionUtils.exception2detail(e));
-            }
-            updateTransferHttpRequestState(httpContent);
             
-            if ( !isTransferHttpRequestComplete() ) {
+            if ( !isRecvHttpRequestComplete() ) {
                 return currentEventHandler();
             }
             else {
+                if (needTransformHttpRequest()) {
+                    tryTransformAndReplaceHttpRequestOnce();
+                    transferHttpRequestAndContents();
+                }
                 tryStartForceFinishedTimer();
                 _memo.endBizStep(STEP.TRANSFER_CONTENT, _watch4Step.stopAndRestart());
                 _memo.beginBizStep(STEP.RECV_RESP);
@@ -564,15 +560,65 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
         return ret;
     }
 
-    private void updateTransferHttpRequestState(final HttpObject httpObject) {
-        if ( (httpObject instanceof FullHttpRequest) 
-            || (httpObject instanceof LastHttpContent)) {
-            this._transferHttpRequestComplete = true;
+    private boolean needTransformHttpRequest() {
+        return null!=this._transformer;
+    }
+
+    private boolean tryTransformAndReplaceHttpRequestOnce() {
+        final FullHttpRequest newRequest = transformToFullHttpRequestOnce();
+        if (null!=newRequest) {
+            ReferenceCountUtil.release(this._httpRequest);
+            this._httpRequest = newRequest;
+            releaseAllContents();
+            //  add transform request count and record from relay begin 
+            //  until transform complete 's time cost 
+            this._memo.incBizResult(RESULT.TRANSFORM_REQUEST, 
+                    this._watch4Result.pauseAndContinue());
+            return true;
+        }
+        else {
+            return false;
         }
     }
     
-    private boolean isTransferHttpRequestComplete() {
-        return this._transferHttpRequestComplete;
+    private FullHttpRequest transformToFullHttpRequestOnce() {
+        if (null!=this._transformer) {
+            try {
+                if (this._httpRequest instanceof FullHttpRequest) {
+                    return this._transformer.transform(
+                        this._httpRequest, ((FullHttpRequest)this._httpRequest).content());
+                }
+                else {
+                    final ByteBuf[] bufs = new ByteBuf[this._contents.size()];
+                    for (int idx = 0; idx<this._contents.size(); idx++) {
+                        bufs[idx] = this._contents.get(idx).content().retain();
+                    }
+                    final ByteBuf content = Unpooled.wrappedBuffer(bufs);
+                    
+                    try {
+                        return this._transformer.transform(this._httpRequest, content);
+                    } finally {
+                        content.release();
+                    }
+                }
+            } finally {
+                this._transformer = null;
+            }
+        }
+        else {
+            return null;
+        }
+    }
+
+    private void updateRecvHttpRequestState(final HttpObject httpObject) {
+        if ( (httpObject instanceof FullHttpRequest) 
+            || (httpObject instanceof LastHttpContent)) {
+            this._recvHttpRequestComplete = true;
+        }
+    }
+    
+    private boolean isRecvHttpRequestComplete() {
+        return this._recvHttpRequestComplete;
     }
 
     /**
@@ -604,6 +650,57 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             && response.getStatus().code() < 600;
     }
     
+    /**
+     * @param flow
+     */
+    private void releaseAllContents() {
+        for (HttpContent content : this._contents) {
+            ReferenceCountUtil.safeRelease(content);
+        }
+        this._contents.clear();
+    }
+
+    /**
+     * @param httpclient
+     */
+    private void transferHttpRequest() {
+        try {
+            this._httpClient.sendHttpRequest(this._httpClientId.updateIdAndGet(),
+                this._httpRequest, genHttpReactor());
+        }
+        catch (Exception e) {
+            LOG.error(
+                    "state({})/{}: exception when sendHttpRequest, detail:{}",
+                    currentEventHandler().getName(), currentEvent(),
+                    ExceptionUtils.exception2detail(e));
+        }
+    }
+
+    /**
+     * @param content
+     */
+    private void transferHttpContent(final HttpContent content) {
+        try {
+            this._httpClient.sendHttpContent(content);
+        }
+        catch (Exception e) {
+            LOG.error(
+                    "state({})/{}: exception when sendHttpContent, detail:{}",
+                    currentEventHandler().getName(), currentEvent(),
+                    ExceptionUtils.exception2detail(e));
+        }
+    }
+
+    /**
+     * 
+     */
+    private void transferHttpRequestAndContents() {
+        transferHttpRequest();
+        for (HttpContent content : _contents) {
+            transferHttpContent(content);
+        }
+    }
+
     private static final FlowLifecycleListener<RelayFlow> RELAY_LIFECYCLE_LISTENER = 
             new FlowLifecycleListener<RelayFlow>() {
 
@@ -622,10 +719,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
                 flow._forceFinishedTimer = null;
             }
             ReferenceCountUtil.safeRelease(flow._httpRequest);
-            for (HttpContent content : flow._contents) {
-                ReferenceCountUtil.safeRelease(content);
-            }
-            flow._contents.clear();
+            flow.releaseAllContents();
         }
     };
     
@@ -634,6 +728,8 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
     private final ServiceMemo _serviceMemo; 
     private final RoutingInfoMemo _noRoutingMemo;
     private final Router<HttpRequest, Dispatcher> _router;
+    private final Builder _transformerBuilder;
+    private HttpRequestTransformer _transformer = null;
     
     private HttpRequest _httpRequest;
     private ChannelHandlerContext _channelCtx;
@@ -643,7 +739,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
     private Guide _guide;
     private HttpClient _httpClient;
     private final List<HttpContent> _contents = new ArrayList<HttpContent>();
-    private boolean _transferHttpRequestComplete = false;
+    private boolean _recvHttpRequestComplete = false;
     
     private final ValidationId _guideId = new ValidationId();
     private final ValidationId _httpClientId = new ValidationId();

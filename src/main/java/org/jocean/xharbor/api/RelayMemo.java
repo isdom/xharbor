@@ -22,6 +22,7 @@ public interface RelayMemo extends BizMemo<RelayMemo.STEP, RelayMemo.RESULT> {
     
     public enum RESULT {
         RELAY_SUCCESS,
+        TRANSFORM_REQUEST,
         CONNECTDESTINATION_FAILURE,
         RELAY_RETRY,
         HTTP_CLIENT_ERROR,

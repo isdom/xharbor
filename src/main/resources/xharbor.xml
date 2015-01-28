@@ -103,6 +103,9 @@
         <constructor-arg ref="serviceMemo" />
         <constructor-arg ref="noRoutingMemo" />
         <constructor-arg ref="httpClientPool" />
+        <constructor-arg>
+             <null/>
+        </constructor-arg>
     </bean>
     
     <bean id="relayAgent" class="org.jocean.xharbor.relay.RelayAgentImpl">
