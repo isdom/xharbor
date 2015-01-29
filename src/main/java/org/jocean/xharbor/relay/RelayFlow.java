@@ -146,7 +146,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
                 return currentEventHandler();
             }
             if (LOG.isDebugEnabled()) {
-                LOG.debug("http for {} lost.", _target.serviceUri());
+                LOG.debug("http for {} lost.", safeGetServiceUri());
             }
             if (null != this._ifHttpLost) {
                 try {
@@ -177,7 +177,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             } catch (Throwable e) {
                 LOG.warn(
                         "exception when detach http handle for uri:{}, detail:{}",
-                        this._target.serviceUri(), ExceptionUtils.exception2detail(e));
+                        this.safeGetServiceUri(), ExceptionUtils.exception2detail(e));
             }
             this._guide = null;
         }
@@ -191,7 +191,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
         @OnEvent(event = "detach")
         private BizStep onDetach() throws Exception {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("relay for uri:{} progress canceled", _target.serviceUri());
+                LOG.debug("relay for uri:{} progress canceled", safeGetServiceUri());
             }
             safeDetachHttp();
             if (null != this._ifDetached) {
@@ -257,7 +257,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             _memo.endBizStep(STEP.ROUTING, _watch4Step.stopAndRestart());
             
             if ( LOG.isDebugEnabled() ) {
-                LOG.debug("dispatch to ({}) for request({})", _target.serviceUri(), _httpRequest);
+                LOG.debug("dispatch to ({}) for request({})", safeGetServiceUri(), _httpRequest);
             }
             
             _memo.beginBizStep(STEP.OBTAINING_HTTPCLIENT);
@@ -380,7 +380,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
                 return currentEventHandler();
             }
             if (LOG.isDebugEnabled()) {
-                LOG.debug("channel for {} recv response {}", _target.serviceUri(), response);
+                LOG.debug("channel for {} recv response {}", safeGetServiceUri(), response);
             }
             
             if ( _checkResponseStatus ) {
@@ -502,14 +502,14 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
                                 if (LOG.isDebugEnabled()) {
                                     LOG.debug(
                                             "uri:{} force finished timeout, so force detach.",
-                                            _target.serviceUri());
+                                            safeGetServiceUri());
                                 }
                                 _forceFinishedTimer = null;
                                 selfEventReceiver().acceptEvent("detach");
                             } catch (Exception e) {
                                 LOG.warn(
                                         "exception when acceptEvent detach by force finished for uri:{}, detail:{}",
-                                        _target.serviceUri(),
+                                        safeGetServiceUri(),
                                         ExceptionUtils.exception2detail(e));
                             }
                         }
@@ -703,6 +703,13 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
         for (HttpContent content : _contents) {
             transferHttpContent(content);
         }
+    }
+
+    /**
+     * @return
+     */
+    private String safeGetServiceUri() {
+        return null != this._target ? this._target.serviceUri().toString() : "non-uri";
     }
 
     private static final FlowLifecycleListener<RelayFlow> RELAY_LIFECYCLE_LISTENER = 
