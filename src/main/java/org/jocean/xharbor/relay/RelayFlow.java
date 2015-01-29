@@ -145,9 +145,9 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             if (!isValidGuideId(guideId)) {
                 return currentEventHandler();
             }
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("http for {} lost.", safeGetServiceUri());
-            }
+            LOG.warn("{}/{}: http for {} lost.", 
+                    currentEventHandler().getName(), currentEvent(), 
+                    safeGetServiceUri());
             if (null != this._ifHttpLost) {
                 try {
                     return this._ifHttpLost.call();
@@ -394,7 +394,10 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             }
             
             _channelCtx.write(ReferenceCountUtil.retain(response));
-            return RECVCONTENT;
+            
+            //  TODO consider 响应为1xx，204，304相应或者head请求，则直接忽视掉消息实体内容。
+            //  当满足上述情况时，是否应该直接结束转发流程。
+            return buildRecvContentByConnectionEntity();
         }
 
         /**
@@ -425,7 +428,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
         }})))
     .freeze();
 
-    private final BizStep RECVCONTENT = new BizStep("relay.RECVCONTENT") {
+    private final BizStep RECVCONTENT_TMPL = new BizStep("relay.RECVCONTENT.template") {
         @OnEvent(event = "onHttpContentReceived")
         private BizStep contentReceived(final int httpClientId,
                 final HttpContent content) throws Exception {
@@ -433,12 +436,16 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
                 return currentEventHandler();
             }
             
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("channel for {} recv http content {}", safeGetServiceUri(), content);
+            }
+            
             // content 的内容仅保证在事件 onHttpContentReceived 处理方法中有效
             // 而channelCtx.write完成后，会主动调用 ReferenceCountUtil.release 释放content
             // 因此需要先使用 ReferenceCountUtil.retain 增加一次引用计数
             _channelCtx.write(
                 ReferenceCountUtil.retain(content));
-            return RECVCONTENT;
+            return currentEventHandler();
         }
 
         @OnEvent(event = "onLastHttpContentReceived")
@@ -448,6 +455,10 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
                 return currentEventHandler();
             }
 
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("channel for {} recv last http content {}", safeGetServiceUri(), content);
+            }
+            
             _memo.endBizStep(STEP.RECV_RESP, _watch4Step.stopAndRestart());
             
             //  release relay's http client
@@ -464,20 +475,6 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             return null;
         }
     }
-    .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
-        @Override
-        public BizStep call() {
-            _memo.endBizStep(STEP.RECV_RESP, -1);
-            _memo.incBizResult(RESULT.RELAY_FAILURE, _watch4Result.stopAndRestart());
-            try {
-                _channelCtx.close();
-            }
-            catch(Throwable e) {
-                LOG.warn("exception when close {}, detail: {}", 
-                        _channelCtx, ExceptionUtils.exception2detail(e));
-            }
-            return null;
-        }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
         public void run() {
@@ -486,6 +483,51 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
         }})))
     .freeze();
 
+    private BizStep buildRecvContentByConnectionEntity() {
+        //  ref : http://blog.csdn.net/yankai0219/article/details/8269922
+        // 1、在http1.1及之后版本。如果是keep alive，则content-length和chunk必然是二选一。
+        //   若是非keep alive(Connection: close)，则和http1.0一样, Server侧通过 socket 关闭来表示消息结束
+        // 2、在Http 1.0及之前版本中，content-length字段可有可无。Server侧通过 socket 关闭来表示消息结束
+        if ( HttpHeaders.isKeepAlive(_httpRequest) ) {
+            return RECVCONTENT_TMPL
+                    .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
+                        @Override
+                        public BizStep call() {
+                            _memo.endBizStep(STEP.RECV_RESP, -1);
+                            _memo.incBizResult(RESULT.RELAY_FAILURE, _watch4Result.stopAndRestart());
+                            try {
+                                _channelCtx.close();
+                            }
+                            catch(Throwable e) {
+                                LOG.warn("exception when close {}, detail: {}", 
+                                        _channelCtx, ExceptionUtils.exception2detail(e));
+                            }
+                            return null;
+                        }})))
+                    .rename("relay.RECVCONTENT.KeepAlive")
+                    .freeze();
+        }
+        else {
+            // Connection: close
+            return RECVCONTENT_TMPL
+                    .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
+                        @Override
+                        public BizStep call() {
+                            _memo.endBizStep(STEP.RECV_RESP, _watch4Step.stopAndRestart());
+                            _memo.incBizResult(RESULT.RELAY_SUCCESS, _watch4Result.stopAndRestart());
+                            if (LOG.isDebugEnabled()) {
+                                LOG.debug("channel for {} is Connection: close, so just mark RELAY_SUCCESS and close peer.", 
+                                        safeGetServiceUri());
+                            }
+                            _channelCtx.flush().close();
+                            return null;
+                        }})))
+                    .rename("relay.RECVCONTENT.Close")
+                    .freeze();
+        }
+    }
+    
+        
     @SuppressWarnings("unchecked")
     private HttpReactor<Integer> genHttpReactor() {
         return (HttpReactor<Integer>) this

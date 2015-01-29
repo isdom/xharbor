@@ -37,8 +37,8 @@ public class RelayMemoBuilderForDispatchFeedback implements RelayMemo.Builder {
             @Override
             public void endBizStep(final STEP step, final long ttl) {
                 if ( step.equals(STEP.RECV_RESP) ) {
-                    //  < 500 ms
-                    if ( ttl < 500 ) {
+                    //  0ms <= ttl < 500 ms
+                    if ( ttl >= 0 && ttl < 500 ) {
                         final int weight = target.addWeight(1);
                         if ( LOG.isDebugEnabled() ) {
                             LOG.debug("endBizStep for RECV_RESP with ttl < 500ms, so add weight with 1 to {}",

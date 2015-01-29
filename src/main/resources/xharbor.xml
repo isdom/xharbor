@@ -14,7 +14,7 @@
     
     <bean id="httpTransportLogStatus" class="org.jocean.httpclient.impl.HttpUtils"
         factory-method="enableHttpTransportLog">
-        <constructor-arg value="${gateway.httpTransportLogEnabled:true}"/>
+        <constructor-arg value="${gateway.outbound.httpTransportLogEnabled:true}"/>
     </bean>
     
     <bean id="source" class="org.jocean.event.extend.Runners"
@@ -135,6 +135,7 @@
         <property name="logByteStream" value="${gateway.log.byteStream:false}"/>
         <property name="idleTimeSeconds" value="${gateway.idleTimeSeconds:200}"/>
         <property name="checkAlivePath" value="${gateway.checkAlivePath:/}"/>
+        <property name="enableHttpLog" value="${gateway.inbound.httpTransportLogEnabled:true}"/>
     </bean>
      
     <bean id="zkClient" class="org.apache.curator.framework.CuratorFrameworkFactory" 

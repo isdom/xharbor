@@ -25,6 +25,8 @@ import io.netty.handler.codec.http.HttpRequestDecoder;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseEncoder;
 import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.logging.LogLevel;
+import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.traffic.TrafficCounterExt;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
@@ -68,6 +70,8 @@ public class HttpGatewayServer {
     
     //响应检查服务是否活着的请求
     private String _checkAlivePath = "/";
+    
+    private boolean _enableHttpLog = false;
     
     @ChannelHandler.Sharable
     private class RelayHandler extends ChannelInboundHandlerAdapter{
@@ -232,6 +236,10 @@ public class HttpGatewayServer {
         final BaseInitializer baseInitializer = new BaseInitializer(){
             @Override
             protected void addCodecHandler(final ChannelPipeline pipeline) throws Exception {
+                if (_enableHttpLog) {
+                    pipeline.addLast("log", new LoggingHandler(LogLevel.TRACE));
+                }
+                
                 //IN decoder
                 pipeline.addLast("decoder",new HttpRequestDecoder());
                 //OUT 统计数据流大小 这个handler需要放在HttpResponseToByteEncoder前面处理
@@ -345,5 +353,13 @@ public class HttpGatewayServer {
 
     public void setCheckAlivePath(final String checkAlivePath) {
         this._checkAlivePath = checkAlivePath;
+    }
+
+    public boolean isEnableHttpLog() {
+        return _enableHttpLog;
+    }
+
+    public void setEnableHttpLog(final boolean enableHttpLog) {
+        this._enableHttpLog = enableHttpLog;
     }
 }
