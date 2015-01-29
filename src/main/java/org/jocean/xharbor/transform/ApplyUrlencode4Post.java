@@ -160,7 +160,7 @@ public class ApplyUrlencode4Post implements Cloneable, HttpRequestTransformer, H
             
             if (LOG.isDebugEnabled()) {
                 LOG.debug("request {}'s transformed content:({})", 
-                        httpRequest.getUri(), newContent);
+                        httpRequest.getUri(), encodedMsg);
             }
             
             return newRequest;
