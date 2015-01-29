@@ -13,6 +13,9 @@ import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.route.CachedRouter;
 import org.jocean.xharbor.route.RoutingInfo2Dispatcher;
+import org.jocean.xharbor.spi.HttpRequestTransformer;
+import org.jocean.xharbor.transform.AUPZKUpdater;
+import org.jocean.xharbor.transform.CompositeAUPBuilder;
 import org.jocean.xharbor.util.RulesZKUpdater;
 import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
@@ -58,16 +61,28 @@ public class Main {
         final CachedRouter<RoutingInfo, Dispatcher> cachedRouter = 
                 (CachedRouter<RoutingInfo, Dispatcher>)ctx.getBean("cachedRouter");
         
-        ((BeanProxy<Visitor<RoutingInfo2Dispatcher>>) checkNotNull(ctx.getBean("&updaterRules", BeanProxy.class)))
+        ((BeanProxy<Visitor<RoutingInfo2Dispatcher>>) checkNotNull(ctx.getBean("&routerUpdaterRules", BeanProxy.class)))
             .setImpl(new Visitor<RoutingInfo2Dispatcher>() {
                 @Override
                 public void visit(final RoutingInfo2Dispatcher rules) throws Exception {
                     cachedRouter.updateRouter(rules);
                 }});
         
-        final RulesZKUpdater updater = ctx.getBean(RulesZKUpdater.class);
+        final BeanProxy<HttpRequestTransformer.Builder> builderProxy = 
+                ((BeanProxy<HttpRequestTransformer.Builder>) 
+                    checkNotNull(ctx.getBean("&transformBuilder", BeanProxy.class)));
+        builderProxy.setImpl(new CompositeAUPBuilder());
         
-        updater.start();
+        
+        ((BeanProxy<Visitor<CompositeAUPBuilder>>) checkNotNull(ctx.getBean("&aupUpdaterRules", BeanProxy.class)))
+            .setImpl(new Visitor<CompositeAUPBuilder>() {
+                @Override
+                public void visit(final CompositeAUPBuilder builder) throws Exception {
+                    builderProxy.setImplForced(builder);
+                }});
+        
+        checkNotNull(ctx.getBean(RulesZKUpdater.class)).start();
+        checkNotNull(ctx.getBean(AUPZKUpdater.class)).start();
     }
 
 }

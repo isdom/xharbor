@@ -96,15 +96,19 @@
     
     <bean id="noRoutingMemo" class="org.jocean.xharbor.util.RoutingInfoMemoImpl"/>
    
-    <bean id="transformBuilder" class="org.jocean.xharbor.transform.ApplyUrlencode4Post">
-        <constructor-arg value="${patch.urlencode.path}"/>
-        <constructor-arg value="${patch.urlencode.noapplyFeature}"/>
-        <constructor-arg>
-            <bean class="org.springframework.util.StringUtils"
-                factory-method="commaDelimitedListToStringArray">
-               <constructor-arg value="${patch.urlencode.applyKeys:}"/>
-            </bean>
-        </constructor-arg>
+    <bean id="transformBuilder" class="org.jocean.j2se.spring.BeanProxy">
+        <constructor-arg value="org.jocean.xharbor.spi.HttpRequestTransformer.Builder"/>
+    </bean>
+    
+    <bean id="aupUpdaterRules" class="org.jocean.j2se.spring.BeanProxy">
+        <constructor-arg value="org.jocean.idiom.Visitor"/>
+    </bean>
+    
+    <bean id="aupUpdater" class="org.jocean.xharbor.transform.AUPZKUpdater">
+        <constructor-arg ref="source"/>
+        <constructor-arg ref="zkClient"/>
+        <constructor-arg value="${zk.rules.path:/demo}/aups"/>
+        <constructor-arg ref="aupUpdaterRules"/>
     </bean>
     
     <bean id="relayFlow" class="org.jocean.xharbor.relay.RelayFlow" 
@@ -145,15 +149,15 @@
         </constructor-arg>
     </bean>
         
-    <bean id="updaterRules" class="org.jocean.j2se.spring.BeanProxy">
+    <bean id="routerUpdaterRules" class="org.jocean.j2se.spring.BeanProxy">
         <constructor-arg value="org.jocean.idiom.Visitor"/>
     </bean>
     
-    <bean id="updater" class="org.jocean.xharbor.util.RulesZKUpdater">
+    <bean id="routerUpdater" class="org.jocean.xharbor.util.RulesZKUpdater">
         <constructor-arg ref="source"/>
         <constructor-arg ref="zkClient"/>
-        <constructor-arg value="${zk.rules.path:/demo}"/>
-        <constructor-arg ref="updaterRules"/>
+        <constructor-arg value="${zk.rules.path:/demo}/routers"/>
+        <constructor-arg ref="routerUpdaterRules"/>
     </bean>
     
 <!--         final CuratorFramework client = 

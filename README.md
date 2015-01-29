@@ -38,7 +38,8 @@ TODO:
   12、对转发失败的HttpRequest，增加一定次数的重新转发，包括重新转发完整的HttpContent(s)。 并记录重新转发次数。(done, 记录为 RELAY_RETRY result)
   
   13、如转发成功，但返回得到的HttpResponse为异常状态码(4XX, 5XX)，则对转发路由进行权重降低？或者标识该目的地的特定接口(API)无效。
-      (done, 增加 Result(HTTP_CLIENT_ERROR/HTTP_SERVER_ERROR)，并根据这两个Result结果，标识特定接口无效，并尝试再次转发)
+      (done, 增加 Result(HTTP_CLIENT_ERROR/HTTP_SERVER_ERROR)，并根据这两个Result结果，标识特定接口无效，并尝试再次转发,
+      并增加了开关控制是否启用该 检查特性)
   
   14、对已经标志为down机的服务，设置定时器动作进行定期重置down机标志为false，当有匹配业务需要转发时，则可再次重新尝试该路由目的地。
       让曾经down机服务在恢复后，有机会再次成为有效的转发目的地 (done)。
@@ -48,4 +49,9 @@ TODO:
   16、对 NO_ROUTING 的HttpRequest不再注册一组独立的 MBean，而是统一到一个记录NoRouting的MBean中，String形式 或 Map 形式呈现，无效URI/请求次数 信息对
      减少无效MBean的无效信息呈现 (done)
      
+  17、尽可能将应用的配置项迁移到ZooKeeper中，可以采用实例ID在ZK上区分全局配置项 和 实例特定配置项，每个配置项一个条目，方便独立修改，参考
+     RulesZKUpdater的实现方式
+     
+  18、从 netty 接收到 http request 即开始计时(StopWatch)，逼近 ROUTING 耗时统计的起始时间点
   
+  19、从 xharbor 通过 REST API的方式下载各类统计信息的 Excel(CSV)，统计内容可以包括：接口调用时长、次数、noRouting URI，流量大小 等

@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
  * @author isdom
  *
  */
-public class ApplyUrlencode4Post implements HttpRequestTransformer, HttpRequestTransformer.Builder {
+public class ApplyUrlencode4Post implements Cloneable, HttpRequestTransformer, HttpRequestTransformer.Builder {
     
     private static final Logger LOG = LoggerFactory
             .getLogger(ApplyUrlencode4Post.class);
@@ -39,6 +39,12 @@ public class ApplyUrlencode4Post implements HttpRequestTransformer, HttpRequestT
             : false;
     }
 
+    @Override
+    protected ApplyUrlencode4Post clone() throws CloneNotSupportedException {
+        return new ApplyUrlencode4Post(
+                this._path, this._noapplyFeature, this._applyKeys);
+    }
+    
     public ApplyUrlencode4Post(
             final String path, 
             final String noapplyFeature,
@@ -46,6 +52,10 @@ public class ApplyUrlencode4Post implements HttpRequestTransformer, HttpRequestT
         this._path = path;
         this._noapplyFeature = noapplyFeature;
         this._applyKeys = applyKeys;
+    }
+    
+    public String path() {
+        return this._path;
     }
     
     @Override
@@ -113,6 +123,11 @@ public class ApplyUrlencode4Post implements HttpRequestTransformer, HttpRequestT
             }
             
             // try transform
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("request {}'s original content:({})", 
+                        httpRequest.getUri(), msg);
+            }
+            
             final StringBuilder sb = new StringBuilder();
             for ( String key : this._applyKeys) {
                 final Triple<String,String,String> splitted = splitByKey(msg, key);
@@ -131,17 +146,21 @@ public class ApplyUrlencode4Post implements HttpRequestTransformer, HttpRequestT
             if (null!=msg) {
                 sb.append(URLEncoder.encode(msg, "UTF-8"));
             }
-            final String newContent = sb.toString();
+            final String encodedMsg = sb.toString();
+            final ByteBuf newContent = Unpooled.wrappedBuffer(encodedMsg.getBytes("UTF-8"));
             final DefaultFullHttpRequest newRequest = new DefaultFullHttpRequest(
                     httpRequest.getProtocolVersion(), 
                     httpRequest.getMethod(), 
                     httpRequest.getUri(),
-                    Unpooled.wrappedBuffer(newContent.getBytes("UTF-8")));
+                    newContent
+                    );
             newRequest.headers().add(httpRequest.headers());
+            HttpHeaders.setContentLength(newRequest, newContent.readableBytes());
+            //  TODO need remove transfer-encoding: chunked http header?
             
             if (LOG.isDebugEnabled()) {
-                LOG.debug("request {}'s content transform to {}.", 
-                        httpRequest, newContent);
+                LOG.debug("request {}'s transformed content:({})", 
+                        httpRequest.getUri(), newContent);
             }
             
             return newRequest;
