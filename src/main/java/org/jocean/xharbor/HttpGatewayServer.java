@@ -118,9 +118,9 @@ public class HttpGatewayServer {
                         LOG.debug("messageReceived:{} default http request\n[{}]",ctx.channel(),request);
                     }
                     
-                    if ( ifCheckAliveAndResponse(ctx, request) ) {
-                        return;
-                    }
+//                    if ( ifCheckAliveAndResponse(ctx, request) ) {
+//                        return;
+//                    }
                     
                     detachCurrentTaskOf(ctx);
                     
