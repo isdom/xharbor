@@ -194,7 +194,7 @@
                 <entry key="org.jocean:name=httpClientPool" value-ref="httpClientPool"/>
                 <entry key="org.jocean:name=serviceMemo"   value-ref="serviceMemo"/>
                 <entry key="org.jocean:name=noRouting"   value-ref="noRoutingMemo"/>
-                <entry key="org.jocean:name=htmladapter,port=8082" value-ref="htmlAdaptorServer"/>
+                <entry key="org.jocean:name=htmladapter,port=${jmxhtml.port:8082}" value-ref="htmlAdaptorServer"/>
             </map>
         </property>
     </bean>
