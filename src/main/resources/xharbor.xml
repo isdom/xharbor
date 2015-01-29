@@ -181,7 +181,9 @@
     </bean>
      
     <bean id="htmlAdaptorServer" class="com.sun.jdmk.comm.HtmlAdaptorServer" 
-        init-method="start" destroy-method="stop"/>
+        init-method="start" destroy-method="stop">
+        <property name="port" value="${jmxhtml.port:8082}"/>
+    </bean>
 
     <bean id="directMemory" class="org.jocean.xharbor.util.DirectMemoryIndicator"/>
     
