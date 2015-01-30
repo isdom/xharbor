@@ -69,7 +69,7 @@ public class HttpGatewayServer {
     private RelayAgent  _relayAgent;
     
     //响应检查服务是否活着的请求
-    private String _checkAlivePath = "/";
+    private String _checkAlivePath = null;
     
     private boolean _enableHttpLog = false;
     
@@ -118,9 +118,9 @@ public class HttpGatewayServer {
                         LOG.debug("messageReceived:{} default http request\n[{}]",ctx.channel(),request);
                     }
                     
-//                    if ( ifCheckAliveAndResponse(ctx, request) ) {
-//                        return;
-//                    }
+                    if ( ifCheckAliveAndResponse(ctx, request) ) {
+                        return;
+                    }
                     
                     detachCurrentTaskOf(ctx);
                     
@@ -163,7 +163,8 @@ public class HttpGatewayServer {
     private boolean ifCheckAliveAndResponse(
             final ChannelHandlerContext ctx,
             final HttpRequest request) {
-        if ( this._checkAlivePath.equalsIgnoreCase(request.getUri())) {
+        if ( null != this._checkAlivePath 
+                && this._checkAlivePath.equalsIgnoreCase(request.getUri())) {
             // deal with check alive
             final HttpResponse response = new DefaultFullHttpResponse(
                     request.getProtocolVersion(), HttpResponseStatus.OK);
