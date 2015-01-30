@@ -100,17 +100,6 @@
         <constructor-arg value="org.jocean.xharbor.spi.HttpRequestTransformer.Builder"/>
     </bean>
     
-    <bean id="aupUpdaterRules" class="org.jocean.j2se.spring.BeanProxy">
-        <constructor-arg value="org.jocean.idiom.Visitor"/>
-    </bean>
-    
-    <bean id="aupUpdater" class="org.jocean.xharbor.transform.AUPZKUpdater">
-        <constructor-arg ref="source"/>
-        <constructor-arg ref="zkClient"/>
-        <constructor-arg value="${zk.rules.path:/demo}/aups"/>
-        <constructor-arg ref="aupUpdaterRules"/>
-    </bean>
-    
     <bean id="relayFlow" class="org.jocean.xharbor.relay.RelayFlow" 
         scope="prototype">
         <constructor-arg ref="router" />
@@ -150,15 +139,34 @@
         </constructor-arg>
     </bean>
         
+    <bean id="aupUpdaterRules" class="org.jocean.j2se.spring.BeanProxy">
+        <constructor-arg value="org.jocean.idiom.Visitor"/>
+    </bean>
+    
+    <bean id="aupUpdater" class="org.jocean.xharbor.util.ZKUpdater">
+        <constructor-arg ref="source"/>
+        <constructor-arg ref="zkClient"/>
+        <constructor-arg value="${zk.rules.path:/demo}/aups"/>
+        <constructor-arg>
+            <bean class="org.jocean.xharbor.transform.AUPOperator">
+                <constructor-arg ref="aupUpdaterRules"/>
+            </bean>
+        </constructor-arg>
+    </bean>
+    
     <bean id="routerUpdaterRules" class="org.jocean.j2se.spring.BeanProxy">
         <constructor-arg value="org.jocean.idiom.Visitor"/>
     </bean>
     
-    <bean id="routerUpdater" class="org.jocean.xharbor.util.RulesZKUpdater">
+    <bean id="routerUpdater" class="org.jocean.xharbor.util.ZKUpdater">
         <constructor-arg ref="source"/>
         <constructor-arg ref="zkClient"/>
         <constructor-arg value="${zk.rules.path:/demo}/routers"/>
-        <constructor-arg ref="routerUpdaterRules"/>
+        <constructor-arg>
+            <bean class="org.jocean.xharbor.util.RouteRulesOperator">
+                <constructor-arg ref="routerUpdaterRules"/>
+            </bean>
+        </constructor-arg>
     </bean>
     
 <!--         final CuratorFramework client = 

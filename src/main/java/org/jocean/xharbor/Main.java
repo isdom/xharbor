@@ -14,9 +14,8 @@ import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.route.CachedRouter;
 import org.jocean.xharbor.route.RoutingInfo2Dispatcher;
 import org.jocean.xharbor.spi.HttpRequestTransformer;
-import org.jocean.xharbor.transform.AUPZKUpdater;
 import org.jocean.xharbor.transform.CompositeAUPBuilder;
-import org.jocean.xharbor.util.RulesZKUpdater;
+import org.jocean.xharbor.util.ZKUpdater;
 import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 
@@ -81,8 +80,8 @@ public class Main {
                     builderProxy.setImplForced(builder);
                 }});
         
-        checkNotNull(ctx.getBean(RulesZKUpdater.class)).start();
-        checkNotNull(ctx.getBean(AUPZKUpdater.class)).start();
+        checkNotNull(ctx.getBean("routerUpdater", ZKUpdater.class)).start();
+        checkNotNull(ctx.getBean("aupUpdater", ZKUpdater.class)).start();
     }
 
 }
