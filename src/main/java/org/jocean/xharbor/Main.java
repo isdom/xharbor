@@ -72,7 +72,6 @@ public class Main {
                     checkNotNull(ctx.getBean("&transformBuilder", BeanProxy.class)));
         builderProxy.setImpl(new CompositeAUPBuilder());
         
-        
         ((BeanProxy<Visitor<CompositeAUPBuilder>>) checkNotNull(ctx.getBean("&aupUpdaterRules", BeanProxy.class)))
             .setImpl(new Visitor<CompositeAUPBuilder>() {
                 @Override
