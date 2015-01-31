@@ -127,7 +127,30 @@
         <property name="enableHttpLog" value="${gateway.inbound.httpTransportLogEnabled:true}"/>
     </bean>
      
-    <bean id="zkClient" class="org.apache.curator.framework.CuratorFrameworkFactory" 
+    <bean id="zkClient" class="org.jocean.xharbor.util.ZKUtils"
+        factory-method="buildWithExhibitorEnsembleProvider"
+        init-method="start"
+        destroy-method="close">
+        <constructor-arg>
+            <bean class="org.springframework.util.StringUtils"
+                factory-method="commaDelimitedListToStringArray">
+                <constructor-arg value="${exhibitor.hosts}"/>
+            </bean>
+        </constructor-arg>
+        <constructor-arg value="${exhibitor.restport}"/>
+        <constructor-arg value="${exhibitor.backupConnectionString}"/>
+        <constructor-arg value="${exhibitor.basicAuthUser}"/>
+        <constructor-arg value="${exhibitor.basicAuthPass}"/>
+        <constructor-arg value="${exhibitor.restUriPath:/exhibitor/v1/cluster/list}"/>
+        <constructor-arg value="${exhibitor.pollingMs:2000}"/>
+        <constructor-arg>
+            <bean class="org.apache.curator.retry.ExponentialBackoffRetry">
+                <constructor-arg value="1000"/>
+                <constructor-arg value="3"/>
+            </bean>
+        </constructor-arg>
+    </bean>
+<!--         class="org.apache.curator.framework.CuratorFrameworkFactory" 
         factory-method="newClient"
         init-method="start">
         <constructor-arg value="${zk.address:121.41.45.51:2181}"/>
@@ -138,7 +161,7 @@
             </bean>
         </constructor-arg>
     </bean>
-        
+-->    
     <bean id="aupUpdaterRules" class="org.jocean.j2se.spring.BeanProxy">
         <constructor-arg value="org.jocean.idiom.Visitor"/>
     </bean>
@@ -153,7 +176,7 @@
             </bean>
         </constructor-arg>
     </bean>
-    
+
     <bean id="routerUpdaterRules" class="org.jocean.j2se.spring.BeanProxy">
         <constructor-arg value="org.jocean.idiom.Visitor"/>
     </bean>
@@ -168,18 +191,6 @@
             </bean>
         </constructor-arg>
     </bean>
-    
-<!--         final CuratorFramework client = 
-                CuratorFrameworkFactory.newClient("121.41.45.51:2181", 
-                        new ExponentialBackoffRetry(1000, 3));
-        client.start();
-        
-        final RulesZKUpdater updater = new RulesZKUpdater(source, client, "/demo", new Visitor<RoutingInfo2URIs>() {
-            @Override
-            public void visit(final RoutingInfo2URIs rules) throws Exception {
-                cachedRouter.updateRouter(rules);
-            }});
- -->
 
     <bean id="jmxConnectorServer" 
         class="org.springframework.jmx.support.ConnectorServerFactoryBean"  >
@@ -203,8 +214,8 @@
                 <entry key="org.jocean:name=directMemory"   value-ref="directMemory"/>
                 <entry key="org.jocean:name=bytesPool"      value-ref="bytesPool"/>
                 <entry key="org.jocean:name=httpClientPool" value-ref="httpClientPool"/>
-                <entry key="org.jocean:name=serviceMemo"   value-ref="serviceMemo"/>
-                <entry key="org.jocean:name=noRouting"   value-ref="noRoutingMemo"/>
+                <entry key="org.jocean:name=serviceMemo"    value-ref="serviceMemo"/>
+                <entry key="org.jocean:name=noRouting"      value-ref="noRoutingMemo"/>
                 <entry key="org.jocean:name=htmladapter,port=${jmxhtml.port:8082}" value-ref="htmlAdaptorServer"/>
             </map>
         </property>
