@@ -262,15 +262,13 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
             if ( null == _target ) {
                 LOG.warn("can't found matched target service for request {}, just return 200 OK for client http connection ({}).", 
                         info, _channelCtx.channel());
-                responseDefault200OK();
                 _noRoutingMemo.incRoutingInfo(info);
                 setEndReason("relay.NOROUTING");
-                return  null;
+                return  waitforRequestFinished();
             }
             if (MONITOR_CHECKALIVE.equalsIgnoreCase(_target.serviceUri().toString())) {
-                responseDefault200OK();
                 setEndReason("relay.CHECKALIVE."+_target.serviceUri().toString().replace(':', '-'));
-                return  null;
+                return  waitforRequestFinished();
             }
             
             _memo = _memoBuilder.build(_target, info);
@@ -297,6 +295,37 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
         }})))
     .freeze();
 
+    private BizStep waitforRequestFinished() {
+        if (isRecvHttpRequestComplete()) {
+            responseDefault200OK();
+            return null;
+        }
+        else {
+            return RESP_200OK;
+        }
+    }
+
+    public final BizStep RESP_200OK = new BizStep("relay.RESP_200OK") {
+        @OnEvent(event = "sendHttpContent")
+        private BizStep onSendHttpContent(final HttpContent httpContent) {
+            updateRecvHttpRequestState(httpContent);
+            if (isRecvHttpRequestComplete()) {
+                responseDefault200OK();
+                return null;
+            }
+            else {
+                return currentEventHandler();
+            }
+        }
+    }
+    .handler(handlersOf(new ONDETACH(new Runnable() {
+        @Override
+        public void run() {
+            _memo.incBizResult(RESULT.SOURCE_CANCELED, -1);
+            setEndReason("relay.SOURCE_CANCELED");
+        }})))
+    .freeze();
+    
     private final BizStep OBTAINING = new BizStep("relay.OBTAINING") {
         @OnEvent(event = "onHttpClientObtained")
         private BizStep onHttpObtained(
