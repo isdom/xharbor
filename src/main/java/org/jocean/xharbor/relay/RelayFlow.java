@@ -73,6 +73,8 @@ import org.slf4j.helpers.NOPLogger;
  */
 class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
 
+    private static final String MONITOR_CHECKALIVE = "monitor://checkalive";
+
     private static final Logger LOG = LoggerFactory
             .getLogger(RelayFlow.class);
     
@@ -263,6 +265,11 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
                 responseDefault200OK();
                 _noRoutingMemo.incRoutingInfo(info);
                 setEndReason("relay.NOROUTING");
+                return  null;
+            }
+            if (MONITOR_CHECKALIVE.equalsIgnoreCase(_target.serviceUri().toString())) {
+                responseDefault200OK();
+                setEndReason("relay.CHECKALIVE."+_target.serviceUri().toString());
                 return  null;
             }
             
