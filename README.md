@@ -59,3 +59,8 @@ TODO:
   20、将RulesZKUpdater & AUPZKUpdater 的实现抽象出公共 ZK's Updater with CopyOnWrite
   
   21、对 健康检查 信令 在 RelayFlow 中做单独处理，包括 匹配的 method/path，返回状态码，消息体 等。
+  
+  22、统计显示 NOROUTING 的对端 IP 信息 (peer.ip.addr)
+  
+  23、manifest/MANIFEST.MF 中的 ClassPath 指向外部路径，实现 在公共位置 保存 logback.xml、*.properties 的特性，AppServer 升级时，不用拷贝和迁移
+      配置文件（参考 confluence、jira 的做法） 
