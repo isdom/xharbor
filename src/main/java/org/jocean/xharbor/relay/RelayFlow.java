@@ -37,8 +37,10 @@ import org.jocean.httpclient.api.HttpClient;
 import org.jocean.httpclient.api.HttpClient.HttpReactor;
 import org.jocean.idiom.Detachable;
 import org.jocean.idiom.ExceptionUtils;
+import org.jocean.idiom.Slf4jLoggerSource;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.ValidationId;
+import org.jocean.j2se.spring.BeanProxy;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.RelayMemo.RESULT;
@@ -52,6 +54,7 @@ import org.jocean.xharbor.spi.HttpRequestTransformer;
 import org.jocean.xharbor.spi.HttpRequestTransformer.Builder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.helpers.NOPLogger;
 
 /**
  * @author isdom
@@ -68,7 +71,7 @@ import org.slf4j.LoggerFactory;
  * |<---------------ttlRelayFailure--------------------------------->              |     +---> WHOLE time cost
  * |<------------------------------------ttlRelaySuccess-------------------------->|   --+
  */
-class RelayFlow extends AbstractFlow<RelayFlow> {
+class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
 
     private static final Logger LOG = LoggerFactory
             .getLogger(RelayFlow.class);
@@ -79,6 +82,13 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
                 + _guideId + ", httpClientId=" + _httpClientId + "]";
     }
 
+    private final BeanProxy<Logger> _proxyLogger = new BeanProxy<Logger>(Logger.class);
+    
+    @Override
+    public Logger getLogger() {
+        return this._proxyLogger.buildProxy();
+    }
+    
     private static class RouterCtxImpl implements Router.Context {
         private final HashMap<String, Object> _map = new HashMap<String, Object>();
         
@@ -113,6 +123,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             final boolean           checkResponseStatus,
             final HttpRequestTransformer.Builder transformerBuilder
             ) {
+        this._proxyLogger.setImpl(LOG);
         this._checkResponseStatus = checkResponseStatus;
         this._router = router;
         this._memoBuilder = memoBuilder;
@@ -795,6 +806,8 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             }
             ReferenceCountUtil.safeRelease(flow._httpRequest);
             flow.releaseAllContents();
+            //  replace logger to nop logger to disable all log message after flow destroy
+            flow._proxyLogger.setImplForced(NOPLogger.NOP_LOGGER);
         }
     };
     
