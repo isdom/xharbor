@@ -8,12 +8,14 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.ReferenceCountUtil;
 
@@ -164,6 +166,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
                 LOG.warn("exception when close {}, detail: {}", 
                         _channelCtx, ExceptionUtils.exception2detail(e));
             }
+            setEndReason("relay.HTTPLOST");
             return null;
         }
         
@@ -244,10 +247,11 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
             _target = null != dispatcher ? dispatcher.dispatch() : null;
             
             if ( null == _target ) {
-                LOG.warn("can't found matched target service for request {}, just close client http connection ({}).", 
+                LOG.warn("can't found matched target service for request {}, just return 200 OK for client http connection ({}).", 
                         info, _channelCtx.channel());
-                _channelCtx.close();
+                responseDefault200OK();
                 _noRoutingMemo.incRoutingInfo(info);
+                setEndReason("relay.NOROUTING");
                 return  null;
             }
             
@@ -271,6 +275,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
         @Override
         public void run() {
             _memo.incBizResult(RESULT.SOURCE_CANCELED, -1);
+            setEndReason("relay.SOURCE_CANCELED");
         }})))
     .freeze();
 
@@ -328,6 +333,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
         public void run() {
             _memo.endBizStep(STEP.OBTAINING_HTTPCLIENT, -1);
             _memo.incBizResult(RESULT.SOURCE_CANCELED, _watch4Result.stopAndRestart());
+            setEndReason("relay.SOURCE_CANCELED");
         }})))
     .freeze();
 
@@ -369,6 +375,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
         public void run() {
             _memo.endBizStep(STEP.TRANSFER_CONTENT, -1);
             _memo.incBizResult(RESULT.SOURCE_CANCELED, _watch4Result.stopAndRestart());
+            setEndReason("relay.SOURCE_CANCELED");
         }})))
     .freeze();
         
@@ -425,6 +432,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
         public void run() {
             _memo.endBizStep(STEP.RECV_RESP, -1);
             _memo.incBizResult(RESULT.SOURCE_CANCELED, _watch4Result.stopAndRestart());
+            setEndReason("relay.SOURCE_CANCELED");
         }})))
     .freeze();
 
@@ -472,6 +480,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
                 future.addListener(ChannelFutureListener.CLOSE);
             }
             _memo.incBizResult(RESULT.RELAY_SUCCESS, _watch4Result.stopAndRestart());
+            setEndReason("relay.RELAY_SUCCESS");
             return null;
         }
     }
@@ -480,6 +489,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
         public void run() {
             _memo.endBizStep(STEP.RECV_RESP, -1);
             _memo.incBizResult(RESULT.SOURCE_CANCELED, _watch4Result.stopAndRestart());
+            setEndReason("relay.SOURCE_CANCELED");
         }})))
     .freeze();
 
@@ -502,6 +512,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
                                 LOG.warn("exception when close {}, detail: {}", 
                                         _channelCtx, ExceptionUtils.exception2detail(e));
                             }
+                            setEndReason("relay.RELAY_FAILURE");
                             return null;
                         }})))
                     .rename("relay.RECVCONTENT.KeepAlive")
@@ -520,6 +531,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
                                         safeGetServiceUri());
                             }
                             _channelCtx.flush().close();
+                            setEndReason("relay.HTTP10.RELAY_SUCCESS");
                             return null;
                         }})))
                     .rename("relay.RECVCONTENT.Close")
@@ -752,6 +764,16 @@ class RelayFlow extends AbstractFlow<RelayFlow> {
      */
     private String safeGetServiceUri() {
         return null != this._target ? this._target.serviceUri().toString() : "non-uri";
+    }
+
+    private void responseDefault200OK() {
+        final HttpResponse response = new DefaultFullHttpResponse(
+                this._httpRequest.getProtocolVersion(), HttpResponseStatus.OK);
+        HttpHeaders.setHeader(response, HttpHeaders.Names.CONTENT_LENGTH, 0);
+        final ChannelFuture future = this._channelCtx.writeAndFlush(response);
+        if ( !HttpHeaders.isKeepAlive( this._httpRequest ) ) {
+            future.addListener(ChannelFutureListener.CLOSE);
+        }
     }
 
     private static final FlowLifecycleListener<RelayFlow> RELAY_LIFECYCLE_LISTENER = 
