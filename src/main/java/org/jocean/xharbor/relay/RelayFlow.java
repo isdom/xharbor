@@ -269,7 +269,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
             }
             if (MONITOR_CHECKALIVE.equalsIgnoreCase(_target.serviceUri().toString())) {
                 responseDefault200OK();
-                setEndReason("relay.CHECKALIVE."+_target.serviceUri().toString());
+                setEndReason("relay.CHECKALIVE."+_target.serviceUri().toString().replace(':', '-'));
                 return  null;
             }
             
