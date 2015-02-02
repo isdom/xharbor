@@ -69,7 +69,7 @@ public class ZKUpdater<CTX> {
     }
 
     private class ZKTreeWatcherFlow extends AbstractFlow<ZKTreeWatcherFlow> {
-        final BizStep UNINITIALIZED = new BizStep("updateaup.UNINITIALIZED") {
+        final BizStep UNINITIALIZED = new BizStep("zkupdate.UNINITIALIZED") {
 
             @OnEvent(event = "NODE_ADDED")
             private BizStep nodeAdded(final TreeCacheEvent event) throws Exception {
@@ -116,7 +116,7 @@ public class ZKUpdater<CTX> {
         }
         .freeze();
         
-        final BizStep INITIALIZED = new BizStep("updateaup.INITIALIZED") {
+        final BizStep INITIALIZED = new BizStep("zkupdate.INITIALIZED") {
 
             @OnEvent(event = "NODE_ADDED")
             private BizStep nodeAdded(final TreeCacheEvent event) throws Exception {
