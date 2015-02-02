@@ -112,7 +112,6 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
         }
         
         private String descrption;
-        private String scheme;
         private InfoDesc[] regexs;
         
         @JSONField(name="descrption")
@@ -125,16 +124,6 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
             this.descrption = descrption;
         }
 
-        @JSONField(name="scheme")
-        public String getScheme() {
-            return scheme;
-        }
-        
-        @JSONField(name="scheme")
-        public void setScheme(String scheme) {
-            this.scheme = scheme;
-        }
-        
         @JSONField(name="regexs")
         public InfoDesc[] getRegexs() {
             return regexs;
