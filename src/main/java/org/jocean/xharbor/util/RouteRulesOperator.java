@@ -33,12 +33,12 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
     }
     
     @Override
-    public RoutingInfo2Dispatcher createEntity() {
+    public RoutingInfo2Dispatcher createContext() {
         return new RoutingInfo2Dispatcher();
     }
 
     @Override
-    public RoutingInfo2Dispatcher addOrUpdateToEntity(
+    public RoutingInfo2Dispatcher doAddOrUpdate(
             final RoutingInfo2Dispatcher entity, 
             final String root, 
             final TreeCacheEvent event)
@@ -59,7 +59,7 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
     }
 
     @Override
-    public RoutingInfo2Dispatcher removeFromEntity(
+    public RoutingInfo2Dispatcher doRemove(
             final RoutingInfo2Dispatcher entity, 
             final String root, 
             final TreeCacheEvent event)
@@ -78,7 +78,7 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
     }
 
     @Override
-    public RoutingInfo2Dispatcher applyEntity(final RoutingInfo2Dispatcher entity) {
+    public RoutingInfo2Dispatcher applyContext(final RoutingInfo2Dispatcher entity) {
         if ( null != entity ) {
             try {
                 if (LOG.isDebugEnabled()) {

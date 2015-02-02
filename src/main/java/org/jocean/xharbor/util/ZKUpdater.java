@@ -13,17 +13,17 @@ import org.jocean.idiom.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class ZKUpdater<T> {
-    public interface Operator<T> {
-        public T createEntity();
+public class ZKUpdater<CTX> {
+    public interface Operator<CTX> {
+        public CTX createContext();
         
-        public T addOrUpdateToEntity(final T entity, final String root, final TreeCacheEvent event) 
+        public CTX doAddOrUpdate(final CTX ctx, final String root, final TreeCacheEvent event) 
                 throws Exception;
         
-        public T removeFromEntity(final T entity, final String root, final TreeCacheEvent event) 
+        public CTX doRemove(final CTX ctx, final String root, final TreeCacheEvent event) 
                 throws Exception;
         
-        public T applyEntity(final T entity);
+        public CTX applyContext(final CTX ctx);
     }
     
     private static final Logger LOG = LoggerFactory
@@ -33,14 +33,14 @@ public class ZKUpdater<T> {
             final EventReceiverSource source,
             final CuratorFramework client, 
             final String root, 
-            final Operator<T> operator) {
+            final Operator<CTX> operator) {
         this._operator = operator;
         this._root = root;
         this._zkCache = TreeCache.newBuilder(client, root).setCacheData(true).build();
         this._receiver = new ZKTreeWatcherFlow() {{
             source.create(this, this.UNINITIALIZED);
         }}.queryInterfaceInstance(EventReceiver.class);
-        this._entity = this._operator.createEntity();
+        this._context = this._operator.createContext();
     }
     
     public void start() {
@@ -60,11 +60,11 @@ public class ZKUpdater<T> {
     }
 
     /**
-     * @param newEntity
+     * @param newCtx
      */
-    private void safeUpdateEntity(final T newEntity) {
-        if (null != newEntity) {
-            this._entity = newEntity;
+    private void safeUpdateCtx(final CTX newCtx) {
+        if (null != newCtx) {
+            this._context = newCtx;
         }
     }
 
@@ -78,7 +78,7 @@ public class ZKUpdater<T> {
                             currentEventHandler(), event);
                 }
                 try {
-                    _operator.addOrUpdateToEntity(_entity, _root, event);
+                    _operator.doAddOrUpdate(_context, _root, event);
                 } catch (Exception e) {
                     LOG.warn("exception when addOrUpdateToBuilder for event({}), detail:{}",
                             event, ExceptionUtils.exception2detail(e));
@@ -94,7 +94,7 @@ public class ZKUpdater<T> {
                             currentEventHandler(), event);
                 }
                 try {
-                    _operator.removeFromEntity(_entity, _root, event);
+                    _operator.doRemove(_context, _root, event);
                 } catch (Exception e) {
                     LOG.warn("exception when removeFromBuilder for event({}), detail:{}",
                             event, ExceptionUtils.exception2detail(e));
@@ -110,7 +110,7 @@ public class ZKUpdater<T> {
             
             @OnEvent(event = "INITIALIZED")
             private BizStep initialized(final TreeCacheEvent event) throws Exception {
-                safeUpdateEntity(_operator.applyEntity(_entity));
+                safeUpdateCtx(_operator.applyContext(_context));
                 return INITIALIZED;
             }
         }
@@ -125,8 +125,8 @@ public class ZKUpdater<T> {
                             currentEventHandler(), event);
                 }
                 try {
-                    safeUpdateEntity(
-                        _operator.applyEntity(_operator.addOrUpdateToEntity(_entity, _root, event)));
+                    safeUpdateCtx(
+                        _operator.applyContext(_operator.doAddOrUpdate(_context, _root, event)));
                 } catch (Exception e) {
                     LOG.warn("exception when addOrUpdateToBuilder for event({}), detail:{}",
                             event, ExceptionUtils.exception2detail(e));
@@ -142,8 +142,8 @@ public class ZKUpdater<T> {
                             currentEventHandler(), event);
                 }
                 try {
-                    safeUpdateEntity(
-                        _operator.applyEntity(_operator.removeFromEntity(_entity, _root, event)));
+                    safeUpdateCtx(
+                        _operator.applyContext(_operator.doRemove(_context, _root, event)));
                 } catch (Exception e) {
                     LOG.warn("exception when removeFromBuilder for event({}), detail:{}",
                             event, ExceptionUtils.exception2detail(e));
@@ -162,7 +162,7 @@ public class ZKUpdater<T> {
     
     private final String _root;
     private final TreeCache _zkCache;
-    private final Operator<T> _operator;
+    private final Operator<CTX> _operator;
     private final EventReceiver _receiver;
-    private T _entity;
+    private CTX _context;
 }

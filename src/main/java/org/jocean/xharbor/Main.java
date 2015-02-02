@@ -81,6 +81,7 @@ public class Main {
         
         checkNotNull(ctx.getBean("routerUpdater", ZKUpdater.class)).start();
         checkNotNull(ctx.getBean("aupUpdater", ZKUpdater.class)).start();
+        checkNotNull(ctx.getBean("gatewayUpdater", ZKUpdater.class)).start();
     }
 
 }

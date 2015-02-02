@@ -25,8 +25,6 @@ import io.netty.handler.codec.http.HttpRequestDecoder;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseEncoder;
 import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.logging.LogLevel;
-import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.traffic.TrafficCounterExt;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
@@ -63,15 +61,14 @@ public class HttpGatewayServer {
     private final EventLoopGroup _clientGroup = new NioEventLoopGroup();
     
     private TrafficCounterExt _trafficCounterExt;
-    private boolean _logByteStream = false;
-    private int _idleTimeSeconds = 180; //seconds  为了避免建立了过多的闲置连接 闲置180秒的连接主动关闭
+//    private boolean _logByteStream = false;
+//    private int _idleTimeSeconds = 180; //seconds  为了避免建立了过多的闲置连接 闲置180秒的连接主动关闭
     
     private RelayAgent  _relayAgent;
     
     //响应检查服务是否活着的请求
     private String _checkAlivePath = null;
-    
-    private boolean _enableHttpLog = false;
+    private final BaseInitializer _baseInitializer;
     
     @ChannelHandler.Sharable
     private class RelayHandler extends ChannelInboundHandlerAdapter{
@@ -156,6 +153,34 @@ public class HttpGatewayServer {
         }
     }
     
+    public HttpGatewayServer() {
+        this._baseInitializer = new BaseInitializer(){
+            @Override
+            protected void addCodecHandler(final ChannelPipeline pipeline) throws Exception {
+                //IN decoder
+                pipeline.addLast("decoder",new HttpRequestDecoder());
+                //OUT 统计数据流大小 这个handler需要放在HttpResponseToByteEncoder前面处理
+//                pipeline.addLast("statistics",new StatisticsResponseHandler()); 
+                //OUT encoder
+                pipeline.addLast("encoder-object",new HttpResponseEncoder());
+                
+                //IN/OUT 支持压缩
+                pipeline.addLast("deflater", new HttpContentCompressor());
+            }
+            
+            @Override
+            protected void addBusinessHandler(final ChannelPipeline pipeline) throws Exception {
+                pipeline.addLast("biz-handler", new RelayHandler());
+                
+            }
+        };
+        
+        // 因为响应可能不是message，logMessage无法处理
+        this._baseInitializer.setLogMessage(false);
+        // 为了避免建立了过多的闲置连接 闲置180秒的连接主动关闭
+        this._baseInitializer.setIdleTimeSeconds(180);
+    }
+    
     /**
      * @param ctx
      * @param request
@@ -234,40 +259,11 @@ public class HttpGatewayServer {
                  */
                 .childOption(ChannelOption.SO_LINGER, -1);
         
-        final BaseInitializer baseInitializer = new BaseInitializer(){
-            @Override
-            protected void addCodecHandler(final ChannelPipeline pipeline) throws Exception {
-                if (_enableHttpLog) {
-                    pipeline.addLast("log", new LoggingHandler(LogLevel.TRACE));
-                }
-                
-                //IN decoder
-                pipeline.addLast("decoder",new HttpRequestDecoder());
-                //OUT 统计数据流大小 这个handler需要放在HttpResponseToByteEncoder前面处理
-//                pipeline.addLast("statistics",new StatisticsResponseHandler()); 
-                //OUT encoder
-                pipeline.addLast("encoder-object",new HttpResponseEncoder());
-                
-                //IN/OUT 支持压缩
-                pipeline.addLast("deflater", new HttpContentCompressor());
-            }
-            
-            @Override
-            protected void addBusinessHandler(final ChannelPipeline pipeline) throws Exception {
-                pipeline.addLast("biz-handler", new RelayHandler());
-                
-            }
-        };
-        
-        baseInitializer.setLogByteStream(this._logByteStream);
-        baseInitializer.setLogMessage(false);//因为响应可能不是message，logMessage无法处理
-        
         if ( null != this._trafficCounterExt) {
-            baseInitializer.setTrafficCounter(this._trafficCounterExt);
+            this._baseInitializer.setTrafficCounter(this._trafficCounterExt);
         }
-        baseInitializer.setIdleTimeSeconds(this._idleTimeSeconds);
         
-        _bootstrap.childHandler(baseInitializer);
+        this._bootstrap.childHandler(this._baseInitializer);
 
         int retryCount = 0;
         boolean binded = false;
@@ -320,22 +316,16 @@ public class HttpGatewayServer {
 //        return channelCount.intValue();
 //    }
 
-    public void setLogByteStream(boolean logByteStream) {
-        this._logByteStream = logByteStream;
+    public void setLogByteStream(final boolean logByteStream) {
+        this._baseInitializer.setLogByteStream(logByteStream);
+//        this._logByteStream = logByteStream;
     }
 
-    public void setIdleTimeSeconds(int idleTimeSeconds) {
-        this._idleTimeSeconds = idleTimeSeconds;
+    public void setIdleTimeSeconds(final int idleTimeSeconds) {
+        this._baseInitializer.setIdleTimeSeconds(idleTimeSeconds);
+//        this._idleTimeSeconds = idleTimeSeconds;
     }
  
-    /*public List<String> getSessionMap(int fakeValue){
-        List<String> ret = new ArrayList<String>();
-        for(Session value:SESSIONMAP.values()){
-            ret.add(value.toString());
-        }
-        return ret;
-    }*/
-
 //    public void setPacketsFrequency(int packetsFrequency) {
 //        this.packetsFrequency = packetsFrequency;
 //    }
@@ -354,13 +344,5 @@ public class HttpGatewayServer {
 
     public void setCheckAlivePath(final String checkAlivePath) {
         this._checkAlivePath = checkAlivePath;
-    }
-
-    public boolean isEnableHttpLog() {
-        return _enableHttpLog;
-    }
-
-    public void setEnableHttpLog(final boolean enableHttpLog) {
-        this._enableHttpLog = enableHttpLog;
     }
 }

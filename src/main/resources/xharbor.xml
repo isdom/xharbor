@@ -116,17 +116,16 @@
         <lookup-method name="createRelayFlow" bean="relayFlow"/>
     </bean>
     
-    <bean id="httpServer" class="org.jocean.xharbor.HttpGatewayServer"
+<!--     <bean id="httpServer" class="org.jocean.xharbor.HttpGatewayServer"
         init-method="start" destroy-method="stop">
         <property name="relayAgent" ref="relayAgent"/>
         <property name="acceptPort" value="${gateway.port:8080}" />
         <property name="acceptIp" value="${gateway.ip:0.0.0.0}" />
-        <property name="logByteStream" value="${gateway.log.byteStream:false}"/>
+        <property name="logByteStream" value="${gateway.inbound.httpTransportLogEnabled:true}"/>
         <property name="idleTimeSeconds" value="${gateway.idleTimeSeconds:200}"/>
-        <property name="checkAlivePath" value="${gateway.checkAlivePath:/}"/>
-        <property name="enableHttpLog" value="${gateway.inbound.httpTransportLogEnabled:true}"/>
     </bean>
-     
+ -->
+      
     <bean id="zkClient" class="org.jocean.xharbor.util.ZKUtils"
         factory-method="buildWithExhibitorEnsembleProvider"
         init-method="start"
@@ -138,7 +137,7 @@
             </bean>
         </constructor-arg>
         <constructor-arg value="${exhibitor.restport}"/>
-        <constructor-arg value="${exhibitor.backupConnectionString}"/>
+        <constructor-arg value="${zk.address}"/>
         <constructor-arg value="${exhibitor.basicAuthUser}"/>
         <constructor-arg value="${exhibitor.basicAuthPass}"/>
         <constructor-arg value="${exhibitor.restUriPath:/exhibitor/v1/cluster/list}"/>
@@ -150,7 +149,7 @@
             </bean>
         </constructor-arg>
     </bean>
-<!--         class="org.apache.curator.framework.CuratorFrameworkFactory" 
+<!--<bean id="zkClient" class="org.apache.curator.framework.CuratorFrameworkFactory"
         factory-method="newClient"
         init-method="start">
         <constructor-arg value="${zk.address:121.41.45.51:2181}"/>
@@ -192,6 +191,17 @@
         </constructor-arg>
     </bean>
 
+    <bean id="gatewayUpdater" class="org.jocean.xharbor.util.ZKUpdater">
+        <constructor-arg ref="source"/>
+        <constructor-arg ref="zkClient"/>
+        <constructor-arg value="${zk.rules.path:/demo}/gateways"/>
+        <constructor-arg>
+            <bean class="org.jocean.xharbor.GatewayLifecycleOperator">
+                <constructor-arg ref="relayAgent"/>
+            </bean>
+        </constructor-arg>
+    </bean>
+    
     <bean id="jmxConnectorServer" 
         class="org.springframework.jmx.support.ConnectorServerFactoryBean"  >
         <property name="serviceUrl" value="service:jmx:jmxmp://0.0.0.0:${jmxmp.port:9876}" />

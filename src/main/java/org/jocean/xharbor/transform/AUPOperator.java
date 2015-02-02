@@ -32,12 +32,12 @@ public class AUPOperator implements Operator<CompositeAUPBuilder> {
     }
     
     @Override
-    public CompositeAUPBuilder createEntity() {
+    public CompositeAUPBuilder createContext() {
         return new CompositeAUPBuilder();
     }
 
     @Override
-    public CompositeAUPBuilder addOrUpdateToEntity(
+    public CompositeAUPBuilder doAddOrUpdate(
             final CompositeAUPBuilder builder,
             final String root, 
             final TreeCacheEvent event) throws Exception {
@@ -55,7 +55,7 @@ public class AUPOperator implements Operator<CompositeAUPBuilder> {
     }
 
     @Override
-    public CompositeAUPBuilder removeFromEntity(
+    public CompositeAUPBuilder doRemove(
             final CompositeAUPBuilder builder,
             final String root, 
             final TreeCacheEvent event) throws Exception {
@@ -72,7 +72,7 @@ public class AUPOperator implements Operator<CompositeAUPBuilder> {
     }
 
     @Override
-    public CompositeAUPBuilder applyEntity(final CompositeAUPBuilder builder) {
+    public CompositeAUPBuilder applyContext(final CompositeAUPBuilder builder) {
         if ( null != builder ) {
             try {
                 if (LOG.isDebugEnabled()) {
