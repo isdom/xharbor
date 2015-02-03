@@ -37,10 +37,10 @@ import org.jocean.httpclient.api.HttpClient;
 import org.jocean.httpclient.api.HttpClient.HttpReactor;
 import org.jocean.idiom.Detachable;
 import org.jocean.idiom.ExceptionUtils;
+import org.jocean.idiom.ProxyBuilder;
 import org.jocean.idiom.Slf4jLoggerSource;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.ValidationId;
-import org.jocean.j2se.spring.BeanProxy;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.RelayMemo.RESULT;
@@ -84,7 +84,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
                 + _guideId + ", httpClientId=" + _httpClientId + "]";
     }
 
-    private final BeanProxy<Logger> _proxyLogger = new BeanProxy<Logger>(Logger.class);
+    private final ProxyBuilder<Logger> _proxyLogger = new ProxyBuilder<Logger>(Logger.class);
     
     @Override
     public Logger getLogger() {
@@ -843,7 +843,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
             ReferenceCountUtil.safeRelease(flow._httpRequest);
             flow.releaseAllContents();
             //  replace logger to nop logger to disable all log message after flow destroy
-            flow._proxyLogger.setImplForced(NOPLogger.NOP_LOGGER);
+            flow._proxyLogger.setImpl(NOPLogger.NOP_LOGGER);
         }
     };
     
