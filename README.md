@@ -56,11 +56,15 @@ TODO:
   
   19、从 xharbor 通过 REST API的方式下载各类统计信息的 Excel(CSV)，统计内容可以包括：接口调用时长、次数、noRouting URI，流量大小 等
   
-  20、将RulesZKUpdater & AUPZKUpdater 的实现抽象出公共 ZK's Updater with CopyOnWrite
+  20、~~将RulesZKUpdater & AUPZKUpdater 的实现抽象出公共 ZK's Updater with CopyOnWrite。~~ (done)
   
   21、对 健康检查 信令 在 RelayFlow 中做单独处理，包括 匹配的 method/path，返回状态码，消息体 等。
   
   22、统计显示 NOROUTING 的对端 IP 信息 (peer.ip.addr)
   
-  23、manifest/MANIFEST.MF 中的 ClassPath 指向外部路径，实现 在公共位置 保存 logback.xml、*.properties 的特性，AppServer 升级时，不用拷贝和迁移
-      配置文件（参考 confluence、jira 的做法） 
+  23、~~manifest/MANIFEST.MF 中的 ClassPath 指向外部路径，实现 在公共位置 保存 logback.xml、*.properties 的特性，AppServer 升级时，不用拷贝和迁移
+      配置文件（参考 confluence、jira 的做法）~~ (done, 2015-02-04 在 MANIFEST.MF中, 根据目前现网部署模式将 Class-Path 改进成了 ../../etc/) 
+      
+  24、基于 JMX 的命令行，可用 ObjectName 的部分匹配模式，查询出 字段超过一定数值的 MBean。
+  
+  25、将各级转发信令的统计信息MBean 合并在一个或有限个 MBean中，用类似 Map(OpenMBean TabularData) 的方式呈现出来。
