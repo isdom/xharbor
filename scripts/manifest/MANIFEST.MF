@@ -1,2 +1,2 @@
 Main-Class: org.jocean.xharbor.Booter
-Class-Path: ../../etc
+Class-Path: ../../etc/ 
