@@ -160,9 +160,11 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
             if (!isValidGuideId(guideId)) {
                 return currentEventHandler();
             }
-            LOG.warn("{}/{}: http for {} lost.", 
-                    currentEventHandler().getName(), currentEvent(), 
-                    safeGetServiceUri());
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("{}/{}: http for {} lost.", 
+                        currentEventHandler().getName(), currentEvent(), 
+                        safeGetServiceUri());
+            }
             if (null != this._ifHttpLost) {
                 try {
                     return this._ifHttpLost.call();
@@ -291,6 +293,8 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
         @Override
         public void run() {
             _memo.incBizResult(RESULT.SOURCE_CANCELED, -1);
+            LOG.warn("source_canceled\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]",
+                    -1, _httpRequest, safeGetServiceUri());
             setEndReason("relay.SOURCE_CANCELED");
         }})))
     .freeze();
@@ -321,8 +325,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
         public void run() {
-            _memo.incBizResult(RESULT.SOURCE_CANCELED, -1);
-            setEndReason("relay.SOURCE_CANCELED");
+            memoDetachResult();
         }})))
     .freeze();
     
@@ -371,16 +374,13 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
         @Override
         public BizStep call() throws Exception {
             _memo.endBizStep(STEP.OBTAINING_HTTPCLIENT, -1);
-            final long ttl = _watch4Result.stopAndRestart();
-            _memo.incBizResult(RESULT.CONNECTDESTINATION_FAILURE, ttl);
-            return launchRetry(ttl);
+            return launchRetry(memoHttplostResult(RESULT.CONNECTDESTINATION_FAILURE, true));
         }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
         public void run() {
             _memo.endBizStep(STEP.OBTAINING_HTTPCLIENT, -1);
-            _memo.incBizResult(RESULT.SOURCE_CANCELED, _watch4Result.stopAndRestart());
-            setEndReason("relay.SOURCE_CANCELED");
+            memoDetachResult();
         }})))
     .freeze();
 
@@ -413,16 +413,13 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
         @Override
         public BizStep call() throws Exception {
             _memo.endBizStep(STEP.TRANSFER_CONTENT, -1);
-            final long ttl = _watch4Result.stopAndRestart();
-            _memo.incBizResult(RESULT.RELAY_FAILURE, ttl);
-            return launchRetry(ttl);
+            return launchRetry(memoHttplostResult(RESULT.RELAY_FAILURE, true));
         }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
         public void run() {
             _memo.endBizStep(STEP.TRANSFER_CONTENT, -1);
-            _memo.incBizResult(RESULT.SOURCE_CANCELED, _watch4Result.stopAndRestart());
-            setEndReason("relay.SOURCE_CANCELED");
+            memoDetachResult();
         }})))
     .freeze();
         
@@ -439,30 +436,30 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
             
             if ( _checkResponseStatus ) {
                 if (isHttpClientError(response)) {
-                    return retryFor(RESULT.HTTP_CLIENT_ERROR);
+                    return retryFor(RESULT.HTTP_CLIENT_ERROR,response);
                 }
                 
                 if (isHttpServerError(response)) {
-                    return retryFor(RESULT.HTTP_SERVER_ERROR);
+                    return retryFor(RESULT.HTTP_SERVER_ERROR,response);
                 }
             }
             
-            _channelCtx.write(ReferenceCountUtil.retain(response));
+            //  http response will never be changed, so record it
+            _httpResponse = ReferenceCountUtil.retain(response);
+            _channelCtx.write(ReferenceCountUtil.retain(_httpResponse));
             
             //  TODO consider 响应为1xx，204，304相应或者head请求，则直接忽视掉消息实体内容。
             //  当满足上述情况时，是否应该直接结束转发流程。
             return buildRecvContentByConnectionEntity();
         }
 
-        /**
-         * @return
-         * @throws Exception
-         */
-        private BizStep retryFor(final RESULT result) throws Exception {
+        private BizStep retryFor(final RESULT result, final HttpResponse response) throws Exception {
             safeDetachHttp();
             _memo.endBizStep(STEP.RECV_RESP, _watch4Step.stopAndRestart());
             final long ttl = _watch4Result.stopAndRestart();
             _memo.incBizResult(result, ttl);
+            LOG.warn("{},retry\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]\nresponse:[{}]",
+                    result.name(), ttl / (float)1000.0, _httpRequest, safeGetServiceUri(), response);
             return launchRetry(ttl);
         }
     }
@@ -470,16 +467,13 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
         @Override
         public BizStep call() throws Exception {
             _memo.endBizStep(STEP.RECV_RESP, -1);
-            final long ttl = _watch4Result.stopAndRestart();
-            _memo.incBizResult(RESULT.RELAY_FAILURE, ttl);
-            return launchRetry(ttl);
+            return launchRetry(memoHttplostResult(RESULT.RELAY_FAILURE, true));
         }})))
     .handler(handlersOf(new ONDETACH(new Runnable() {
         @Override
         public void run() {
             _memo.endBizStep(STEP.RECV_RESP, -1);
-            _memo.incBizResult(RESULT.SOURCE_CANCELED, _watch4Result.stopAndRestart());
-            setEndReason("relay.SOURCE_CANCELED");
+            memoDetachResult();
         }})))
     .freeze();
 
@@ -526,7 +520,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
             if ( !HttpHeaders.isKeepAlive( _httpRequest ) ) {
                 future.addListener(ChannelFutureListener.CLOSE);
             }
-            _memo.incBizResult(RESULT.RELAY_SUCCESS, _watch4Result.stopAndRestart());
+            memoRelaySuccessResult("RELAY_SUCCESS");
             setEndReason("relay.RELAY_SUCCESS");
             return null;
         }
@@ -535,8 +529,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
         @Override
         public void run() {
             _memo.endBizStep(STEP.RECV_RESP, -1);
-            _memo.incBizResult(RESULT.SOURCE_CANCELED, _watch4Result.stopAndRestart());
-            setEndReason("relay.SOURCE_CANCELED");
+            memoDetachResult();
         }})))
     .freeze();
 
@@ -550,8 +543,6 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
                     .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
                         @Override
                         public BizStep call() {
-                            _memo.endBizStep(STEP.RECV_RESP, -1);
-                            _memo.incBizResult(RESULT.RELAY_FAILURE, _watch4Result.stopAndRestart());
                             try {
                                 _channelCtx.close();
                             }
@@ -559,6 +550,8 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
                                 LOG.warn("exception when close {}, detail: {}", 
                                         _channelCtx, ExceptionUtils.exception2detail(e));
                             }
+                            _memo.endBizStep(STEP.RECV_RESP, -1);
+                            memoHttplostResult(RESULT.RELAY_FAILURE, false);
                             setEndReason("relay.RELAY_FAILURE");
                             return null;
                         }})))
@@ -571,13 +564,13 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
                     .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
                         @Override
                         public BizStep call() {
-                            _memo.endBizStep(STEP.RECV_RESP, _watch4Step.stopAndRestart());
-                            _memo.incBizResult(RESULT.RELAY_SUCCESS, _watch4Result.stopAndRestart());
                             if (LOG.isDebugEnabled()) {
                                 LOG.debug("channel for {} is Connection: close, so just mark RELAY_SUCCESS and close peer.", 
                                         safeGetServiceUri());
                             }
+                            _memo.endBizStep(STEP.RECV_RESP, _watch4Step.stopAndRestart());
                             _channelCtx.flush().close();
+                            memoRelaySuccessResult("HTTP10.RELAY_SUCCESS");
                             setEndReason("relay.HTTP10.RELAY_SUCCESS");
                             return null;
                         }})))
@@ -642,8 +635,8 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
     private boolean isValidGuideId(final int guideId) {
         final boolean ret = this._guideId.isValidId(guideId);
         if (!ret) {
-            if (LOG.isTraceEnabled()) {
-                LOG.trace(
+            if (LOG.isDebugEnabled()) {
+                LOG.debug(
                         "RelayFlow({})/{}/{}: special guide id({}) is !NOT! current guide id ({}), just ignore.",
                         this, currentEventHandler().getName(), currentEvent(),
                         guideId, this._guideId);
@@ -655,8 +648,8 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
     private boolean isValidHttpClientId(final int httpClientId) {
         final boolean ret = this._httpClientId.isValidId(httpClientId);
         if (!ret) {
-            if (LOG.isTraceEnabled()) {
-                LOG.trace(
+            if (LOG.isDebugEnabled()) {
+                LOG.debug(
                         "RelayFlow({})/{}/{}: special httpclient id({}) is !NOT! current httpclient id ({}), just ignore.",
                         this, currentEventHandler().getName(), currentEvent(),
                         httpClientId, this._httpClientId);
@@ -823,6 +816,30 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
         }
     }
 
+    private void memoDetachResult() {
+        final long ttl = _watch4Result.stopAndRestart();
+        _memo.incBizResult(RESULT.SOURCE_CANCELED, ttl);
+        LOG.warn("source_canceled\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]",
+                ttl / (float)1000.0, _httpRequest, safeGetServiceUri());
+        setEndReason("relay.SOURCE_CANCELED");
+    }
+
+    private long memoHttplostResult(final RESULT result, final boolean isRetry) {
+        final long ttl = _watch4Result.stopAndRestart();
+        _memo.incBizResult(result, ttl);
+        LOG.warn("{},{}\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]",
+                result.name(), (isRetry ? "retry" : "not retry"), 
+                ttl / (float)1000.0, _httpRequest, safeGetServiceUri());
+        return ttl;
+    }
+
+    private void memoRelaySuccessResult(final String successName) {
+        final long ttl = _watch4Result.stopAndRestart();
+        _memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
+        LOG.info("{}\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]\nresponse:[{}]",
+                successName, ttl / (float)1000.0, _httpRequest, safeGetServiceUri(), _httpResponse);
+    }
+
     private static final FlowLifecycleListener<RelayFlow> RELAY_LIFECYCLE_LISTENER = 
             new FlowLifecycleListener<RelayFlow>() {
 
@@ -841,6 +858,9 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
                 flow._forceFinishedTimer = null;
             }
             ReferenceCountUtil.safeRelease(flow._httpRequest);
+            if (null!=flow._httpResponse) {
+                ReferenceCountUtil.safeRelease(flow._httpResponse);
+            }
             flow.releaseAllContents();
             //  replace logger to nop logger to disable all log message after flow destroy
             flow._proxyLogger.setImpl(NOPLogger.NOP_LOGGER);
@@ -858,6 +878,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
     
     private HttpRequest _httpRequest;
     private ChannelHandlerContext _channelCtx;
+    private HttpResponse _httpResponse = null;
     
     private Target _target;
     private RelayMemo _memo;

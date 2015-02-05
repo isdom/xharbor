@@ -74,7 +74,7 @@
  -->
 <!--     <logger name="org.jocean" level="TRACE"/>
  -->
-    <logger name="io.netty" level="TRACE"/>
+    <logger name="io.netty" level="INFO"/>
     <logger name="org.apache.zookeeper" level="WARN"/>
     
     <logger name="timeoutLogger" level="INFO" additivity="false">
@@ -90,7 +90,7 @@
         <appender-ref ref="file"/>
     </appender>
 
-    <root level="debug">
+    <root level="INFO">
         <appender-ref ref="stdout"/>
         <appender-ref ref="ASYNC"/>
         <appender-ref ref="errorFile"/>

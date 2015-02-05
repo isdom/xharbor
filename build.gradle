@@ -19,7 +19,6 @@ dependencies {
     compile('org.jocean:jocean-event-core:0.1.5-SNAPSHOT') { transitive = false }
     compile('org.jocean:jocean-event-extend:0.0.4-SNAPSHOT') { transitive = false }
     compile('org.jocean:jocean-restful-server:0.0.4-SNAPSHOT') { transitive = false }
-    compile('org.jocean:jocean-restful-server:0.0.4-SNAPSHOT') { transitive = false }
     compile('org.jocean:jocean-j2se:0.0.3-SNAPSHOT') { transitive = false }
     compile('org.jocean:jocean-rosa:0.1.1-SNAPSHOT') { transitive = false }
 
