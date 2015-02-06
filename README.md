@@ -81,3 +81,9 @@ TODO:
             +------------ host1/user1 +-----------
                                       |
                                       +----------(实例特定配置)
+  29、relayAgent的创建也和HttpGateServer一样，有ZK进行配置，并在运行时刻可动态创建及销毁。并与 HttpGatewayServer 可动态匹配，通过命名？
+  
+  30、relayAgent 及 HttpGatewayServer 均可通过MBean进行监控，观察运行参数配置及运行情况。
+  
+  31、细化不能转发的信令的Http request's WARN日志详细信息，包括 HTTP 头等。
+  

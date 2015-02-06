@@ -293,7 +293,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
         @Override
         public void run() {
             _memo.incBizResult(RESULT.SOURCE_CANCELED, -1);
-            LOG.warn("source_canceled\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]",
+            LOG.warn("SOURCE_CANCELED\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]",
                     -1, _httpRequest, safeGetServiceUri());
             setEndReason("relay.SOURCE_CANCELED");
         }})))
@@ -819,7 +819,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
     private void memoDetachResult() {
         final long ttl = _watch4Result.stopAndRestart();
         _memo.incBizResult(RESULT.SOURCE_CANCELED, ttl);
-        LOG.warn("source_canceled\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]",
+        LOG.warn("SOURCE_CANCELED\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]",
                 ttl / (float)1000.0, _httpRequest, safeGetServiceUri());
         setEndReason("relay.SOURCE_CANCELED");
     }
