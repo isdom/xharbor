@@ -69,6 +69,7 @@ public class HttpGatewayServer {
     //响应检查服务是否活着的请求
     private String _checkAlivePath = null;
     private final BaseInitializer _baseInitializer;
+    private final RelayHandler _relayHandler = new RelayHandler();
     
     @ChannelHandler.Sharable
     private class RelayHandler extends ChannelInboundHandlerAdapter{
@@ -170,8 +171,7 @@ public class HttpGatewayServer {
             
             @Override
             protected void addBusinessHandler(final ChannelPipeline pipeline) throws Exception {
-                pipeline.addLast("biz-handler", new RelayHandler());
-                
+                pipeline.addLast("biz-handler", _relayHandler);
             }
         };
         
