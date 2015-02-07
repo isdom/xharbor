@@ -262,8 +262,8 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
             _target = null != dispatcher ? dispatcher.dispatch() : null;
             
             if ( null == _target ) {
-                LOG.warn("can't found matched target service for request {}, just return 200 OK for client http connection ({}).", 
-                        info, _channelCtx.channel());
+                LOG.warn("can't found matched target service for request:[{}]\njust return 200 OK for client http connection ({}).", 
+                        _httpRequest, _channelCtx.channel());
                 _noRoutingMemo.incRoutingInfo(info);
                 setEndReason("relay.NOROUTING");
                 return  waitforRequestFinished();
