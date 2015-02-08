@@ -108,6 +108,7 @@
         <constructor-arg ref="noRoutingMemo" />
         <constructor-arg ref="httpClientPool" />
         <constructor-arg value="${relay.checkResponseStatus:true}"/>
+        <constructor-arg value="${relay.showInfoLog:true}"/>
         <constructor-arg ref="transformBuilder"/>
     </bean>
     

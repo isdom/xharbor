@@ -123,10 +123,12 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
             final RoutingInfoMemo   noRoutingMemo,
             final GuideBuilder      guideBuilder,
             final boolean           checkResponseStatus,
+            final boolean           showInfoLog,
             final HttpRequestTransformer.Builder transformerBuilder
             ) {
         this._proxyLogger.setImpl(LOG);
         this._checkResponseStatus = checkResponseStatus;
+        this._showInfoLog = showInfoLog;
         this._router = router;
         this._memoBuilder = memoBuilder;
         this._serviceMemo = serviceMemo;
@@ -762,6 +764,12 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
      * @param httpclient
      */
     private void transferHttpRequest() {
+//        final String uri = this._httpRequest.getUri();
+//        if ( uri.startsWith("/jmxhtml") ) {
+//            final int idx = uri.indexOf('/', 7);
+//            final String newUri = idx > 0 ? uri.substring(idx) : "/";
+//            this._httpRequest.setUri(newUri);
+//        }
         try {
             this._httpClient.sendHttpRequest(this._httpClientId.updateIdAndGet(),
                 this._httpRequest, genHttpReactor());
@@ -836,8 +844,10 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
     private void memoRelaySuccessResult(final String successName) {
         final long ttl = _watch4Result.stopAndRestart();
         _memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
-        LOG.info("{}\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]\nresponse:[{}]",
-                successName, ttl / (float)1000.0, _httpRequest, safeGetServiceUri(), _httpResponse);
+        if (this._showInfoLog) {
+            LOG.info("{}\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]\nresponse:[{}]",
+                    successName, ttl / (float)1000.0, _httpRequest, safeGetServiceUri(), _httpResponse);
+        }
     }
 
     private static final FlowLifecycleListener<RelayFlow> RELAY_LIFECYCLE_LISTENER = 
@@ -868,6 +878,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
     };
     
     private final boolean _checkResponseStatus;
+    private final boolean _showInfoLog;
     private final GuideBuilder _guideBuilder;
     private final RelayMemo.Builder _memoBuilder;
     private final ServiceMemo _serviceMemo; 
