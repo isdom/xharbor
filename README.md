@@ -85,7 +85,7 @@ TODO:
   
   30、relayAgent 及 HttpGatewayServer 均可通过MBean进行监控，观察运行参数配置及运行情况。
   
-  31、细化不能转发的信令的Http request's WARN日志详细信息，包括 HTTP 头等。
+  31、~~细化不能转发的信令的Http request's WARN日志详细信息，包括 HTTP 头等。~~ (done)
   
   32、在转发时，可取消部分path路径，对 HttpRequest做出一定程度的修改。
   

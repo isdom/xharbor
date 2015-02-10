@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.jocean.idiom.Function;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.ServiceMemo;
 import org.jocean.xharbor.api.Target;
@@ -21,8 +22,9 @@ public class TargetSet implements Dispatcher {
 
     private static final int MAX_EFFECTIVEWEIGHT = 1000;
     
-    public TargetSet(final URI[] uris, final ServiceMemo serviceMemo) {
+    public TargetSet(final URI[] uris, final Function<String, String> rewritePath, final ServiceMemo serviceMemo) {
         this._serviceMemo = serviceMemo;
+        this._rewritePath = rewritePath;
         this._targets = new ArrayList<TargetImpl>() {
             private static final long serialVersionUID = 1L;
         {
@@ -37,6 +39,7 @@ public class TargetSet implements Dispatcher {
         return Arrays.toString( new ArrayList<String>() {
             private static final long serialVersionUID = 1L;
         {
+            this.add("rewrite:" + _rewritePath.toString());
             for (TargetImpl peer : _targets) {
                 this.add(peer._uri.toString() + ":down(" + isTargetDown(peer)
                         + "):effectiveWeight(" + peer._effectiveWeight.get()
@@ -97,6 +100,11 @@ public class TargetSet implements Dispatcher {
         }
         
         @Override
+        public String rewritePath(final String path) {
+            return _rewritePath.apply(path);
+        }
+        
+        @Override
         public int addWeight(final int deltaWeight) {
             int weight = this._effectiveWeight.addAndGet(deltaWeight);
             if ( weight > MAX_EFFECTIVEWEIGHT ) {
@@ -119,12 +127,13 @@ public class TargetSet implements Dispatcher {
             this._uri = uri;
         }
         
-        public final URI _uri;
+        private final URI _uri;
         private final AtomicInteger _currentWeight = new AtomicInteger(1);
         private final AtomicInteger _effectiveWeight = new AtomicInteger(1);
         private final AtomicBoolean _down = new AtomicBoolean(false);
     }
     
     private final ServiceMemo _serviceMemo;
+    private final Function<String, String> _rewritePath;
     private final TargetImpl[] _targets;
 }

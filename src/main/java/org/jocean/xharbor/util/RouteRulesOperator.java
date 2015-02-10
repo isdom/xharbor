@@ -3,7 +3,10 @@
  */
 package org.jocean.xharbor.util;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.regex.Pattern;
 
 import org.apache.curator.framework.recipes.cache.ChildData;
 import org.apache.curator.framework.recipes.cache.TreeCacheEvent;
@@ -44,18 +47,32 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
             final TreeCacheEvent event)
             throws Exception {
         final ChildData data = event.getData();
-        final Pair<Integer,String> pair = parseFromPath(root, data.getPath());
-        final RuleDesc desc = parseFromData(data.getData());
-        if (null != pair && null != desc ) {
-            final int priority = pair.getFirst();
-            final String uri = pair.getSecond().replace(":||","://");
-            if ( LOG.isDebugEnabled()) {
-                LOG.debug("add or update rule with {}/{}/{}", 
-                        priority, uri, Arrays.toString( desc.getRegexs()));
+        final Integer level = tryParseLevel(root, data.getPath());
+        if ( null != level ) {
+            final LevelDesc desc = parseLevelDetail(data.getData());
+            if (null != desc ) {
+                if ( LOG.isDebugEnabled()) {
+                    LOG.debug("add or update level detail with {}/{}", 
+                            level, Arrays.toString( desc.rewritePaths));
+                }
+                return entity.addOrUpdateRewritePath(level, desc.asPatternAndStringList());
             }
-            return entity.addOrUpdateRule(priority, uri, desc.getRegexs());
+            return null;
         }
-        return null;
+        else {
+            final Pair<Integer,String> pair = tryParseLevelAndUri(root, data.getPath());
+            final RuleDesc desc = parseRules(data.getData());
+            if (null != pair && null != desc ) {
+                final int priority = pair.getFirst();
+                final String uri = pair.getSecond().replace(":||","://");
+                if ( LOG.isDebugEnabled()) {
+                    LOG.debug("add or update rule with {}/{}/{}", 
+                            priority, uri, Arrays.toString( desc.getRegexs()));
+                }
+                return entity.addOrUpdateRule(priority, uri, desc.getRegexs());
+            }
+            return null;
+        }
     }
 
     @Override
@@ -65,16 +82,22 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
             final TreeCacheEvent event)
             throws Exception {
         final ChildData data = event.getData();
-        final Pair<Integer,String> pair = parseFromPath(root, data.getPath());
-        if (null != pair ) {
-            final int priority = pair.getFirst();
-            final String uri = pair.getSecond().replace(":||","://");
-            if ( LOG.isDebugEnabled()) {
-                LOG.debug("remove rule with {}/{}", priority, uri);
-            }
-            return entity.removeRule(pair.getFirst(), pair.getSecond().replace(":||", "://"));
+        final Integer level = tryParseLevel(root, data.getPath());
+        if ( null != level ) {
+            return entity.removeLevel(level);
         }
-        return null;
+        else {
+            final Pair<Integer,String> pair = tryParseLevelAndUri(root, data.getPath());
+            if (null != pair ) {
+                final int priority = pair.getFirst();
+                final String uri = pair.getSecond().replace(":||","://");
+                if ( LOG.isDebugEnabled()) {
+                    LOG.debug("remove rule with {}/{}", priority, uri);
+                }
+                return entity.removeRule(pair.getFirst(), pair.getSecond().replace(":||", "://"));
+            }
+            return null;
+        }
     }
 
     @Override
@@ -91,6 +114,59 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
             }
         }
         return entity;
+    }
+
+    public static class LevelDesc {
+        
+        public static class RewritePathDesc {
+
+            public String regex;
+            public String rewriteTo;
+            @Override
+            public String toString() {
+                return "RewritePathDesc [regex=" + regex + ", rewriteTo="
+                        + rewriteTo + "]";
+            }
+        }
+        
+        public RewritePathDesc[] rewritePaths;
+        
+        public List<Pair<Pattern, String>> asPatternAndStringList() {
+            return new ArrayList<Pair<Pattern, String>>() {
+                private static final long serialVersionUID = 1L;
+                {
+                    for (RewritePathDesc desc : rewritePaths) {
+                        this.add(Pair.of(Pattern.compile(desc.regex), desc.rewriteTo));
+                    }
+                }};
+        }
+    }
+    
+    private Integer tryParseLevel(final String root, final String path) {
+        if (path.length() <= root.length() ) {
+            return null;
+        }
+        final String pathToLevel = path.substring(root.length() + ( !root.endsWith("/") ? 1 : 0 ));
+        final String[] arrays = pathToLevel.split("/");
+        if (arrays.length == 1) {
+            return Integer.parseInt(arrays[0]);
+        }
+        else {
+            return null;
+        }
+    }
+    
+    private LevelDesc parseLevelDetail(final byte[] data) {
+        if (null == data || data.length == 0) {
+            return null;
+        }
+        try {
+            return JSON.parseObject(new String(data,  "UTF-8"), LevelDesc.class);
+        } catch (Exception e) {
+            LOG.warn("exception when parse level detail {}, detail:{}", 
+                    Arrays.toString(data), ExceptionUtils.exception2detail(e));
+        }
+        return null;
     }
 
     public static class RuleDesc {
@@ -135,7 +211,7 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
         }
     }
     
-    private Pair<Integer, String> parseFromPath(final String root, final String path) {
+    private Pair<Integer, String> tryParseLevelAndUri(final String root, final String path) {
         if (path.length() <= root.length() ) {
             return null;
         }
@@ -154,7 +230,7 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
         return null;
     }
 
-    private RuleDesc parseFromData(final byte[] data) {
+    private RuleDesc parseRules(final byte[] data) {
         if (null == data || data.length == 0) {
             return null;
         }

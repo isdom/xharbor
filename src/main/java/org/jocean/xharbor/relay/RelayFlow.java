@@ -764,12 +764,8 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
      * @param httpclient
      */
     private void transferHttpRequest() {
-//        final String uri = this._httpRequest.getUri();
-//        if ( uri.startsWith("/jmxhtml") ) {
-//            final int idx = uri.indexOf('/', 7);
-//            final String newUri = idx > 0 ? uri.substring(idx) : "/";
-//            this._httpRequest.setUri(newUri);
-//        }
+        this._httpRequest.setUri(
+            this._target.rewritePath(this._httpRequest.getUri()));
         try {
             this._httpClient.sendHttpRequest(this._httpClientId.updateIdAndGet(),
                 this._httpRequest, genHttpReactor());

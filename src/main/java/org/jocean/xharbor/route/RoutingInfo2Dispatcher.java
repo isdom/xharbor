@@ -13,8 +13,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.jocean.idiom.Function;
 import org.jocean.idiom.Pair;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.Router;
@@ -30,8 +32,27 @@ import org.jocean.xharbor.util.TargetSet;
 public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Dispatcher>, RulesMXBean {
 
     private static final URI[] EMPTY_URIS = new URI[0];
-    private static final TargetSet EMPTY_TARGETSET = new TargetSet(EMPTY_URIS, null);
+    private static final Function<String, String> NOP_REWRITEPATH = new Function<String, String>() {
+        @Override
+        public String apply(final String input) {
+            return input;
+        }
+        @Override
+        public String toString() {
+            return "NOP";
+        }};
+    private static final TargetSet EMPTY_TARGETSET = new TargetSet(EMPTY_URIS, NOP_REWRITEPATH, null);
 
+    private static class MatchResult {
+        final URI[] _uris;
+        final Function<String, String> _rewritePath;
+        
+        MatchResult(final URI[] uris, final Function<String, String> rewritePath) {
+            this._uris = uris;
+            this._rewritePath = rewritePath;
+        }
+    }
+    
     @Override
     public int hashCode() {
         final int prime = 31;
@@ -84,9 +105,9 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
         final Iterator<Level> itr = _levels.iterator();
         while (itr.hasNext()) {
             final Level level = itr.next();
-            final URI[] uris = level.match(info);
-            if ( null != uris && uris.length > 0 ) {
-                return new TargetSet(uris, memo);
+            final MatchResult result = level.match(info);
+            if (null != result) {
+                return new TargetSet(result._uris, result._rewritePath, memo);
             }
         }
         return EMPTY_TARGETSET;
@@ -97,7 +118,17 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
         return  this;
     }
     
-    public RoutingInfo2Dispatcher addOrUpdateRule(final int priority, final String uri, final RoutingInfo[] infoRegexs) 
+    public RoutingInfo2Dispatcher addOrUpdateRewritePath(final int priority, final List<Pair<Pattern,String>> rewritePaths)
+            throws Exception {
+        if ( !this._isFrozen ) {
+            getOrCreateLevel(priority).setRewritePaths(rewritePaths);
+            return  this;
+        } else {
+            return this.clone().addOrUpdateRewritePath(priority, rewritePaths);
+        }
+    }
+    
+    public RoutingInfo2Dispatcher addOrUpdateRule(final int priority, final String uri, final RoutingInfo[] infoRegexs)
             throws Exception {
         if ( !this._isFrozen ) {
             getOrCreateLevel(priority).addOrUpdateRule(uri, infoRegexs);
@@ -117,6 +148,16 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
         }
     }
     
+    public RoutingInfo2Dispatcher removeLevel(final int priority) 
+            throws Exception {
+        if ( !this._isFrozen ) {
+            doRemoveLevel(priority);
+            return  this;
+        } else {
+            return this.clone().removeLevel(priority);
+        }
+    }
+    
     private Level getOrCreateLevel(final int priority) {
         final Iterator<Level> itr = this._levels.iterator();
         while (itr.hasNext()) {
@@ -130,12 +171,23 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
         return level;
     }
 
+    private void doRemoveLevel(final int priority) {
+        final Iterator<Level> itr = this._levels.iterator();
+        while (itr.hasNext()) {
+            final Level level = itr.next();
+            if ( level.getPriority() == priority ) {
+                this._levels.remove(level);
+            }
+        }
+    }
+
     static class Level implements Cloneable, Comparable<Level> {
 
         @Override
         public Level clone() throws CloneNotSupportedException {
             final Level cloned = new Level(this._priority);
             cloned._rules.putAll(this._rules);
+            cloned._rewritePaths.addAll(this._rewritePaths);
             return cloned;
         }
 
@@ -144,39 +196,9 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
         }
         
         @Override
-        public int hashCode() {
-            final int prime = 31;
-            int result = 1;
-            result = prime * result + _priority;
-            result = prime * result
-                    + ((_rules == null) ? 0 : _rules.hashCode());
-            return result;
-        }
-
-        @Override
-        public boolean equals(final Object obj) {
-            if (this == obj)
-                return true;
-            if (obj == null)
-                return false;
-            if (getClass() != obj.getClass())
-                return false;
-            Level other = (Level) obj;
-            if (_priority != other._priority)
-                return false;
-            if (_rules == null) {
-                if (other._rules != null)
-                    return false;
-            } else if (!_rules.equals(other._rules))
-                return false;
-            return true;
-        }
-
-        @Override
         public int compareTo(final Level o) {
             return o._priority - this._priority;
         }
-        
         
         public int getPriority() {
             return this._priority;
@@ -197,6 +219,11 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
             this._rules.remove(new URI(uri));
         }
 
+        public void setRewritePaths(final List<Pair<Pattern, String>> rewritePaths) {
+            this._rewritePaths.clear();
+            this._rewritePaths.addAll(rewritePaths);
+        }
+        
         /**
          * @param regex
          * @return
@@ -205,7 +232,7 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
             return null != regex ? Pattern.compile(regex) : null;
         }
         
-        private URI[] match(final RoutingInfo info) {
+        private MatchResult match(final RoutingInfo info) {
             final List<URI> ret = new ArrayList<URI>();
             
             for ( Map.Entry<URI, Pair<Pattern[],Pattern[]>> entry : this._rules.entrySet() ) {
@@ -221,7 +248,9 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
                     }
                 }
             }
-            return !ret.isEmpty() ? ret.toArray(EMPTY_URIS) : EMPTY_URIS;
+            return !ret.isEmpty() 
+                ? new MatchResult(ret.toArray(EMPTY_URIS), genRewritePath(info.getPath())) 
+                : null;
         }
 
         /**
@@ -231,6 +260,27 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
          */
         private static boolean isMatched(final Pattern pattern, final String content) {
             return pattern != null ? pattern.matcher(content).find() : true;
+        }
+        
+        private Function<String, String> genRewritePath(final String path) {
+            for (Pair<Pattern,String> pair : this._rewritePaths) {
+                final Pattern pattern = pair.getFirst();
+                final Matcher matcher = pattern.matcher(path);
+                if ( matcher.find() ) {
+                    final String replaceTo = pair.getSecond();
+                    return new Function<String, String>() {
+                        @Override
+                        public String apply(final String input) {
+                            return pattern.matcher(input).replaceFirst(replaceTo);
+                        }
+                        
+                        @Override
+                        public String toString() {
+                            return "[" + pattern.toString() + "->" + replaceTo + "]";
+                        }};
+                }
+            }
+            return NOP_REWRITEPATH;
         }
         
         private Collection<String> getRules() {
@@ -251,6 +301,9 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
         
         private final Map<URI, Pair<Pattern[],Pattern[]>> _rules = 
                 new HashMap<URI, Pair<Pattern[],Pattern[]>>();
+        
+        private final List<Pair<Pattern,String>> _rewritePaths = 
+                new ArrayList<Pair<Pattern,String>>();
     }
 
     private final SortedSet<Level> _levels = new TreeSet<Level>();
