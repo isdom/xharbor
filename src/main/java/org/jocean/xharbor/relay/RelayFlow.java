@@ -268,14 +268,19 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
                         _httpRequest, _channelCtx.channel());
                 _noRoutingMemo.incRoutingInfo(info);
                 setEndReason("relay.NOROUTING");
-                return  waitforRequestFinished();
+                return  waitforRequestFinishedAndResponse200OK();
             }
+            
             if (MONITOR_CHECKALIVE.equalsIgnoreCase(_target.serviceUri().toString())) {
                 setEndReason("relay.CHECKALIVE."+_target.serviceUri().toString().replace(':', '-'));
-                return  waitforRequestFinished();
+                return  waitforRequestFinishedAndResponse200OK();
             }
             
             _memo = _memoBuilder.build(_target, info);
+            
+            if (_target.isNeedAuthorization(_httpRequest)) {
+                return  waitforRequestFinishedAndResponse401Unauthorized();
+            }
             
             _memo.beginBizStep(STEP.ROUTING);
             _memo.endBizStep(STEP.ROUTING, _watch4Step.stopAndRestart());
@@ -301,7 +306,50 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
         }})))
     .freeze();
 
-    private BizStep waitforRequestFinished() {
+    private BizStep waitforRequestFinishedAndResponse401Unauthorized() {
+        if (isRecvHttpRequestComplete()) {
+            response401Unauthorized();
+            return null;
+        }
+        else {
+            return RESP_401;
+        }
+    }
+
+    public final BizStep RESP_401 = new BizStep("relay.RESP_401") {
+        @OnEvent(event = "sendHttpContent")
+        private BizStep onSendHttpContent(final HttpContent httpContent) {
+            updateRecvHttpRequestState(httpContent);
+            if (isRecvHttpRequestComplete()) {
+                response401Unauthorized();
+                return null;
+            }
+            else {
+                return currentEventHandler();
+            }
+        }
+    }
+    .handler(handlersOf(new ONDETACH(new Runnable() {
+        @Override
+        public void run() {
+            memoDetachResult();
+        }})))
+    .freeze();
+    
+    private void response401Unauthorized() {
+        final HttpResponse response = new DefaultFullHttpResponse(
+                this._httpRequest.getProtocolVersion(), HttpResponseStatus.UNAUTHORIZED);
+        HttpHeaders.setHeader(response, HttpHeaders.Names.WWW_AUTHENTICATE, "Basic realm=\"iplusmed\"");
+        HttpHeaders.setHeader(response, HttpHeaders.Names.CONTENT_LENGTH, 0);
+        final ChannelFuture future = this._channelCtx.writeAndFlush(response);
+        if ( !HttpHeaders.isKeepAlive( this._httpRequest ) ) {
+            future.addListener(ChannelFutureListener.CLOSE);
+        }
+        _memo.incBizResult(RESULT.HTTP_UNAUTHORIZED, _watch4Result.stopAndRestart());
+        setEndReason("relay.HTTP_UNAUTHORIZED");
+    }
+    
+    private BizStep waitforRequestFinishedAndResponse200OK() {
         if (isRecvHttpRequestComplete()) {
             responseDefault200OK();
             return null;
@@ -330,6 +378,16 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
             memoDetachResult();
         }})))
     .freeze();
+    
+    private void responseDefault200OK() {
+        final HttpResponse response = new DefaultFullHttpResponse(
+                this._httpRequest.getProtocolVersion(), HttpResponseStatus.OK);
+        HttpHeaders.setHeader(response, HttpHeaders.Names.CONTENT_LENGTH, 0);
+        final ChannelFuture future = this._channelCtx.writeAndFlush(response);
+        if ( !HttpHeaders.isKeepAlive( this._httpRequest ) ) {
+            future.addListener(ChannelFutureListener.CLOSE);
+        }
+    }
     
     private final BizStep OBTAINING = new BizStep("relay.OBTAINING") {
         @OnEvent(event = "onHttpClientObtained")
@@ -808,16 +866,6 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
      */
     private String safeGetServiceUri() {
         return null != this._target ? this._target.serviceUri().toString() : "non-uri";
-    }
-
-    private void responseDefault200OK() {
-        final HttpResponse response = new DefaultFullHttpResponse(
-                this._httpRequest.getProtocolVersion(), HttpResponseStatus.OK);
-        HttpHeaders.setHeader(response, HttpHeaders.Names.CONTENT_LENGTH, 0);
-        final ChannelFuture future = this._channelCtx.writeAndFlush(response);
-        if ( !HttpHeaders.isKeepAlive( this._httpRequest ) ) {
-            future.addListener(ChannelFutureListener.CLOSE);
-        }
     }
 
     private void memoDetachResult() {

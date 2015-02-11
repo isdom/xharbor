@@ -3,6 +3,8 @@
  */
 package org.jocean.xharbor.api;
 
+import io.netty.handler.codec.http.HttpRequest;
+
 import java.net.URI;
 
 /**
@@ -20,4 +22,6 @@ public interface Target {
     public void markServiceDownStatus(final boolean isDown);
     
     public void markAPIDownStatus(final boolean isDown);
+
+    public boolean isNeedAuthorization(final HttpRequest httpRequest);
 }

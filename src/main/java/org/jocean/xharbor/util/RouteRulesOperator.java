@@ -12,6 +12,7 @@ import org.apache.curator.framework.recipes.cache.ChildData;
 import org.apache.curator.framework.recipes.cache.TreeCacheEvent;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.Pair;
+import org.jocean.idiom.Triple;
 import org.jocean.idiom.Visitor;
 import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.route.RoutingInfo2Dispatcher;
@@ -55,7 +56,7 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
                     LOG.debug("add or update level detail with {}/{}", 
                             level, Arrays.toString( desc.rewritePaths));
                 }
-                return entity.addOrUpdateRewritePath(level, desc.asPatternAndStringList());
+                return entity.addOrUpdateDetail(level, desc.asRewritePathList(), desc.asAuthorizationList());
             }
             return null;
         }
@@ -129,14 +130,38 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
             }
         }
         
-        public RewritePathDesc[] rewritePaths;
+        public static class AuthorizationDesc {
+
+            public String regex;
+            public String user;
+            public String password;
+            @Override
+            public String toString() {
+                return "AuthorizationDesc [regex=" + regex + ", user="
+                        + user + ", password=" + password
+                        + "]";
+            }
+        }
         
-        public List<Pair<Pattern, String>> asPatternAndStringList() {
+        public RewritePathDesc[] rewritePaths;
+        public AuthorizationDesc[] authorizations;
+        
+        public List<Pair<Pattern, String>> asRewritePathList() {
             return new ArrayList<Pair<Pattern, String>>() {
                 private static final long serialVersionUID = 1L;
                 {
                     for (RewritePathDesc desc : rewritePaths) {
                         this.add(Pair.of(Pattern.compile(desc.regex), desc.rewriteTo));
+                    }
+                }};
+        }
+        
+        public List<Triple<Pattern, String, String>> asAuthorizationList() {
+            return new ArrayList<Triple<Pattern, String, String>>() {
+                private static final long serialVersionUID = 1L;
+                {
+                    for (AuthorizationDesc desc : authorizations) {
+                        this.add(Triple.of(Pattern.compile(desc.regex), desc.user, desc.password));
                     }
                 }};
         }

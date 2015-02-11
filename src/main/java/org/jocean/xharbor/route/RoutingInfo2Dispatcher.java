@@ -3,6 +3,10 @@
  */
 package org.jocean.xharbor.route;
 
+import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpRequest;
+
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -16,20 +20,29 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.Function;
 import org.jocean.idiom.Pair;
+import org.jocean.idiom.Triple;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.Router;
 import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.api.ServiceMemo;
 import org.jocean.xharbor.util.RulesMXBean;
 import org.jocean.xharbor.util.TargetSet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.io.BaseEncoding;
 
 /**
  * @author isdom
  *
  */
 public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Dispatcher>, RulesMXBean {
+    
+    private static final Logger LOG = LoggerFactory
+            .getLogger(RoutingInfo2Dispatcher.class);
 
     private static final URI[] EMPTY_URIS = new URI[0];
     private static final Function<String, String> NOP_REWRITEPATH = new Function<String, String>() {
@@ -41,15 +54,29 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
         public String toString() {
             return "NOP";
         }};
-    private static final TargetSet EMPTY_TARGETSET = new TargetSet(EMPTY_URIS, NOP_REWRITEPATH, null);
+    private static final Function<HttpRequest, Boolean> NOP_NEEDAUTHORIZATION = new Function<HttpRequest, Boolean>() {
+        @Override
+        public Boolean apply(final HttpRequest request) {
+            return false;
+        }
+        @Override
+        public String toString() {
+            return "NOP";
+        }};
+    private static final TargetSet EMPTY_TARGETSET = 
+            new TargetSet(EMPTY_URIS, NOP_REWRITEPATH, NOP_NEEDAUTHORIZATION, null);
 
     private static class MatchResult {
         final URI[] _uris;
         final Function<String, String> _rewritePath;
+        final Function<HttpRequest, Boolean> _needAuthorization;
         
-        MatchResult(final URI[] uris, final Function<String, String> rewritePath) {
+        MatchResult(final URI[] uris, 
+                final Function<String, String> rewritePath,
+                final Function<HttpRequest, Boolean> needAuthorization) {
             this._uris = uris;
             this._rewritePath = rewritePath;
+            this._needAuthorization = needAuthorization;
         }
     }
     
@@ -107,7 +134,7 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
             final Level level = itr.next();
             final MatchResult result = level.match(info);
             if (null != result) {
-                return new TargetSet(result._uris, result._rewritePath, memo);
+                return new TargetSet(result._uris, result._rewritePath, result._needAuthorization, memo);
             }
         }
         return EMPTY_TARGETSET;
@@ -118,13 +145,19 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
         return  this;
     }
     
-    public RoutingInfo2Dispatcher addOrUpdateRewritePath(final int priority, final List<Pair<Pattern,String>> rewritePaths)
+    public RoutingInfo2Dispatcher addOrUpdateDetail(
+            final int priority, 
+            final List<Pair<Pattern,String>> rewritePaths,
+            final List<Triple<Pattern,String,String>> authorizations
+            )
             throws Exception {
         if ( !this._isFrozen ) {
-            getOrCreateLevel(priority).setRewritePaths(rewritePaths);
+            getOrCreateLevel(priority)
+                .setRewritePaths(rewritePaths)
+                .setAuthorizations(authorizations);
             return  this;
         } else {
-            return this.clone().addOrUpdateRewritePath(priority, rewritePaths);
+            return this.clone().addOrUpdateDetail(priority, rewritePaths, authorizations);
         }
     }
     
@@ -188,6 +221,7 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
             final Level cloned = new Level(this._priority);
             cloned._rules.putAll(this._rules);
             cloned._rewritePaths.addAll(this._rewritePaths);
+            cloned._authorizations.addAll(this._authorizations);
             return cloned;
         }
 
@@ -219,9 +253,16 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
             this._rules.remove(new URI(uri));
         }
 
-        public void setRewritePaths(final List<Pair<Pattern, String>> rewritePaths) {
+        public Level setRewritePaths(final List<Pair<Pattern, String>> rewritePaths) {
             this._rewritePaths.clear();
             this._rewritePaths.addAll(rewritePaths);
+            return this;
+        }
+        
+        public Level setAuthorizations(final List<Triple<Pattern,String,String>> authorizations) {
+            this._authorizations.clear();
+            this._authorizations.addAll(authorizations);
+            return this;
         }
         
         /**
@@ -249,7 +290,9 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
                 }
             }
             return !ret.isEmpty() 
-                ? new MatchResult(ret.toArray(EMPTY_URIS), genRewritePath(info.getPath())) 
+                ? new MatchResult(ret.toArray(EMPTY_URIS), 
+                        genRewritePath(info.getPath()), 
+                        genNeedAuthorization(info.getPath()))
                 : null;
         }
 
@@ -283,6 +326,76 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
             return NOP_REWRITEPATH;
         }
         
+        private Function<HttpRequest, Boolean> genNeedAuthorization(final String path) {
+            for (Triple<Pattern,String,String> triple : this._authorizations) {
+                final Pattern pattern = triple.getFirst();
+                final Matcher matcher = pattern.matcher(path);
+                if ( matcher.find() ) {
+                    final String user = triple.getSecond();
+                    final String password = triple.getThird();
+                    return new Function<HttpRequest, Boolean>() {
+                        @Override
+                        public Boolean apply(final HttpRequest request) {
+                            return !isAuthorizeSuccess(request, user, password);
+                        }
+                        
+                        @Override
+                        public String toString() {
+                            return "[" + pattern.toString() + ":" + user + "/" + password + "]";
+                        }};
+                }
+            }
+            return NOP_NEEDAUTHORIZATION;
+        }
+
+        private boolean isAuthorizeSuccess(
+                final HttpRequest httpRequest, 
+                final String authUser, 
+                final String authPassword) {
+            final String authorization = HttpHeaders.getHeader(httpRequest, HttpHeaders.Names.AUTHORIZATION);
+            if ( null != authorization) {
+                final String userAndPassBase64Encoded = validateBasicAuth(authorization);
+                if ( null != userAndPassBase64Encoded ) {
+                    final Pair<String, String> userAndPass = getUserAndPassForBasicAuth(userAndPassBase64Encoded);
+                    if (null != userAndPass) {
+                        final boolean ret = (userAndPass.getFirst().equals(authUser)
+                                && userAndPass.getSecond().equals(authPassword));
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("httpRequest [{}] basic authorization {}, input:{}/{}, setted auth:{}/{}", 
+                                    httpRequest, (ret ? "success" : "failure"), 
+                                    userAndPass.getFirst(), userAndPass.getSecond(),
+                                    authUser, authPassword);
+                        }
+                        return ret;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static String validateBasicAuth(final String authorization) {
+            if (authorization.startsWith("Basic")) {
+                final String[] authFields = authorization.split(" ");
+                if (authFields.length>=2) {
+                    return authFields[1];
+                }
+            }
+            return null;
+        }
+        
+        private static Pair<String, String> getUserAndPassForBasicAuth(
+                final String userAndPassBase64Encoded) {
+            try {
+                final String userAndPass = new String(BaseEncoding.base64().decode(userAndPassBase64Encoded), "UTF-8");
+                final String[] fields = userAndPass.split(":");
+                return fields.length == 2 ? Pair.of(fields[0], fields[1]) : null;
+            } catch (UnsupportedEncodingException e) {
+                LOG.warn("exception when getUserAndPassForBasicAuth({}), detail:{}", 
+                        userAndPassBase64Encoded, ExceptionUtils.exception2detail(e));
+                return null;
+            }
+        }
+
         private Collection<String> getRules() {
             return new ArrayList<String>() {
                 private static final long serialVersionUID = 1L;
@@ -304,6 +417,9 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
         
         private final List<Pair<Pattern,String>> _rewritePaths = 
                 new ArrayList<Pair<Pattern,String>>();
+        
+        private final List<Triple<Pattern,String,String>> _authorizations = 
+                new ArrayList<Triple<Pattern,String,String>>();
     }
 
     private final SortedSet<Level> _levels = new TreeSet<Level>();

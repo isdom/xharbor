@@ -25,6 +25,7 @@ public interface RelayMemo extends BizMemo<RelayMemo.STEP, RelayMemo.RESULT> {
         TRANSFORM_REQUEST,
         CONNECTDESTINATION_FAILURE,
         RELAY_RETRY,
+        HTTP_UNAUTHORIZED,
         HTTP_CLIENT_ERROR,
         HTTP_SERVER_ERROR,
         RELAY_FAILURE,

@@ -85,6 +85,7 @@ public class GatewayLifecycleOperator implements Operator<Object> {
             server.setAcceptIp(desc.getAcceptIp());
             server.setAcceptPort(desc.getAcceptPort());
             server.setLogByteStream(desc.isLogByteStream());
+            server.setCompressContent(desc.isCompressContent());
             server.setIdleTimeSeconds(desc.getIdleTimeSeconds());
             try {
                 server.start();
@@ -98,6 +99,7 @@ public class GatewayLifecycleOperator implements Operator<Object> {
         else {
             server.setLogByteStream(desc.isLogByteStream());
             server.setIdleTimeSeconds(desc.getIdleTimeSeconds());
+            server.setCompressContent(desc.isCompressContent());
             LOG.info("HttpGatewayServer {} updated.", desc);
         }
     }
@@ -118,15 +120,17 @@ public class GatewayLifecycleOperator implements Operator<Object> {
         private String descrption;
         private int acceptPort;
         private String acceptIp;
-        private boolean logByteStream;
-        private int idleTimeSeconds;
+        private boolean logByteStream = false;
+        private boolean compressContent = true;
+        private int idleTimeSeconds = 200;
         
         @Override
         public String toString() {
             return "GatewayDesc [descrption=" + descrption + ", acceptPort="
                     + acceptPort + ", acceptIp=" + acceptIp
-                    + ", logByteStream=" + logByteStream + ", idleTimeSeconds="
-                    + idleTimeSeconds + "]";
+                    + ", logByteStream=" + logByteStream + ", compressContent="
+                    + compressContent + ", idleTimeSeconds=" + idleTimeSeconds
+                    + "]";
         }
 
         @JSONField(name="descrption")
@@ -173,6 +177,16 @@ public class GatewayLifecycleOperator implements Operator<Object> {
         @JSONField(name="idleTimeSeconds")
         public void setIdleTimeSeconds(final int idleTimeSeconds) {
             this.idleTimeSeconds = idleTimeSeconds;
+        }
+        
+        @JSONField(name="compressContent")
+        public boolean isCompressContent() {
+            return compressContent;
+        }
+
+        @JSONField(name="compressContent")
+        public void setCompressContent(final boolean compressContent) {
+            this.compressContent = compressContent;
         }
     }
     

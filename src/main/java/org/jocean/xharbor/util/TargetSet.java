@@ -3,6 +3,8 @@
  */
 package org.jocean.xharbor.util;
 
+import io.netty.handler.codec.http.HttpRequest;
+
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,9 +24,13 @@ public class TargetSet implements Dispatcher {
 
     private static final int MAX_EFFECTIVEWEIGHT = 1000;
     
-    public TargetSet(final URI[] uris, final Function<String, String> rewritePath, final ServiceMemo serviceMemo) {
+    public TargetSet(final URI[] uris, 
+            final Function<String, String> rewritePath, 
+            final Function<HttpRequest, Boolean> needAuthorization, 
+            final ServiceMemo serviceMemo) {
         this._serviceMemo = serviceMemo;
         this._rewritePath = rewritePath;
+        this._needAuthorization = needAuthorization;
         this._targets = new ArrayList<TargetImpl>() {
             private static final long serialVersionUID = 1L;
         {
@@ -40,6 +46,7 @@ public class TargetSet implements Dispatcher {
             private static final long serialVersionUID = 1L;
         {
             this.add("rewrite:" + _rewritePath.toString());
+            this.add("authorize:" + _needAuthorization.toString());
             for (TargetImpl peer : _targets) {
                 this.add(peer._uri.toString() + ":down(" + isTargetDown(peer)
                         + "):effectiveWeight(" + peer._effectiveWeight.get()
@@ -105,6 +112,11 @@ public class TargetSet implements Dispatcher {
         }
         
         @Override
+        public boolean isNeedAuthorization(final HttpRequest httpRequest) {
+            return _needAuthorization.apply(httpRequest);
+        }
+        
+        @Override
         public int addWeight(final int deltaWeight) {
             int weight = this._effectiveWeight.addAndGet(deltaWeight);
             if ( weight > MAX_EFFECTIVEWEIGHT ) {
@@ -135,5 +147,6 @@ public class TargetSet implements Dispatcher {
     
     private final ServiceMemo _serviceMemo;
     private final Function<String, String> _rewritePath;
+    private final Function<HttpRequest, Boolean> _needAuthorization;
     private final TargetImpl[] _targets;
 }

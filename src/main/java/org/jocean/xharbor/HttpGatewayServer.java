@@ -63,6 +63,7 @@ public class HttpGatewayServer {
     private TrafficCounterExt _trafficCounterExt;
 //    private boolean _logByteStream = false;
 //    private int _idleTimeSeconds = 180; //seconds  为了避免建立了过多的闲置连接 闲置180秒的连接主动关闭
+    private boolean _isCompressContent;
     
     private RelayAgent  _relayAgent;
     
@@ -166,7 +167,9 @@ public class HttpGatewayServer {
                 pipeline.addLast("encoder-object",new HttpResponseEncoder());
                 
                 //IN/OUT 支持压缩
-                pipeline.addLast("deflater", new HttpContentCompressor());
+                if ( _isCompressContent ) {
+                    pipeline.addLast("deflater", new HttpContentCompressor());
+                }
             }
             
             @Override
@@ -344,5 +347,13 @@ public class HttpGatewayServer {
 
     public void setCheckAlivePath(final String checkAlivePath) {
         this._checkAlivePath = checkAlivePath;
+    }
+    
+    public boolean isCompressContent() {
+        return this._isCompressContent;
+    }
+
+    public void setCompressContent(final boolean isCompressContent) {
+        this._isCompressContent = isCompressContent;
     }
 }
