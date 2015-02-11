@@ -150,8 +150,10 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
             return new ArrayList<Pair<Pattern, String>>() {
                 private static final long serialVersionUID = 1L;
                 {
-                    for (RewritePathDesc desc : rewritePaths) {
-                        this.add(Pair.of(Pattern.compile(desc.regex), desc.rewriteTo));
+                    if (null != rewritePaths) {
+                        for (RewritePathDesc desc : rewritePaths) {
+                            this.add(Pair.of(Pattern.compile(desc.regex), desc.rewriteTo));
+                        }
                     }
                 }};
         }
@@ -160,8 +162,10 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
             return new ArrayList<Triple<Pattern, String, String>>() {
                 private static final long serialVersionUID = 1L;
                 {
-                    for (AuthorizationDesc desc : authorizations) {
-                        this.add(Triple.of(Pattern.compile(desc.regex), desc.user, desc.password));
+                    if (null != authorizations ) {
+                        for (AuthorizationDesc desc : authorizations) {
+                            this.add(Triple.of(Pattern.compile(desc.regex), desc.user, desc.password));
+                        }
                     }
                 }};
         }
