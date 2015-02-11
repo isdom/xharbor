@@ -139,8 +139,8 @@
         </constructor-arg>
         <constructor-arg value="${exhibitor.restport}"/>
         <constructor-arg value="${zk.address}"/>
-        <constructor-arg value="${exhibitor.basicAuthUser}"/>
-        <constructor-arg value="${exhibitor.basicAuthPass}"/>
+        <constructor-arg value="${exhibitor.basicAuthUser:}"/>
+        <constructor-arg value="${exhibitor.basicAuthPass:}"/>
         <constructor-arg value="${exhibitor.restUriPath:/exhibitor/v1/cluster/list}"/>
         <constructor-arg value="${exhibitor.pollingMs:2000}"/>
         <constructor-arg>

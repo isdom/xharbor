@@ -40,7 +40,8 @@ public class ZKUtils {
                         public String getBackupConnectionString() throws Exception {
                             return backupConnectionString;
                         }}),
-                (null != basicAuthUser && null != basicAuthPass)
+                (null != basicAuthUser && null != basicAuthPass
+                  && !("".equals(basicAuthUser) && "".equals(basicAuthPass)) )
                     ? new DefaultExhibitorRestClientWithBasicAuth(basicAuthUser, basicAuthPass)
                     : new DefaultExhibitorRestClientWithBasicAuth(),
                 restUriPath,
