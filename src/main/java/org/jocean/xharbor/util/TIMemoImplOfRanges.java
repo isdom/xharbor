@@ -4,6 +4,7 @@
 package org.jocean.xharbor.util;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.management.Attribute;
@@ -30,7 +31,7 @@ import com.google.common.collect.Range;
  * @author isdom
  *
  */
-public class TIMemoImplOfRanges implements TimeIntervalMemo {
+public class TIMemoImplOfRanges implements TimeIntervalMemo, InfoListMaker {
 
     private static final Logger LOG = LoggerFactory
             .getLogger(TIMemoImplOfRanges.class);
@@ -52,6 +53,13 @@ public class TIMemoImplOfRanges implements TimeIntervalMemo {
         final int idx = interval2idx(interval);
         if ( idx >= 0) {
             this._counters[idx].incrementAndGet();
+        }
+    }
+    
+    @Override
+    public void addInfoList(final List<String> infos) {
+        for ( int idx = 0; idx < this._names.length; idx++ ) {
+            infos.add(this._names[idx] +":"+ this._counters[idx].get());
         }
     }
     

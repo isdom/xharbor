@@ -25,8 +25,9 @@ import com.google.common.collect.Range;
  */
 public class RelayMemoBuilderForStats implements RelayMemo.Builder {
 
-    public RelayMemoBuilderForStats() {
+    public RelayMemoBuilderForStats(final Visitor2<String, InfoListMaker> register) {
         this._mbeanSupport.registerMBean("name=relays", this._level0Memo.createMBean());
+        this._register = register;
     }
     
     @Override
@@ -94,6 +95,8 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
         }
     }
     
+    private final Visitor2<String, InfoListMaker> _register;
+    
     private final MBeanRegisterSupport _mbeanSupport = 
             new MBeanRegisterSupport("org.jocean:type=router", null);
     
@@ -130,7 +133,11 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
             sb.append("ttl=");
             sb.append(ttl);
             
-            _mbeanSupport.registerMBean(sb.toString(), newMemo.createMBean());
+            final String name = sb.toString();
+//            _mbeanSupport.registerMBean(name, newMemo.createMBean());
+            if ( null!=_register) {
+                _register.visit(name, newMemo);
+            }
         }};
             
     private SimpleCache<Tuple, RelayTIMemoImpl> _ttlMemos  = 
@@ -164,7 +171,11 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
                 sb.append((String)tuple.getAt(idx));
                 splitter = ',';
             }
-            _mbeanSupport.registerMBean(sb.toString(), newMemo.createMBean());
+            final String name = sb.toString();
+//            _mbeanSupport.registerMBean(name, newMemo.createMBean());
+            if ( null!=_register) {
+                _register.visit(name, newMemo);
+            }
         }};
         
     private final SimpleCache<Tuple, RelayMemoImpl> _bizMemos = 

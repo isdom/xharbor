@@ -80,11 +80,17 @@
     
     <bean id="timer" class="io.netty.util.HashedWheelTimer" />
 
+    <bean id="statsRegister" class="org.jocean.j2se.spring.BeanProxy">
+        <constructor-arg value="org.jocean.idiom.Visitor2"/>
+    </bean>
+    
     <bean id="memoBuilder" class="org.jocean.xharbor.api.RelayMemo.Utils" 
         factory-method="compositeBuilder">
         <constructor-arg>
             <array>
-                <bean class="org.jocean.xharbor.util.RelayMemoBuilderForStats"/>
+                <bean class="org.jocean.xharbor.util.RelayMemoBuilderForStats">
+                    <constructor-arg ref="statsRegister"/>
+                </bean>
                 <bean class="org.jocean.xharbor.util.RelayMemoBuilderForDispatchFeedback">
                     <constructor-arg ref="timer"/>
                 </bean>

@@ -4,6 +4,7 @@
 package org.jocean.xharbor.util;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.management.Attribute;
@@ -32,7 +33,7 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class BizMemoImpl<IMPL extends BizMemoImpl<IMPL,STEP,RESULT>, 
     STEP extends Enum<STEP>, RESULT extends Enum<RESULT>> 
-    implements BizMemo<STEP,RESULT> {
+    implements BizMemo<STEP,RESULT>, InfoListMaker {
     
     private static final Logger LOG = LoggerFactory
             .getLogger(BizMemoImpl.class);
@@ -76,6 +77,16 @@ public abstract class BizMemoImpl<IMPL extends BizMemoImpl<IMPL,STEP,RESULT>,
         this._resultMemos[result.ordinal()].recordInterval(ttl);
     }
     
+    @Override
+    public void addInfoList(final List<String> infos) {
+        for (STEP step : this._steps) {
+            infos.add("STEP:" + step.name() +":"+ this._stepCounters[step.ordinal()].get());
+        }
+        for (RESULT result : this._results) {
+            infos.add("RESULT:" + result.name() +":"+ this._resultCounters[result.ordinal()].get());
+        }
+    }
+
     protected AtomicInteger step2Counter(final STEP step) {
         return this._stepCounters[step.ordinal()];
     }
