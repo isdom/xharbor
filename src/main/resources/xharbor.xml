@@ -80,9 +80,7 @@
     
     <bean id="timer" class="io.netty.util.HashedWheelTimer" />
 
-    <bean id="statsRegister" class="org.jocean.j2se.spring.BeanProxy">
-        <constructor-arg value="org.jocean.idiom.Visitor2"/>
-    </bean>
+    <bean id="statsRegister" class="org.jocean.xharbor.util.StatsImpl" />
     
     <bean id="memoBuilder" class="org.jocean.xharbor.api.RelayMemo.Utils" 
         factory-method="compositeBuilder">
@@ -123,16 +121,6 @@
         <lookup-method name="createRelayFlow" bean="relayFlow"/>
     </bean>
     
-<!--     <bean id="httpServer" class="org.jocean.xharbor.HttpGatewayServer"
-        init-method="start" destroy-method="stop">
-        <property name="relayAgent" ref="relayAgent"/>
-        <property name="acceptPort" value="${gateway.port:8080}" />
-        <property name="acceptIp" value="${gateway.ip:0.0.0.0}" />
-        <property name="logByteStream" value="${gateway.inbound.httpTransportLogEnabled:true}"/>
-        <property name="idleTimeSeconds" value="${gateway.idleTimeSeconds:200}"/>
-    </bean>
- -->
-      
     <bean id="zkClient" class="org.jocean.xharbor.util.ZKUtils"
         factory-method="buildWithExhibitorEnsembleProvider"
         init-method="start"
@@ -234,6 +222,7 @@
                 <entry key="org.jocean:name=serviceMemo"    value-ref="serviceMemo"/>
                 <entry key="org.jocean:name=noRouting"      value-ref="noRoutingMemo"/>
                 <entry key="org.jocean:name=htmladapter,port=${jmxhtml.port:8082}" value-ref="htmlAdaptorServer"/>
+                <entry key="org.jocean:type=router,name=stats" value-ref="statsRegister"/>
             </map>
         </property>
     </bean>

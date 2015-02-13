@@ -10,12 +10,11 @@ import org.jocean.idiom.InterfaceUtils;
 import org.jocean.idiom.SimpleCache;
 import org.jocean.idiom.Tuple;
 import org.jocean.idiom.Visitor2;
-import org.jocean.j2se.MBeanRegisterSupport;
 import org.jocean.xharbor.api.RelayMemo;
-import org.jocean.xharbor.api.RoutingInfo;
-import org.jocean.xharbor.api.Target;
 import org.jocean.xharbor.api.RelayMemo.RESULT;
 import org.jocean.xharbor.api.RelayMemo.STEP;
+import org.jocean.xharbor.api.RoutingInfo;
+import org.jocean.xharbor.api.Target;
 
 import com.google.common.collect.Range;
 
@@ -25,9 +24,9 @@ import com.google.common.collect.Range;
  */
 public class RelayMemoBuilderForStats implements RelayMemo.Builder {
 
-    public RelayMemoBuilderForStats(final Visitor2<String, InfoListMaker> register) {
-        this._mbeanSupport.registerMBean("name=relays", this._level0Memo.createMBean());
+    public RelayMemoBuilderForStats(final Visitor2<String, InfoListMaker> register) throws Exception {
         this._register = register;
+        this._register.visit("all", this._level0Memo);
     }
     
     @Override
@@ -97,9 +96,6 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
     
     private final Visitor2<String, InfoListMaker> _register;
     
-    private final MBeanRegisterSupport _mbeanSupport = 
-            new MBeanRegisterSupport("org.jocean:type=router", null);
-    
     private Function<Tuple, RelayTIMemoImpl> _ttlMemoMaker = new Function<Tuple, RelayTIMemoImpl>() {
         @Override
         public RelayTIMemoImpl apply(final Tuple tuple) {
@@ -133,10 +129,8 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
             sb.append("ttl=");
             sb.append(ttl);
             
-            final String name = sb.toString();
-//            _mbeanSupport.registerMBean(name, newMemo.createMBean());
             if ( null!=_register) {
-                _register.visit(name, newMemo);
+                _register.visit(sb.toString(), newMemo);
             }
         }};
             
@@ -171,10 +165,8 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
                 sb.append((String)tuple.getAt(idx));
                 splitter = ',';
             }
-            final String name = sb.toString();
-//            _mbeanSupport.registerMBean(name, newMemo.createMBean());
             if ( null!=_register) {
-                _register.visit(name, newMemo);
+                _register.visit(sb.toString(), newMemo);
             }
         }};
         
