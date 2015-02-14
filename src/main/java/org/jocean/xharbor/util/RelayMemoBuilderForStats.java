@@ -26,6 +26,12 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
 
     public RelayMemoBuilderForStats(final Visitor2<String, InfoListMaker> register) throws Exception {
         this._register = register;
+        this._level0Memo = new RelayMemoImpl()
+        .fillTimeIntervalMemoWith(new Function<Enum<?>, TimeIntervalMemo>() {
+            @Override
+            public TimeIntervalMemo apply(final Enum<?> e) {
+                return _ttlMemos.get(Tuple.of(e));
+            }});
         this._register.visit("all", this._level0Memo);
     }
     
@@ -173,10 +179,5 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
     private final SimpleCache<Tuple, RelayMemoImpl> _bizMemos = 
             new SimpleCache<Tuple, RelayMemoImpl>(this._bizMemoMaker, this._bizMemoRegister);
     
-    private RelayMemoImpl _level0Memo = new RelayMemoImpl()
-        .fillTimeIntervalMemoWith(new Function<Enum<?>, TimeIntervalMemo>() {
-            @Override
-            public TimeIntervalMemo apply(final Enum<?> e) {
-                return _ttlMemos.get(Tuple.of(e));
-            }});
+    private final RelayMemoImpl _level0Memo;
 }

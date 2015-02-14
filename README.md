@@ -93,4 +93,7 @@ TODO:
   
   34、确认 FullHttpRequest 的HttpContent部分是否会被重复发送两次？
   
-  
+  35、将 RelayAgent 更名为 BusinessAgent ，并将 public RelayTask createRelayTask(final ChannelHandlerContext channelCtx, final HttpRequest httpRequest)
+
+     中的 ChannelHandlerContext 进行接口包装，目的是 使得 业务处理流程 可以适应 Http 传输 和 TCP 多路复用的传输方式。
+     
