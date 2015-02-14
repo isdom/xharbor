@@ -54,7 +54,7 @@
         <constructor-arg value="${gateway.connector.maxConnection:1000}"/>
     </bean>
     
-    <bean id="genObjname" class="org.jocean.j2se.spring.BeanProxy">
+<!--     <bean id="genObjname" class="org.jocean.j2se.spring.BeanProxy">
         <constructor-arg value="org.jocean.idiom.Function"/>
     </bean>
     
@@ -77,7 +77,8 @@
             </array>
         </constructor-arg>
     </bean>
-    
+ -->
+     
     <bean id="timer" class="io.netty.util.HashedWheelTimer" />
 
     <bean id="statsRegister" class="org.jocean.xharbor.util.StatsImpl" />
@@ -104,7 +105,7 @@
         <constructor-arg value="org.jocean.xharbor.spi.HttpRequestTransformer.Builder"/>
     </bean>
     
-    <bean id="relayFlow" class="org.jocean.xharbor.relay.RelayFlow" 
+<!--     <bean id="relayFlow" class="org.jocean.xharbor.relay.RelayFlow" 
         scope="prototype">
         <constructor-arg ref="router" />
         <constructor-arg ref="memoBuilder" />
@@ -120,7 +121,8 @@
         <constructor-arg ref="source" />
         <lookup-method name="createRelayFlow" bean="relayFlow"/>
     </bean>
-    
+ -->
+     
     <bean id="zkClient" class="org.jocean.xharbor.util.ZKUtils"
         factory-method="buildWithExhibitorEnsembleProvider"
         init-method="start"
@@ -171,7 +173,7 @@
         </constructor-arg>
     </bean>
 
-    <bean id="routerUpdaterRules" class="org.jocean.j2se.spring.BeanProxy">
+<!--     <bean id="routerUpdaterRules" class="org.jocean.j2se.spring.BeanProxy">
         <constructor-arg value="org.jocean.idiom.Visitor"/>
     </bean>
     
@@ -185,14 +187,27 @@
             </bean>
         </constructor-arg>
     </bean>
-
+ -->
+ 
+    <bean id="businessRepository" class="org.jocean.xharbor.relay.RepositoryImpl">
+        <constructor-arg ref="source" />
+        <constructor-arg ref="zkClient" />
+        <constructor-arg ref="memoBuilder" />
+        <constructor-arg ref="serviceMemo" />
+        <constructor-arg ref="noRoutingMemo" />
+        <constructor-arg ref="httpClientPool" />
+        <constructor-arg value="${relay.checkResponseStatus:true}"/>
+        <constructor-arg value="${relay.showInfoLog:true}"/>
+        <constructor-arg ref="transformBuilder"/>
+    </bean>
+    
     <bean id="gatewayUpdater" class="org.jocean.xharbor.util.ZKUpdater">
         <constructor-arg ref="source"/>
         <constructor-arg ref="zkClient"/>
         <constructor-arg value="${zk.rules.path:/demo}/gateways"/>
         <constructor-arg>
             <bean class="org.jocean.xharbor.GatewayLifecycleOperator">
-                <constructor-arg ref="relayAgent"/>
+                <constructor-arg ref="businessRepository"/>
             </bean>
         </constructor-arg>
     </bean>

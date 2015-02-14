@@ -81,7 +81,8 @@ TODO:
             +------------ host1/user1 +-----------
                                       |
                                       +----------(实例特定配置)
-  29、relayAgent的创建也和HttpGateServer一样，有ZK进行配置，并在运行时刻可动态创建及销毁。并与 HttpGatewayServer 可动态匹配，通过命名？
+                                      
+  29、relayAgent的创建也和HttpGateServer一样，由ZK进行配置，并在运行时刻可动态创建及销毁。并与 HttpGatewayServer 可动态匹配，通过命名？
   
   30、relayAgent 及 HttpGatewayServer 均可通过MBean进行监控，观察运行参数配置及运行情况。
   
@@ -96,4 +97,15 @@ TODO:
   35、将 RelayAgent 更名为 BusinessAgent ，并将 public RelayTask createRelayTask(final ChannelHandlerContext channelCtx, final HttpRequest httpRequest)
 
      中的 ChannelHandlerContext 进行接口包装，目的是 使得 业务处理流程 可以适应 Http 传输 和 TCP 多路复用的传输方式。
+     
+  36、将 RelayFlow中的传入参数
+            final RelayMemo.Builder memoBuilder,
+            final ServiceMemo       serviceMemo, 
+            final GuideBuilder      guideBuilder,
+            final boolean           checkResponseStatus,
+            final boolean           showInfoLog,
+            final HttpRequestTransformer.Builder transformerBuilder
+      均考虑采用target中带入的方式传入 RelayFlow，这样 可以做到在 ZK Node 的Data中进行配置。
+      先考虑将 checkResponseStatus & showInfoLog ZK 配置化
+  
      

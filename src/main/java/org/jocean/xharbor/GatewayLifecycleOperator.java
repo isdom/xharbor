@@ -9,7 +9,6 @@ import java.util.Map;
 import org.apache.curator.framework.recipes.cache.ChildData;
 import org.apache.curator.framework.recipes.cache.TreeCacheEvent;
 import org.jocean.idiom.ExceptionUtils;
-import org.jocean.xharbor.api.RelayAgent;
 import org.jocean.xharbor.util.ZKUpdater.Operator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,8 +25,9 @@ public class GatewayLifecycleOperator implements Operator<Object> {
     private static final Logger LOG = LoggerFactory
             .getLogger(GatewayLifecycleOperator.class);
     
-    public GatewayLifecycleOperator(final RelayAgent relayAgent) {
-        this._relayAgent = relayAgent;
+    public GatewayLifecycleOperator(final BusinessRepository businessRepository) {
+//        this._relayAgent = relayAgent;
+        this._businessRepository = businessRepository;
     }
     
     @Override
@@ -81,7 +81,7 @@ public class GatewayLifecycleOperator implements Operator<Object> {
         HttpGatewayServer server = this._servers.get(desc.getAcceptPort());
         if (null == server) {
             server = new HttpGatewayServer();
-            server.setRelayAgent(this._relayAgent);
+            server.setRelayAgent(this._businessRepository.getBusinessAgent(desc.getRelayConfig()));
             server.setAcceptIp(desc.getAcceptIp());
             server.setAcceptPort(desc.getAcceptPort());
             server.setLogByteStream(desc.isLogByteStream());
@@ -123,14 +123,15 @@ public class GatewayLifecycleOperator implements Operator<Object> {
         private boolean logByteStream = false;
         private boolean compressContent = true;
         private int idleTimeSeconds = 200;
+        private String relayConfig;
         
         @Override
         public String toString() {
             return "GatewayDesc [descrption=" + descrption + ", acceptPort="
-                    + acceptPort + ", acceptIp=" + acceptIp
-                    + ", logByteStream=" + logByteStream + ", compressContent="
-                    + compressContent + ", idleTimeSeconds=" + idleTimeSeconds
-                    + "]";
+                    + acceptPort + ", acceptIp=" + acceptIp + ", relayConfig="
+                    + relayConfig + ", logByteStream=" + logByteStream
+                    + ", compressContent=" + compressContent
+                    + ", idleTimeSeconds=" + idleTimeSeconds + "]";
         }
 
         @JSONField(name="descrption")
@@ -188,6 +189,16 @@ public class GatewayLifecycleOperator implements Operator<Object> {
         public void setCompressContent(final boolean compressContent) {
             this.compressContent = compressContent;
         }
+
+        @JSONField(name="relayConfig")
+        public String getRelayConfig() {
+            return relayConfig;
+        }
+
+        @JSONField(name="relayConfig")
+        public void setRelayConfig(String config) {
+            this.relayConfig = config;
+        }
     }
     
     private int parseFromPath(final String root, final String path) {
@@ -222,7 +233,8 @@ public class GatewayLifecycleOperator implements Operator<Object> {
         return null;
     }
     
-    private final RelayAgent _relayAgent;
+//    private final RelayAgent _relayAgent;
+    private final BusinessRepository _businessRepository;
     private final Map<Integer, HttpGatewayServer> _servers = 
             new HashMap<Integer, HttpGatewayServer>();
 }
