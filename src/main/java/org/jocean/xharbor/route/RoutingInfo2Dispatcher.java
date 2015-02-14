@@ -210,6 +210,7 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
             final Level level = itr.next();
             if ( level.getPriority() == priority ) {
                 this._levels.remove(level);
+                break;
             }
         }
     }

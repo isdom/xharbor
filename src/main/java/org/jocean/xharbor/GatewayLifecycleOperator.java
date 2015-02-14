@@ -97,6 +97,7 @@ public class GatewayLifecycleOperator implements Operator<Object> {
             this._servers.put(desc.getAcceptPort(), server);
         }
         else {
+            server.setRelayAgent(this._businessRepository.getBusinessAgent(desc.getRelayConfig()));
             server.setLogByteStream(desc.isLogByteStream());
             server.setIdleTimeSeconds(desc.getIdleTimeSeconds());
             server.setCompressContent(desc.isCompressContent());
