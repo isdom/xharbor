@@ -53,10 +53,14 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
             final LevelDesc desc = parseLevelDetail(data.getData());
             if (null != desc ) {
                 if ( LOG.isDebugEnabled()) {
-                    LOG.debug("add or update level detail with {}/{}", 
-                            level, Arrays.toString( desc.rewritePaths));
+                    LOG.debug("add or update level detail with {}/{}", level, desc);
                 }
-                return entity.addOrUpdateDetail(level, desc.asRewritePathList(), desc.asAuthorizationList());
+                return entity.addOrUpdateDetail(
+                        level, 
+                        desc.isCheckResponseStatus, 
+                        desc.isShowInfoLog, 
+                        desc.asRewritePathList(), 
+                        desc.asAuthorizationList());
             }
             return null;
         }
@@ -143,8 +147,18 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
             }
         }
         
+        @Override
+        public String toString() {
+            return "LevelDesc [rewritePaths=" + Arrays.toString(rewritePaths)
+                    + ", authorizations=" + Arrays.toString(authorizations)
+                    + ", isCheckResponseStatus=" + isCheckResponseStatus
+                    + ", isShowInfoLog=" + isShowInfoLog + "]";
+        }
+
         public RewritePathDesc[] rewritePaths;
         public AuthorizationDesc[] authorizations;
+        public boolean  isCheckResponseStatus = false;
+        public boolean  isShowInfoLog = true;
         
         public List<Pair<Pattern, String>> asRewritePathList() {
             return new ArrayList<Pair<Pattern, String>>() {

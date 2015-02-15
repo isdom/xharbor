@@ -25,10 +25,14 @@ public class TargetSet implements Dispatcher {
     private static final int MAX_EFFECTIVEWEIGHT = 1000;
     
     public TargetSet(final URI[] uris, 
+            final boolean isCheckResponseStatus, 
+            final boolean isShowInfoLog, 
             final Function<String, String> rewritePath, 
             final Function<HttpRequest, Boolean> needAuthorization, 
             final ServiceMemo serviceMemo) {
         this._serviceMemo = serviceMemo;
+        this._isCheckResponseStatus = isCheckResponseStatus;
+        this._isShowInfoLog = isShowInfoLog;
         this._rewritePath = rewritePath;
         this._needAuthorization = needAuthorization;
         this._targets = new ArrayList<TargetImpl>() {
@@ -117,6 +121,16 @@ public class TargetSet implements Dispatcher {
         }
         
         @Override
+        public boolean isCheckResponseStatus() {
+            return _isCheckResponseStatus;
+        }
+
+        @Override
+        public boolean isShowInfoLog() {
+            return _isShowInfoLog;
+        }
+        
+        @Override
         public int addWeight(final int deltaWeight) {
             int weight = this._effectiveWeight.addAndGet(deltaWeight);
             if ( weight > MAX_EFFECTIVEWEIGHT ) {
@@ -146,6 +160,8 @@ public class TargetSet implements Dispatcher {
     }
     
     private final ServiceMemo _serviceMemo;
+    private final boolean _isCheckResponseStatus;
+    private final boolean _isShowInfoLog;
     private final Function<String, String> _rewritePath;
     private final Function<HttpRequest, Boolean> _needAuthorization;
     private final TargetImpl[] _targets;

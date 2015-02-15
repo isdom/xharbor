@@ -43,8 +43,6 @@ public class RepositoryImpl implements BusinessRepository{
             final ServiceMemo       serviceMemo, 
             final RoutingInfoMemo   noRoutingMemo,
             final GuideBuilder      guideBuilder,
-            final boolean           checkResponseStatus,
-            final boolean           showInfoLog,
             final HttpRequestTransformer.Builder transformerBuilder
             ) {
         this._source = source;
@@ -53,8 +51,6 @@ public class RepositoryImpl implements BusinessRepository{
         this._serviceMemo = serviceMemo;
         this._noRoutingMemo = noRoutingMemo;
         this._guideBuilder = guideBuilder;
-        this._checkResponseStatus = checkResponseStatus;
-        this._showInfoLog = showInfoLog;
         this._transformerBuilder = transformerBuilder;
     }
     
@@ -92,8 +88,6 @@ public class RepositoryImpl implements BusinessRepository{
     private final ServiceMemo       _serviceMemo; 
     private final RoutingInfoMemo   _noRoutingMemo;
     private final GuideBuilder      _guideBuilder;
-    private final boolean           _checkResponseStatus;
-    private final boolean           _showInfoLog;
     private final HttpRequestTransformer.Builder _transformerBuilder;
     private final Function<String, ProxyBuilder<RelayAgent>> _maker = 
             new Function<String, ProxyBuilder<RelayAgent>>() {
@@ -119,8 +113,6 @@ public class RepositoryImpl implements BusinessRepository{
                             _serviceMemo, 
                             _noRoutingMemo,
                             _guideBuilder,
-                            _checkResponseStatus,
-                            _showInfoLog,
                             _transformerBuilder
                             );
                 }});

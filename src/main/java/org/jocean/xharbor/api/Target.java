@@ -24,4 +24,8 @@ public interface Target {
     public void markAPIDownStatus(final boolean isDown);
 
     public boolean isNeedAuthorization(final HttpRequest httpRequest);
+    
+    public boolean isCheckResponseStatus();
+    
+    public boolean isShowInfoLog();
 }

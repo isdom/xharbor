@@ -64,17 +64,23 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
             return "NOP";
         }};
     private static final TargetSet EMPTY_TARGETSET = 
-            new TargetSet(EMPTY_URIS, NOP_REWRITEPATH, NOP_NEEDAUTHORIZATION, null);
+            new TargetSet(EMPTY_URIS, false, false, NOP_REWRITEPATH, NOP_NEEDAUTHORIZATION, null);
 
     private static class MatchResult {
         final URI[] _uris;
+        final boolean _isCheckResponseStatus;
+        final boolean _isShowInfoLog;
         final Function<String, String> _rewritePath;
         final Function<HttpRequest, Boolean> _needAuthorization;
         
         MatchResult(final URI[] uris, 
+                final boolean isCheckResponseStatus,
+                final boolean isShowInfoLog,
                 final Function<String, String> rewritePath,
                 final Function<HttpRequest, Boolean> needAuthorization) {
             this._uris = uris;
+            this._isCheckResponseStatus = isCheckResponseStatus;
+            this._isShowInfoLog = isShowInfoLog;
             this._rewritePath = rewritePath;
             this._needAuthorization = needAuthorization;
         }
@@ -134,7 +140,13 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
             final Level level = itr.next();
             final MatchResult result = level.match(info);
             if (null != result) {
-                return new TargetSet(result._uris, result._rewritePath, result._needAuthorization, memo);
+                return new TargetSet(
+                        result._uris, 
+                        result._isCheckResponseStatus, 
+                        result._isShowInfoLog, 
+                        result._rewritePath, 
+                        result._needAuthorization, 
+                        memo);
             }
         }
         return EMPTY_TARGETSET;
@@ -147,17 +159,26 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
     
     public RoutingInfo2Dispatcher addOrUpdateDetail(
             final int priority, 
+            final boolean isCheckResponseStatus, 
+            final boolean isShowInfoLog, 
             final List<Pair<Pattern,String>> rewritePaths,
             final List<Triple<Pattern,String,String>> authorizations
             )
             throws Exception {
         if ( !this._isFrozen ) {
             getOrCreateLevel(priority)
+                .setIsCheckResponseStatus(isCheckResponseStatus)
+                .setIsShowInfoLog(isShowInfoLog)
                 .setRewritePaths(rewritePaths)
                 .setAuthorizations(authorizations);
             return  this;
         } else {
-            return this.clone().addOrUpdateDetail(priority, rewritePaths, authorizations);
+            return this.clone().addOrUpdateDetail(
+                    priority, 
+                    isCheckResponseStatus, 
+                    isShowInfoLog, 
+                    rewritePaths, 
+                    authorizations);
         }
     }
     
@@ -254,6 +275,16 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
             this._rules.remove(new URI(uri));
         }
 
+        public Level setIsCheckResponseStatus(final boolean isCheckResponseStatus) {
+            this._isCheckResponseStatus = isCheckResponseStatus;
+            return this;
+        }
+
+        public Level setIsShowInfoLog(final boolean isShowInfoLog) {
+            this._isShowInfoLog = isShowInfoLog;
+            return this;
+        }
+
         public Level setRewritePaths(final List<Pair<Pattern, String>> rewritePaths) {
             this._rewritePaths.clear();
             this._rewritePaths.addAll(rewritePaths);
@@ -292,6 +323,8 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
             }
             return !ret.isEmpty() 
                 ? new MatchResult(ret.toArray(EMPTY_URIS), 
+                        this._isCheckResponseStatus,
+                        this._isShowInfoLog,
                         genRewritePath(info.getPath()), 
                         genNeedAuthorization(info.getPath()))
                 : null;
@@ -412,6 +445,10 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
         }
         
         private final int _priority;
+        
+        private volatile boolean _isCheckResponseStatus;
+        
+        private volatile boolean _isShowInfoLog;
         
         private final Map<URI, Pair<Pattern[],Pattern[]>> _rules = 
                 new HashMap<URI, Pair<Pattern[],Pattern[]>>();
