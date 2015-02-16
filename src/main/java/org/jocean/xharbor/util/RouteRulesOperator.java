@@ -10,12 +10,15 @@ import java.util.regex.Pattern;
 
 import org.apache.curator.framework.recipes.cache.ChildData;
 import org.apache.curator.framework.recipes.cache.TreeCacheEvent;
+import org.jocean.httpclient.api.GuideBuilder;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.Pair;
 import org.jocean.idiom.Triple;
 import org.jocean.idiom.Visitor;
 import org.jocean.xharbor.api.RoutingInfo;
+import org.jocean.xharbor.api.ServiceMemo;
 import org.jocean.xharbor.route.RoutingInfo2Dispatcher;
+import org.jocean.xharbor.spi.HttpRequestTransformer;
 import org.jocean.xharbor.util.ZKUpdater.Operator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,13 +35,21 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
     private static final Logger LOG = LoggerFactory
             .getLogger(RouteRulesOperator.class);
     
-    public RouteRulesOperator(final Visitor<RoutingInfo2Dispatcher> updateRules) {
+    public RouteRulesOperator(
+            final Visitor<RoutingInfo2Dispatcher> updateRules,
+            final GuideBuilder guideBuilder,
+            final ServiceMemo serviceMemo,
+            final HttpRequestTransformer.Builder transformerBuilder
+            ) {
         this._updateRules = updateRules;
+        this._guideBuilder = guideBuilder;
+        this._serviceMemo = serviceMemo;
+        this._transformerBuilder = transformerBuilder;
     }
     
     @Override
     public RoutingInfo2Dispatcher createContext() {
-        return new RoutingInfo2Dispatcher();
+        return new RoutingInfo2Dispatcher(this._guideBuilder, this._serviceMemo, this._transformerBuilder);
     }
 
     @Override
@@ -287,4 +298,7 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
     }
     
     private final Visitor<RoutingInfo2Dispatcher> _updateRules;
+    private final GuideBuilder _guideBuilder; 
+    private final ServiceMemo _serviceMemo; 
+    private final HttpRequestTransformer.Builder _transformerBuilder;
 }

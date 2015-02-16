@@ -34,33 +34,6 @@ public class Main {
                 new ClassPathXmlApplicationContext(
                         new String[]{"xharbor.xml"});
         
-//        ((BeanProxy<Function<Pair<RoutingInfo,Dispatcher>,String>>)
-//            checkNotNull(ctx.getBean("&genObjname", BeanProxy.class)))
-//            .setImpl(new Function<Pair<RoutingInfo,Dispatcher>,String>() {
-//                @Override
-//                public String apply(final Pair<RoutingInfo,Dispatcher> input) {
-//                    final Dispatcher dispatcher = input.getSecond();
-//                    if (dispatcher.IsValid()) {
-//                        final RoutingInfo info = input.getFirst();
-//                        return "path=" + normalizeString(info.getPath())
-//                                +",method=" + info.getMethod()
-//                                +",name=routes";
-//                    }
-//                    else {
-//                        return null;
-//                    }
-//                }});
-//        
-//        final CachedRouter<RoutingInfo, Dispatcher> cachedRouter = 
-//                (CachedRouter<RoutingInfo, Dispatcher>)ctx.getBean("cachedRouter");
-//        
-//        ((BeanProxy<Visitor<RoutingInfo2Dispatcher>>) checkNotNull(ctx.getBean("&routerUpdaterRules", BeanProxy.class)))
-//            .setImpl(new Visitor<RoutingInfo2Dispatcher>() {
-//                @Override
-//                public void visit(final RoutingInfo2Dispatcher rules) throws Exception {
-//                    cachedRouter.updateRouter(rules);
-//                }});
-        
         final BeanProxy<HttpRequestTransformer.Builder> builderProxy = 
                 ((BeanProxy<HttpRequestTransformer.Builder>) 
                     checkNotNull(ctx.getBean("&transformBuilder", BeanProxy.class)));
@@ -73,7 +46,6 @@ public class Main {
                     builderProxy.setImplForced(builder);
                 }});
         
-//        checkNotNull(ctx.getBean("routerUpdater", ZKUpdater.class)).start();
         checkNotNull(ctx.getBean("aupUpdater", ZKUpdater.class)).start();
         checkNotNull(ctx.getBean("gatewayUpdater", ZKUpdater.class)).start();
     }

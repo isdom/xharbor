@@ -110,10 +110,7 @@ public class RepositoryImpl implements BusinessRepository{
                     return new RelayFlow(
                             router,
                             _memoBuilder,
-                            _serviceMemo, 
-                            _noRoutingMemo,
-                            _guideBuilder,
-                            _transformerBuilder
+                            _noRoutingMemo
                             );
                 }});
             final Visitor<RoutingInfo2Dispatcher> visitor = new Visitor<RoutingInfo2Dispatcher>() {
@@ -121,7 +118,8 @@ public class RepositoryImpl implements BusinessRepository{
                 public void visit(final RoutingInfo2Dispatcher rules) throws Exception {
                     cachedRouter.updateRouter(rules);
                 }};
-            final RouteRulesOperator operator = new RouteRulesOperator(visitor);
+            final RouteRulesOperator operator = new RouteRulesOperator(
+                    visitor, _guideBuilder, _serviceMemo, _transformerBuilder);
             final ZKUpdater<RoutingInfo2Dispatcher> updater = 
                     new ZKUpdater<RoutingInfo2Dispatcher>(_source, _zkClient, zkPath, operator);
             updater.start();

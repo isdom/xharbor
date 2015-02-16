@@ -107,5 +107,6 @@ TODO:
             final HttpRequestTransformer.Builder transformerBuilder
       均考虑采用target中带入的方式传入 RelayFlow，这样 可以做到在 ZK Node 的Data中进行配置。
       先考虑将 checkResponseStatus & showInfoLog ZK 配置化
-  
+
+  37、jmxmp & jmxhtml 的端口配置 采用 ZK 方式启动，去掉 配置文件中的 jmxmp.port & jmxhtml.port 端口配置项。
      

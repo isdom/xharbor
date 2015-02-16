@@ -43,7 +43,7 @@ public class RoutingInfo2DispatcherTestCase {
 
     @Test
     public void testRoutingInfo2URIsClone() throws Exception {
-        final RoutingInfo2Dispatcher r1 = new RoutingInfo2Dispatcher();
+        final RoutingInfo2Dispatcher r1 = new RoutingInfo2Dispatcher(null, null, null);
         
         r1.addOrUpdateRule(1, "http://127.0.0.1", new RoutingInfo[]{new RoutingInfo() {
 

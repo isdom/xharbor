@@ -32,7 +32,6 @@ import org.jocean.event.api.FlowLifecycleListener;
 import org.jocean.event.api.annotation.OnEvent;
 import org.jocean.httpclient.api.Guide;
 import org.jocean.httpclient.api.Guide.GuideReactor;
-import org.jocean.httpclient.api.GuideBuilder;
 import org.jocean.httpclient.api.HttpClient;
 import org.jocean.httpclient.api.HttpClient.HttpReactor;
 import org.jocean.idiom.Detachable;
@@ -48,10 +47,8 @@ import org.jocean.xharbor.api.RelayMemo.STEP;
 import org.jocean.xharbor.api.Router;
 import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.api.RoutingInfoMemo;
-import org.jocean.xharbor.api.ServiceMemo;
 import org.jocean.xharbor.api.Target;
 import org.jocean.xharbor.spi.HttpRequestTransformer;
-import org.jocean.xharbor.spi.HttpRequestTransformer.Builder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.helpers.NOPLogger;
@@ -119,18 +116,12 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
     public RelayFlow(
             final Router<HttpRequest, Dispatcher> router, 
             final RelayMemo.Builder memoBuilder,
-            final ServiceMemo       serviceMemo, 
-            final RoutingInfoMemo   noRoutingMemo,
-            final GuideBuilder      guideBuilder,
-            final HttpRequestTransformer.Builder transformerBuilder
+            final RoutingInfoMemo   noRoutingMemo
             ) {
         this._proxyLogger.setImpl(LOG);
         this._router = router;
         this._memoBuilder = memoBuilder;
-        this._serviceMemo = serviceMemo;
         this._noRoutingMemo = noRoutingMemo;
-        this._guideBuilder = guideBuilder;
-        this._transformerBuilder = transformerBuilder;
         
         addFlowLifecycleListener(RELAY_LIFECYCLE_LISTENER);
     }
@@ -141,9 +132,6 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
         this._httpRequest = ReferenceCountUtil.retain(httpRequest);
         this._channelCtx = channelCtx;
         updateRecvHttpRequestState(this._httpRequest);
-        if (null != this._transformerBuilder) {
-            this._transformer = this._transformerBuilder.build(httpRequest);
-        }
         return this;
     }
 
@@ -250,8 +238,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
             _watch4Step.start();
             _watch4Result.start();
             
-            final RouterCtxImpl routectx = 
-                    new RouterCtxImpl().setProperty("serviceMemo", _serviceMemo);
+            final RouterCtxImpl routectx = new RouterCtxImpl();
             
             final Dispatcher dispatcher = _router.calculateRoute(_httpRequest, routectx);
             final RoutingInfo info = routectx.getProperty("routingInfo");
@@ -277,6 +264,8 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
             if (_target.isNeedAuthorization(_httpRequest)) {
                 return  waitforRequestFinishedAndResponse401Unauthorized();
             }
+            
+            _transformer = _target.getHttpRequestTransformerOf(_httpRequest);
             
             _memo.beginBizStep(STEP.ROUTING);
             _memo.endBizStep(STEP.ROUTING, _watch4Step.stopAndRestart());
@@ -668,7 +657,7 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
     }
 
     private void startObtainHttpClient() {
-        this._guide = this._guideBuilder.createHttpClientGuide();
+        this._guide = this._target.getGuideBuilder().createHttpClientGuide();
         
         this._guide.obtainHttpClient(
                 this._guideId.updateIdAndGet(),
@@ -914,12 +903,9 @@ class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
         }
     };
     
-    private final GuideBuilder _guideBuilder;
     private final RelayMemo.Builder _memoBuilder;
-    private final ServiceMemo _serviceMemo; 
     private final RoutingInfoMemo _noRoutingMemo;
     private final Router<HttpRequest, Dispatcher> _router;
-    private final Builder _transformerBuilder;
     private HttpRequestTransformer _transformer = null;
     
     private HttpRequest _httpRequest;

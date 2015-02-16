@@ -7,11 +7,16 @@ import io.netty.handler.codec.http.HttpRequest;
 
 import java.net.URI;
 
+import org.jocean.httpclient.api.GuideBuilder;
+import org.jocean.xharbor.spi.HttpRequestTransformer;
+
 /**
  * @author isdom
  *
  */
 public interface Target {
+    
+    public GuideBuilder getGuideBuilder();
     
     public URI serviceUri();
     
@@ -28,4 +33,6 @@ public interface Target {
     public boolean isCheckResponseStatus();
     
     public boolean isShowInfoLog();
+    
+    public HttpRequestTransformer getHttpRequestTransformerOf(final HttpRequest httpRequest);
 }

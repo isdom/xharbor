@@ -20,6 +20,7 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.jocean.httpclient.api.GuideBuilder;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.Function;
 import org.jocean.idiom.Pair;
@@ -28,6 +29,7 @@ import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.Router;
 import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.api.ServiceMemo;
+import org.jocean.xharbor.spi.HttpRequestTransformer;
 import org.jocean.xharbor.util.RulesMXBean;
 import org.jocean.xharbor.util.TargetSet;
 import org.slf4j.Logger;
@@ -64,7 +66,7 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
             return "NOP";
         }};
     private static final TargetSet EMPTY_TARGETSET = 
-            new TargetSet(EMPTY_URIS, false, false, NOP_REWRITEPATH, NOP_NEEDAUTHORIZATION, null);
+            new TargetSet(null, EMPTY_URIS, false, false, NOP_REWRITEPATH, NOP_NEEDAUTHORIZATION, null, null);
 
     private static class MatchResult {
         final URI[] _uris;
@@ -111,9 +113,20 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
         return true;
     }
 
+    public RoutingInfo2Dispatcher(
+            final GuideBuilder guideBuilder,
+            final ServiceMemo serviceMemo,
+            final HttpRequestTransformer.Builder transformerBuilder
+            ) {
+        this._guideBuilder = guideBuilder;
+        this._serviceMemo = serviceMemo;
+        this._transformerBuilder = transformerBuilder;
+    }
+    
     @Override
     protected RoutingInfo2Dispatcher clone() throws CloneNotSupportedException {
-        final RoutingInfo2Dispatcher cloned = new RoutingInfo2Dispatcher();
+        final RoutingInfo2Dispatcher cloned = 
+                new RoutingInfo2Dispatcher(this._guideBuilder, this._serviceMemo, this._transformerBuilder);
         for ( Level level : this._levels ) {
             cloned._levels.add(level.clone());
         }
@@ -134,19 +147,20 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
     
     @Override
     public Dispatcher calculateRoute(final RoutingInfo info, final Context routectx) {
-        final ServiceMemo memo = routectx.getProperty("serviceMemo");
         final Iterator<Level> itr = _levels.iterator();
         while (itr.hasNext()) {
             final Level level = itr.next();
             final MatchResult result = level.match(info);
             if (null != result) {
                 return new TargetSet(
+                        this._guideBuilder,
                         result._uris, 
                         result._isCheckResponseStatus, 
                         result._isShowInfoLog, 
                         result._rewritePath, 
                         result._needAuthorization, 
-                        memo);
+                        this._serviceMemo,
+                        this._transformerBuilder);
             }
         }
         return EMPTY_TARGETSET;
@@ -460,6 +474,9 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
                 new ArrayList<Triple<Pattern,String,String>>();
     }
 
+    private final GuideBuilder _guideBuilder;
+    private final ServiceMemo _serviceMemo;
+    private final HttpRequestTransformer.Builder _transformerBuilder;
     private final SortedSet<Level> _levels = new TreeSet<Level>();
     private transient boolean _isFrozen = false;
 }

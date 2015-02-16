@@ -11,10 +11,12 @@ import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.jocean.httpclient.api.GuideBuilder;
 import org.jocean.idiom.Function;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.ServiceMemo;
 import org.jocean.xharbor.api.Target;
+import org.jocean.xharbor.spi.HttpRequestTransformer;
 
 /**
  * @author isdom
@@ -24,13 +26,19 @@ public class TargetSet implements Dispatcher {
 
     private static final int MAX_EFFECTIVEWEIGHT = 1000;
     
-    public TargetSet(final URI[] uris, 
+    public TargetSet(
+            final GuideBuilder guideBuilder,
+            final URI[] uris, 
             final boolean isCheckResponseStatus, 
             final boolean isShowInfoLog, 
             final Function<String, String> rewritePath, 
             final Function<HttpRequest, Boolean> needAuthorization, 
-            final ServiceMemo serviceMemo) {
+            final ServiceMemo serviceMemo,
+            final HttpRequestTransformer.Builder transformerBuilder
+            ) {
+        this._guideBuilder = guideBuilder;
         this._serviceMemo = serviceMemo;
+        this._transformerBuilder = transformerBuilder;
         this._isCheckResponseStatus = isCheckResponseStatus;
         this._isShowInfoLog = isShowInfoLog;
         this._rewritePath = rewritePath;
@@ -105,6 +113,12 @@ public class TargetSet implements Dispatcher {
     }
     
     private class TargetImpl implements Target {
+        
+        @Override
+        public GuideBuilder getGuideBuilder() {
+            return _guideBuilder;
+        }
+        
         @Override
         public URI serviceUri() {
             return this._uri;
@@ -149,6 +163,12 @@ public class TargetSet implements Dispatcher {
             _serviceMemo.markServiceDownStatus(this._uri, isDown);
         }
         
+        @Override
+        public HttpRequestTransformer getHttpRequestTransformerOf(
+                final HttpRequest httpRequest) {
+            return _transformerBuilder.build(httpRequest);
+        }
+        
         TargetImpl(final URI uri) {
             this._uri = uri;
         }
@@ -159,7 +179,9 @@ public class TargetSet implements Dispatcher {
         private final AtomicBoolean _down = new AtomicBoolean(false);
     }
     
+    private final GuideBuilder _guideBuilder;
     private final ServiceMemo _serviceMemo;
+    private final HttpRequestTransformer.Builder _transformerBuilder;
     private final boolean _isCheckResponseStatus;
     private final boolean _isShowInfoLog;
     private final Function<String, String> _rewritePath;
