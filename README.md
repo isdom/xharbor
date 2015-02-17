@@ -110,3 +110,6 @@ TODO:
 
   37、jmxmp & jmxhtml 的端口配置 采用 ZK 方式启动，去掉 配置文件中的 jmxmp.port & jmxhtml.port 端口配置项。
      
+  38、采用构造 Spring Context for ZK 的方式 构造可用功能单元（Unit）。 复用原有j2se中模式。
+  
+  

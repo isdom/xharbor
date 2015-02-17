@@ -218,7 +218,7 @@
         <property name="objectName" value="org.jocean:type=agent,name0=jmxmp" />
     </bean>
      
-    <bean id="htmlAdaptorServer" class="org.jocean.j2se.jdmk.comm.HtmlAdaptorServer" 
+    <bean id="htmlAdaptorServer" class="org.jocean.jdmk.comm.HtmlAdaptorServer" 
         init-method="start" destroy-method="stop">
         <property name="port" value="${jmxhtml.port:8082}"/>
     </bean>
@@ -235,6 +235,7 @@
                 <entry key="org.jocean:name=serviceMemo"    value-ref="serviceMemo"/>
                 <entry key="org.jocean:name=noRouting"      value-ref="noRoutingMemo"/>
                 <entry key="org.jocean:name=htmladapter,port=${jmxhtml.port:8082}" value-ref="htmlAdaptorServer"/>
+                <entry key="org.jocean:name=jmxConnectorServer" value-ref="jmxConnectorServer"/>
                 <entry key="org.jocean:type=router,name=stats" value-ref="statsRegister"/>
             </map>
         </property>
