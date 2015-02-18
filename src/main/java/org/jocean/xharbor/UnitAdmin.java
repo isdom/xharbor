@@ -42,9 +42,9 @@ public class UnitAdmin implements UnitAdminMXBean {
 
         public String getSource();
 
-        public Map<String, String> getParameters();
+        public String[] getParameters();
 
-        public Map<String, String> getPlaceholders();
+        public String[] getPlaceholders();
 
         public String getCreateTimestamp();
 
@@ -120,7 +120,6 @@ public class UnitAdmin implements UnitAdminMXBean {
             throws Exception {
         newUnit(name, pattern, new HashMap<String, String>() {
             private static final long serialVersionUID = 1L;
-
             {
                 //  确保偶数
                 for (int idx = 0; idx < (params.length / 2) * 2; idx += 2) {
@@ -204,8 +203,8 @@ public class UnitAdmin implements UnitAdminMXBean {
                             name,
                             sources[0],
                             now,
-                            params,
-                            configurer.getTextedResolvedPlaceholders());
+                            map2StringArray(params),
+                            configurer.getTextedResolvedPlaceholdersAsStringArray());
 
             this._units.put(name, ctx);
 
@@ -222,6 +221,21 @@ public class UnitAdmin implements UnitAdminMXBean {
         }
     }
 
+
+    /**
+     * @param params
+     * @return
+     */
+    private String[] map2StringArray(final Map<String, String> params) {
+        return new ArrayList<String>() {
+            private static final long serialVersionUID = 1L;
+        {
+            for (Map.Entry<String, String> entry : params.entrySet()) {
+                this.add(entry.getKey() + "<--" + entry.getValue());
+            }
+        }}.toArray(new String[0]);
+    }
+
     /**
      * @param name
      * @param source
@@ -234,8 +248,8 @@ public class UnitAdmin implements UnitAdminMXBean {
             final String name,
             final String source,
             final String now,
-            final Map<String, String> params,
-            final Map<String, String> placeholders) {
+            final String[] params,
+            final String[] placeholders) {
         return new UnitMXBean() {
 
             @Override
@@ -244,12 +258,12 @@ public class UnitAdmin implements UnitAdminMXBean {
             }
 
             @Override
-            public Map<String, String> getParameters() {
+            public String[] getParameters() {
                 return params;
             }
 
             @Override
-            public Map<String, String> getPlaceholders() {
+            public String[] getPlaceholders() {
                 return placeholders;
             }
 
@@ -287,12 +301,12 @@ public class UnitAdmin implements UnitAdminMXBean {
             }
 
             @Override
-            public Map<String, String> getParameters() {
+            public String[] getParameters() {
                 return null;
             }
 
             @Override
-            public Map<String, String> getPlaceholders() {
+            public String[] getPlaceholders() {
                 return null;
             }
 
