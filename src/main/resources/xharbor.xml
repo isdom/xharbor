@@ -173,21 +173,22 @@
         </constructor-arg>
     </bean>
 
-<!--     <bean id="routerUpdaterRules" class="org.jocean.j2se.spring.BeanProxy">
-        <constructor-arg value="org.jocean.idiom.Visitor"/>
+    <bean id="unitAdmin" class="org.jocean.xharbor.UnitAdmin">
+        <constructor-arg>
+            <null/>
+        </constructor-arg>
     </bean>
     
-    <bean id="routerUpdater" class="org.jocean.xharbor.util.ZKUpdater">
+    <bean id="unitUpdater" class="org.jocean.xharbor.util.ZKUpdater">
         <constructor-arg ref="source"/>
         <constructor-arg ref="zkClient"/>
-        <constructor-arg value="${zk.rules.path:/demo}/routers"/>
+        <constructor-arg value="${zk.rules.path:/demo}/units"/>
         <constructor-arg>
-            <bean class="org.jocean.xharbor.util.RouteRulesOperator">
-                <constructor-arg ref="routerUpdaterRules"/>
+            <bean class="org.jocean.xharbor.UnitOperator">
+                <constructor-arg ref="unitAdmin"/>
             </bean>
         </constructor-arg>
     </bean>
- -->
  
     <bean id="businessRepository" class="org.jocean.xharbor.relay.RepositoryImpl">
         <constructor-arg ref="source" />
@@ -210,7 +211,7 @@
         </constructor-arg>
     </bean>
     
-    <bean id="jmxConnectorServer" 
+<!--     <bean id="jmxConnectorServer" 
         class="org.springframework.jmx.support.ConnectorServerFactoryBean"  >
         <property name="serviceUrl" value="service:jmx:jmxmp://0.0.0.0:${jmxmp.port:9876}" />
         <property name="threaded"   value="true" />
@@ -222,7 +223,7 @@
         init-method="start" destroy-method="stop">
         <property name="port" value="${jmxhtml.port:8082}"/>
     </bean>
-
+ -->
     <bean id="directMemory" class="org.jocean.xharbor.util.DirectMemoryIndicator"/>
     
     <bean id="exporter" class="org.springframework.jmx.export.MBeanExporter"
@@ -234,9 +235,8 @@
                 <entry key="org.jocean:name=httpClientPool" value-ref="httpClientPool"/>
                 <entry key="org.jocean:name=serviceMemo"    value-ref="serviceMemo"/>
                 <entry key="org.jocean:name=noRouting"      value-ref="noRoutingMemo"/>
-                <entry key="org.jocean:name=htmladapter,port=${jmxhtml.port:8082}" value-ref="htmlAdaptorServer"/>
-                <entry key="org.jocean:name=jmxConnectorServer" value-ref="jmxConnectorServer"/>
                 <entry key="org.jocean:type=router,name=stats" value-ref="statsRegister"/>
+                <entry key="org.jocean:name=unitAdmin"      value-ref="unitAdmin"/>
             </map>
         </property>
     </bean>
