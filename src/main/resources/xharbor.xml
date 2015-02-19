@@ -173,11 +173,7 @@
         </constructor-arg>
     </bean>
 
-    <bean id="unitAdmin" class="org.jocean.xharbor.UnitAdmin">
-        <constructor-arg>
-            <null/>
-        </constructor-arg>
-    </bean>
+    <bean id="unitAdmin" class="org.jocean.xharbor.UnitAdmin"/>
     
     <bean id="unitUpdater" class="org.jocean.xharbor.util.ZKUpdater">
         <constructor-arg ref="source"/>

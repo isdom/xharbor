@@ -27,12 +27,13 @@ import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.config.PropertyPlaceholderConfigurer;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 import org.springframework.core.io.Resource;
 import org.springframework.util.ReflectionUtils;
 
-public class UnitAdmin implements UnitAdminMXBean {
+public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
 
     private final static String[] _DEFAULT_SOURCE_PATTERNS = new String[]{"**/flow/**.xml"};
 
@@ -65,15 +66,20 @@ public class UnitAdmin implements UnitAdminMXBean {
     private static final Logger LOG =
             LoggerFactory.getLogger(UnitAdmin.class);
 
-    public UnitAdmin(final ApplicationContext root) {
-        this._root = root;
+    public UnitAdmin() {
         this._sourcePatterns = _DEFAULT_SOURCE_PATTERNS;
         this._sourcesRegister = new MBeanRegisterSupport("org.jocean:type=unitSource", null);
         this._unitsRegister = new MBeanRegisterSupport("org.jocean:type=units", null);
+    }
+
+    @Override
+    public void setApplicationContext(final ApplicationContext applicationContext)
+            throws BeansException {
+        this._rootApplicationContext = applicationContext;
         //设置工程全局配置文件
         final PropertyPlaceholderConfigurer rootConfigurer = 
-                null != this._root 
-                ? this._root.getBean(PropertyPlaceholderConfigurer.class) 
+                null != this._rootApplicationContext 
+                ? this._rootApplicationContext.getBean(PropertyPlaceholderConfigurer.class) 
                 : null;
         if (rootConfigurer != null) {
             Field field = ReflectionUtils.findField(rootConfigurer.getClass(), "locations");
@@ -83,7 +89,6 @@ public class UnitAdmin implements UnitAdminMXBean {
             this._rootPropertyFiles = null;
         }
     }
-
 
     public void init() {
         refreshSources();
@@ -420,7 +425,8 @@ public class UnitAdmin implements UnitAdminMXBean {
             final PropertyPlaceholderConfigurer configurer) {
         final AbstractApplicationContext topCtx =
                 new ClassPathXmlApplicationContext(
-                        new String[]{"org/jocean/ext/ebus/spring/unitParent.xml"}, this._root);
+                        new String[]{"org/jocean/ext/ebus/spring/unitParent.xml"}, 
+                        this._rootApplicationContext);
 
         final PropertyConfigurerFactory factory =
                 topCtx.getBean(PropertyConfigurerFactory.class);
@@ -469,11 +475,11 @@ public class UnitAdmin implements UnitAdminMXBean {
 
     private String[] _sourcePatterns;
 
-    private final Resource[] _rootPropertyFiles;
+    private ApplicationContext _rootApplicationContext = null;
+
+    private Resource[] _rootPropertyFiles = null;
 
     private final MBeanRegisterSupport _sourcesRegister;
-
-    private final ApplicationContext _root;
 
     private final MBeanRegisterSupport _unitsRegister;
 
