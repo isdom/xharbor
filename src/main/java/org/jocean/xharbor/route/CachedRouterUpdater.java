@@ -20,5 +20,5 @@ public class CachedRouterUpdater<I, O> implements Visitor<Router<I, O>> {
         this._cachedRouter.updateRouter(rules);
     }
     
-    private CachedRouter<I, O> _cachedRouter;
+    private final CachedRouter<I, O> _cachedRouter;
 };
