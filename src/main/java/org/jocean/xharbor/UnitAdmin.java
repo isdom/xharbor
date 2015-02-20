@@ -54,7 +54,7 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
 
     public static interface SourceMXBean {
 
-        public Map<String, String> getPlaceholders();
+        public String[] getPlaceholders();
 
     }
 
@@ -96,15 +96,15 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
 
     private void refreshSources() {
         //this._unitsRegister.destroy();
-        final Map<String, Map<String, String>> infos = getSourceInfo(this._sourcePatterns);
-        for (Map.Entry<String, Map<String, String>> entry : infos.entrySet()) {
-            final Map<String, String> placeholders = entry.getValue();
+        final Map<String, String[]> infos = getSourceInfo(this._sourcePatterns);
+        for (Map.Entry<String, String[]> entry : infos.entrySet()) {
+            final String[] placeholders = entry.getValue();
             final String suffix = "name=" + entry.getKey();
             if (!this._sourcesRegister.isRegistered(suffix)) {
                 this._sourcesRegister.registerMBean(suffix, new SourceMXBean() {
 
                     @Override
-                    public Map<String, String> getPlaceholders() {
+                    public String[] getPlaceholders() {
                         return placeholders;
                     }
                 });
@@ -358,14 +358,14 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
     }
 
     @Override
-    public Map<String, Map<String, String>> getSourceInfo(final String sourcePattern) {
+    public Map<String, String[]> getSourceInfo(final String sourcePattern) {
         return getSourceInfo(new String[]{sourcePattern});
     }
 
-    public Map<String, Map<String, String>> getSourceInfo(final String[] sourcePatterns) {
+    public Map<String, String[]> getSourceInfo(final String[] sourcePatterns) {
         final String[] sources = searchUnitSourceOf(sourcePatterns);
 
-        final Map<String, Map<String, String>> infos = new HashMap<>();
+        final Map<String, String[]> infos = new HashMap<>();
 
         if (null == sources) {
             LOG.warn("can't found unit source matched {}, getSourcesInfo failed", Arrays.toString(sourcePatterns));
@@ -395,7 +395,7 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
                 createConfigurableApplicationContext(source, configurer);
             } catch (StopInitCtxException ignored) {
             }
-            infos.put(unitSource, configurer.getTextedResolvedPlaceholders());
+            infos.put(unitSource, configurer.getTextedResolvedPlaceholdersAsStringArray());
         }
 
         return infos;

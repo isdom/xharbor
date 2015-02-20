@@ -12,7 +12,7 @@ public interface UnitAdminMXBean {
 
     public void deleteAllUnit();
 
-    public Map<String, Map<String, String>> getSourceInfo(final String template);
+    public Map<String, String[]> getSourceInfo(final String template);
 
     public String[] getLogs();
 
