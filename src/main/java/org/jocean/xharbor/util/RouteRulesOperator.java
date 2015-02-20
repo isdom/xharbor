@@ -15,6 +15,8 @@ import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.Pair;
 import org.jocean.idiom.Triple;
 import org.jocean.idiom.Visitor;
+import org.jocean.xharbor.api.Dispatcher;
+import org.jocean.xharbor.api.Router;
 import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.api.ServiceMemo;
 import org.jocean.xharbor.route.RoutingInfo2Dispatcher;
@@ -30,13 +32,13 @@ import com.alibaba.fastjson.annotation.JSONField;
  * @author isdom
  *
  */
-public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
+public class RouteRulesOperator implements Operator<Router<RoutingInfo, Dispatcher>> {
 
     private static final Logger LOG = LoggerFactory
             .getLogger(RouteRulesOperator.class);
     
     public RouteRulesOperator(
-            final Visitor<RoutingInfo2Dispatcher> updateRules,
+            final Visitor<Router<RoutingInfo, Dispatcher>> updateRules,
             final GuideBuilder guideBuilder,
             final ServiceMemo serviceMemo,
             final HttpRequestTransformer.Builder transformerBuilder
@@ -48,13 +50,13 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
     }
     
     @Override
-    public RoutingInfo2Dispatcher createContext() {
+    public Router<RoutingInfo, Dispatcher> createContext() {
         return new RoutingInfo2Dispatcher(this._guideBuilder, this._serviceMemo, this._transformerBuilder);
     }
 
     @Override
     public RoutingInfo2Dispatcher doAddOrUpdate(
-            final RoutingInfo2Dispatcher entity, 
+            final Router<RoutingInfo, Dispatcher> entity, 
             final String root, 
             final TreeCacheEvent event)
             throws Exception {
@@ -66,7 +68,7 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
                 if ( LOG.isDebugEnabled()) {
                     LOG.debug("add or update level detail with {}/{}", level, desc);
                 }
-                return entity.addOrUpdateDetail(
+                return ((RoutingInfo2Dispatcher)entity).addOrUpdateDetail(
                         level, 
                         desc.isCheckResponseStatus, 
                         desc.isShowInfoLog, 
@@ -85,7 +87,7 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
                     LOG.debug("add or update rule with {}/{}/{}", 
                             priority, uri, Arrays.toString( desc.getRegexs()));
                 }
-                return entity.addOrUpdateRule(priority, uri, desc.getRegexs());
+                return ((RoutingInfo2Dispatcher)entity).addOrUpdateRule(priority, uri, desc.getRegexs());
             }
             return null;
         }
@@ -93,14 +95,14 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
 
     @Override
     public RoutingInfo2Dispatcher doRemove(
-            final RoutingInfo2Dispatcher entity, 
+            final Router<RoutingInfo, Dispatcher> entity, 
             final String root, 
             final TreeCacheEvent event)
             throws Exception {
         final ChildData data = event.getData();
         final Integer level = tryParseLevel(root, data.getPath());
         if ( null != level ) {
-            return entity.removeLevel(level);
+            return ((RoutingInfo2Dispatcher)entity).removeLevel(level);
         }
         else {
             final Pair<Integer,String> pair = tryParseLevelAndUri(root, data.getPath());
@@ -110,20 +112,20 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
                 if ( LOG.isDebugEnabled()) {
                     LOG.debug("remove rule with {}/{}", priority, uri);
                 }
-                return entity.removeRule(pair.getFirst(), pair.getSecond().replace(":||", "://"));
+                return ((RoutingInfo2Dispatcher)entity).removeRule(pair.getFirst(), pair.getSecond().replace(":||", "://"));
             }
             return null;
         }
     }
 
     @Override
-    public RoutingInfo2Dispatcher applyContext(final RoutingInfo2Dispatcher entity) {
+    public Router<RoutingInfo, Dispatcher> applyContext(final Router<RoutingInfo, Dispatcher> entity) {
         if ( null != entity ) {
             try {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("try to update rules for ({})", entity);
                 }
-                this._updateRules.visit(entity.freeze());
+                this._updateRules.visit(((RoutingInfo2Dispatcher)entity).freeze());
             } catch (Exception e) {
                 LOG.warn("exception when update rules {} via ({}), detail:{}",
                         entity, this._updateRules, ExceptionUtils.exception2detail(e));
@@ -297,7 +299,7 @@ public class RouteRulesOperator implements Operator<RoutingInfo2Dispatcher> {
         return null;
     }
     
-    private final Visitor<RoutingInfo2Dispatcher> _updateRules;
+    private final Visitor<Router<RoutingInfo, Dispatcher>> _updateRules;
     private final GuideBuilder _guideBuilder; 
     private final ServiceMemo _serviceMemo; 
     private final HttpRequestTransformer.Builder _transformerBuilder;

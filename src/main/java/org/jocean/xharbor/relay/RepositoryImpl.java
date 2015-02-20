@@ -9,10 +9,8 @@ import org.apache.curator.framework.CuratorFramework;
 import org.jocean.event.api.EventReceiverSource;
 import org.jocean.httpclient.api.GuideBuilder;
 import org.jocean.idiom.Function;
-import org.jocean.idiom.Pair;
 import org.jocean.idiom.ProxyBuilder;
 import org.jocean.idiom.SimpleCache;
-import org.jocean.idiom.Visitor;
 import org.jocean.idiom.Visitor2;
 import org.jocean.xharbor.BusinessRepository;
 import org.jocean.xharbor.api.Dispatcher;
@@ -23,9 +21,10 @@ import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.api.RoutingInfoMemo;
 import org.jocean.xharbor.api.ServiceMemo;
 import org.jocean.xharbor.route.CachedRouter;
+import org.jocean.xharbor.route.CachedRouterUpdater;
 import org.jocean.xharbor.route.Request2RoutingInfo;
+import org.jocean.xharbor.route.RouteObjectNameMaker;
 import org.jocean.xharbor.route.RouteUtils;
-import org.jocean.xharbor.route.RoutingInfo2Dispatcher;
 import org.jocean.xharbor.spi.HttpRequestTransformer;
 import org.jocean.xharbor.util.RouteRulesOperator;
 import org.jocean.xharbor.util.ZKUpdater;
@@ -59,27 +58,10 @@ public class RepositoryImpl implements BusinessRepository{
         return this._repo.get(zkPath).buildProxy();
     }
 
-    private static final String normalizeString(final String input) {
-        return input.replaceAll(":", "-");
-    }
-    
     private CachedRouter<RoutingInfo, Dispatcher> createRouter(final String zkPath) {
         return RouteUtils.buildCachedRouter("org.jocean:type=router,config="+zkPath, 
                 this._source, 
-                new Function<Pair<RoutingInfo,Dispatcher>,String>() {
-            @Override
-            public String apply(final Pair<RoutingInfo,Dispatcher> input) {
-                final Dispatcher dispatcher = input.getSecond();
-                if (dispatcher.IsValid()) {
-                    final RoutingInfo info = input.getFirst();
-                    return "path=" + normalizeString(info.getPath())
-                            +",method=" + info.getMethod()
-                            +",name=routes";
-                }
-                else {
-                    return null;
-                }
-            }});
+                new RouteObjectNameMaker());
     }
             
     private final EventReceiverSource _source;
@@ -113,15 +95,14 @@ public class RepositoryImpl implements BusinessRepository{
                             _noRoutingMemo
                             );
                 }});
-            final Visitor<RoutingInfo2Dispatcher> visitor = new Visitor<RoutingInfo2Dispatcher>() {
-                @Override
-                public void visit(final RoutingInfo2Dispatcher rules) throws Exception {
-                    cachedRouter.updateRouter(rules);
-                }};
+            
             final RouteRulesOperator operator = new RouteRulesOperator(
-                    visitor, _guideBuilder, _serviceMemo, _transformerBuilder);
-            final ZKUpdater<RoutingInfo2Dispatcher> updater = 
-                    new ZKUpdater<RoutingInfo2Dispatcher>(_source, _zkClient, zkPath, operator);
+                    new CachedRouterUpdater<RoutingInfo, Dispatcher>(cachedRouter), 
+                    _guideBuilder, 
+                    _serviceMemo, 
+                    _transformerBuilder);
+            final ZKUpdater<Router<RoutingInfo, Dispatcher>> updater = 
+                    new ZKUpdater<Router<RoutingInfo, Dispatcher>>(_source, _zkClient, zkPath, operator);
             updater.start();
         }};
     

@@ -47,7 +47,7 @@ public class Main {
                 }});
         
         checkNotNull(ctx.getBean("aupUpdater", ZKUpdater.class)).start();
-        checkNotNull(ctx.getBean("gatewayUpdater", ZKUpdater.class)).start();
+//        checkNotNull(ctx.getBean("gatewayUpdater", ZKUpdater.class)).start();
         checkNotNull(ctx.getBean("unitUpdater", ZKUpdater.class)).start();
     }
 

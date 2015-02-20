@@ -58,6 +58,10 @@ public class ZKUpdater<CTX> {
                     this._zkCache, ExceptionUtils.exception2detail(e));
         }
     }
+    
+    public void stop() {
+        this._zkCache.close();
+    }
 
     /**
      * @param newCtx

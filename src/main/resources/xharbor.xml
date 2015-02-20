@@ -3,6 +3,7 @@
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
+        
     <bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
         <property name="locations">
             <list>
@@ -186,7 +187,7 @@
         </constructor-arg>
     </bean>
  
-    <bean id="businessRepository" class="org.jocean.xharbor.relay.RepositoryImpl">
+<!--     <bean id="businessRepository" class="org.jocean.xharbor.relay.RepositoryImpl">
         <constructor-arg ref="source" />
         <constructor-arg ref="zkClient" />
         <constructor-arg ref="memoBuilder" />
@@ -206,20 +207,8 @@
             </bean>
         </constructor-arg>
     </bean>
-    
-<!--     <bean id="jmxConnectorServer" 
-        class="org.springframework.jmx.support.ConnectorServerFactoryBean"  >
-        <property name="serviceUrl" value="service:jmx:jmxmp://0.0.0.0:${jmxmp.port:9876}" />
-        <property name="threaded"   value="true" />
-        <property name="daemon"     value="true" />
-        <property name="objectName" value="org.jocean:type=agent,name0=jmxmp" />
-    </bean>
-     
-    <bean id="htmlAdaptorServer" class="org.jocean.jdmk.comm.HtmlAdaptorServer" 
-        init-method="start" destroy-method="stop">
-        <property name="port" value="${jmxhtml.port:8082}"/>
-    </bean>
  -->
+     
     <bean id="directMemory" class="org.jocean.xharbor.util.DirectMemoryIndicator"/>
     
     <bean id="exporter" class="org.springframework.jmx.export.MBeanExporter"
