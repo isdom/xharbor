@@ -55,31 +55,6 @@
         <constructor-arg value="${gateway.connector.maxConnection:1000}"/>
     </bean>
     
-<!--     <bean id="genObjname" class="org.jocean.j2se.spring.BeanProxy">
-        <constructor-arg value="org.jocean.idiom.Function"/>
-    </bean>
-    
-    <bean id="cachedRouter" class="org.jocean.xharbor.route.RouteUtils" 
-        factory-method="buildCachedRouter">
-        <constructor-arg value="${router.objname:org.jocean:type=router}"/>
-        <constructor-arg ref="source"/>
-        <constructor-arg ref="genObjname"/>
-    </bean>
-    
-    <bean id="router" class="org.jocean.xharbor.route.RouteUtils" 
-        factory-method="compositeRouter">
-        <constructor-arg value="org.jocean.xharbor.api.Dispatcher"/>
-        <constructor-arg>
-            <bean class="org.jocean.xharbor.route.Request2RoutingInfo"/>
-        </constructor-arg>
-        <constructor-arg>
-            <array>
-                <ref bean="cachedRouter"/>
-            </array>
-        </constructor-arg>
-    </bean>
- -->
-     
     <bean id="timer" class="io.netty.util.HashedWheelTimer" />
 
     <bean id="statsRegister" class="org.jocean.xharbor.util.StatsImpl" />
@@ -105,24 +80,6 @@
     <bean id="transformBuilder" class="org.jocean.j2se.spring.BeanProxy">
         <constructor-arg value="org.jocean.xharbor.spi.HttpRequestTransformer.Builder"/>
     </bean>
-    
-<!--     <bean id="relayFlow" class="org.jocean.xharbor.relay.RelayFlow" 
-        scope="prototype">
-        <constructor-arg ref="router" />
-        <constructor-arg ref="memoBuilder" />
-        <constructor-arg ref="serviceMemo" />
-        <constructor-arg ref="noRoutingMemo" />
-        <constructor-arg ref="httpClientPool" />
-        <constructor-arg value="${relay.checkResponseStatus:true}"/>
-        <constructor-arg value="${relay.showInfoLog:true}"/>
-        <constructor-arg ref="transformBuilder"/>
-    </bean>
-    
-    <bean id="relayAgent" class="org.jocean.xharbor.relay.RelayAgentImpl">
-        <constructor-arg ref="source" />
-        <lookup-method name="createRelayFlow" bean="relayFlow"/>
-    </bean>
- -->
      
     <bean id="zkClient" class="org.jocean.xharbor.util.ZKUtils"
         factory-method="buildWithExhibitorEnsembleProvider"
@@ -187,7 +144,7 @@
         </constructor-arg>
     </bean>
  
-<!--     <bean id="businessRepository" class="org.jocean.xharbor.relay.RepositoryImpl">
+<!--     <bean id="businessRepository" class="org.jocean.xharbor.unused.RepositoryImpl">
         <constructor-arg ref="source" />
         <constructor-arg ref="zkClient" />
         <constructor-arg ref="memoBuilder" />
@@ -202,7 +159,7 @@
         <constructor-arg ref="zkClient"/>
         <constructor-arg value="${zk.rules.path:/demo}/gateways"/>
         <constructor-arg>
-            <bean class="org.jocean.xharbor.GatewayLifecycleOperator">
+            <bean class="org.jocean.xharbor.unused.GatewayLifecycleOperator">
                 <constructor-arg ref="businessRepository"/>
             </bean>
         </constructor-arg>

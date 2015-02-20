@@ -68,7 +68,7 @@ import org.slf4j.helpers.NOPLogger;
  * |<---------------ttlRelayFailure--------------------------------->              |     +---> WHOLE time cost
  * |<------------------------------------ttlRelaySuccess-------------------------->|   --+
  */
-class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
+public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
 
     private static final String MONITOR_CHECKALIVE = "monitor://checkalive";
 

@@ -18,14 +18,7 @@ import org.springframework.context.support.ClassPathXmlApplicationContext;
  *
  */
 public class Main {
-//    private static final String normalizeString(final String input) {
-//        return input.replaceAll(":", "-");
-//    }
     
-    /**
-     * @param args
-     * @throws Exception 
-     */
     @SuppressWarnings("unchecked")
     public static void main(String[] args) throws Exception {
         
