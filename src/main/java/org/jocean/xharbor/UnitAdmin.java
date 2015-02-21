@@ -203,20 +203,24 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
             }
 
             final String parentPath = FilenameUtils.getPathNoEndSeparator(name);
-            final ConfigurableApplicationContext parentCtx = this._units.get(parentPath);
+            final Node parentNode = this._units.get(parentPath);
+            final ApplicationContext parentCtx = 
+                    null != parentNode 
+                        ? parentNode._applicationContext 
+                        : this._rootApplicationContext;
             
-            if (LOG.isDebugEnabled()) {
-                if (null != parentCtx) {
-                    LOG.debug("found parent ctx {} for path {} ", parentCtx, parentPath);
-                }
-                else {
-                    LOG.debug("can not found parent ctx for path {} ", parentPath);
-                }
-            }
+//            if (LOG.isDebugEnabled()) {
+//                if (null != parentCtx) {
+//                    LOG.debug("found parent ctx {} for path {} ", parentCtx, parentPath);
+//                }
+//                else {
+//                    LOG.debug("can not found parent ctx for path {} ", parentPath);
+//                }
+//            }
             
             final ConfigurableApplicationContext ctx =
                     createConfigurableApplicationContext(
-                            null != parentCtx ? parentCtx : this._rootApplicationContext,
+                            parentCtx,
                             sources[0], configurer);
 
             final UnitMXBean unit =
@@ -227,7 +231,10 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
                             map2StringArray(params),
                             configurer.getTextedResolvedPlaceholdersAsStringArray());
 
-            this._units.put(name, ctx);
+            if ( null != parentNode) {
+                parentNode.addChild(name);
+            }
+            this._units.put(name, new Node(ctx, params));
 
             this._unitsRegister.replaceRegisteredMBean(objectNameSuffix, mock, unit);
 
@@ -351,9 +358,9 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
     public void deleteUnit(final String name) {
         final int index = this._logidx.incrementAndGet();
             this._unitsRegister.unregisterMBean(genUnitSuffix(name));
-            final ConfigurableApplicationContext ctx = this._units.remove(name);
-            if (null != ctx) {
-                ctx.close();
+            final Node node = this._units.remove(name);
+            if (null != node) {
+                node._applicationContext.close();
                 addLog(Integer.toString(index),
                         new Date().toString() + ": deleteUnit(name=" + name
                                 + ") succeed.)");
@@ -490,6 +497,21 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
         return sources.isEmpty() ? null : sources.toArray(new String[sources.size()]);
     }
 
+    private static class Node {
+        Node(final ConfigurableApplicationContext applicationContext, final Map<String, String> params) {
+            this._applicationContext = applicationContext;
+            this._parameters = params;
+        }
+        
+        void addChild(final String child) {
+            this._children.add(child);
+        }
+        
+        private final List<String> _children = new ArrayList<String>();
+        private final ConfigurableApplicationContext _applicationContext;
+        private final Map<String, String>   _parameters;
+    }
+    
     private String[] _sourcePatterns;
 
     private ApplicationContext _rootApplicationContext = null;
@@ -500,7 +522,7 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
 
     private final MBeanRegisterSupport _unitsRegister;
 
-    private final Map<String, ConfigurableApplicationContext> _units = new ConcurrentHashMap<>();
+    private final Map<String, Node> _units = new ConcurrentHashMap<>();
 
     private final AtomicInteger _logidx = new AtomicInteger(0);
 
