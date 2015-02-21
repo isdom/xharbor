@@ -29,6 +29,7 @@ import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.config.PropertyPlaceholderConfigurer;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 import org.springframework.core.io.Resource;
@@ -202,7 +203,7 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
             }
 
             final String parentPath = FilenameUtils.getPathNoEndSeparator(name);
-            final AbstractApplicationContext parentCtx = this._units.get(parentPath);
+            final ConfigurableApplicationContext parentCtx = this._units.get(parentPath);
             
             if (LOG.isDebugEnabled()) {
                 if (null != parentCtx) {
@@ -213,7 +214,7 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
                 }
             }
             
-            final AbstractApplicationContext ctx =
+            final ConfigurableApplicationContext ctx =
                     createConfigurableApplicationContext(
                             null != parentCtx ? parentCtx : this._rootApplicationContext,
                             sources[0], configurer);
@@ -350,7 +351,7 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
     public void deleteUnit(final String name) {
         final int index = this._logidx.incrementAndGet();
             this._unitsRegister.unregisterMBean(genUnitSuffix(name));
-            final AbstractApplicationContext ctx = this._units.remove(name);
+            final ConfigurableApplicationContext ctx = this._units.remove(name);
             if (null != ctx) {
                 ctx.close();
                 addLog(Integer.toString(index),
@@ -435,7 +436,7 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
      * @param configurer
      * @return
      */
-    private AbstractApplicationContext createConfigurableApplicationContext(
+    private ConfigurableApplicationContext createConfigurableApplicationContext(
             final ApplicationContext parentCtx,
             final String unitSource,
             final PropertyPlaceholderConfigurer configurer) {
@@ -499,7 +500,7 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
 
     private final MBeanRegisterSupport _unitsRegister;
 
-    private final Map<String, AbstractApplicationContext> _units = new ConcurrentHashMap<>();
+    private final Map<String, ConfigurableApplicationContext> _units = new ConcurrentHashMap<>();
 
     private final AtomicInteger _logidx = new AtomicInteger(0);
 
