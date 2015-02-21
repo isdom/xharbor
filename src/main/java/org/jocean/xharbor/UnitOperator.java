@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
+import org.apache.commons.io.FilenameUtils;
 import org.apache.curator.framework.recipes.cache.ChildData;
 import org.apache.curator.framework.recipes.cache.TreeCacheEvent;
 import org.jocean.xharbor.util.ZKUpdater.Operator;
@@ -40,22 +41,26 @@ public class UnitOperator implements Operator<Object> {
             final TreeCacheEvent event)
             throws Exception {
         final ChildData data = event.getData();
-        final String sourceName = parseSourceFromPath(root, data.getPath());
-        if ( null != sourceName ) {
+        final String pathName = parseSourceFromPath(root, data.getPath());
+        if ( null != pathName ) {
             if ( LOG.isDebugEnabled()) {
-                LOG.debug("create or update unit with {}", sourceName);
+                LOG.debug("create or update unit with {}", pathName);
             }
-            this._unitAdmin.deleteUnit(sourceName);
+            this._unitAdmin.deleteUnit(pathName);
             
-            final String pattern = "**"+ getTemplateFromSourceName(sourceName) + ".xml";
-            final InputStream is = new ByteArrayInputStream(data.getData());
+            final String pattern = "**"+ getTemplateFromFullPathName(pathName) + ".xml";
+            final InputStream is = null != data.getData() 
+                        ? new ByteArrayInputStream(data.getData()) 
+                        : null;
             
             try {
                 final Properties props =  new Properties();
-                props.load( is );
+                if (null != is) {
+                    props.load( is );
+                }
                 
                 this._unitAdmin.createUnit(
-                        sourceName,
+                        pathName,
                         pattern,
                         new HashMap<String, String>() {
                             private static final long serialVersionUID = 1L;
@@ -103,18 +108,16 @@ public class UnitOperator implements Operator<Object> {
         return path.substring(root.length() + ( !root.endsWith("/") ? 1 : 0 ));
     }
 
-    private String getTemplateFromSourceName(final String sourceName) {
-        String  template = sourceName;
-        int idx = template.lastIndexOf('.');
-        if ( -1 == idx ) {
-            idx = template.lastIndexOf('/');
-        }
-        
-        if ( -1 != idx ) {
-            template = template.substring(idx + 1);
-        }
-        
-        return template;
+    private String getTemplateFromFullPathName(final String fullPathName) {
+//        a/b/c.txt --> c.txt
+//        a.txt     --> a.txt
+//        a/b/c     --> c
+//        a/b/c/    --> ""
+        // for return value, eg:
+        //  and gateway.1.2.3.4 --> gateway
+        final String  template = FilenameUtils.getName(fullPathName);
+        final int idx = template.indexOf('.');
+        return ( -1 != idx ) ? template.substring(0, idx) : template;
     }
     
     private final UnitAdmin _unitAdmin;
