@@ -30,14 +30,13 @@ import org.springframework.beans.factory.config.PropertyPlaceholderConfigurer;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 import org.springframework.core.io.Resource;
 import org.springframework.util.ReflectionUtils;
 
 public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
 
-    private final static String[] _DEFAULT_SOURCE_PATTERNS = new String[]{"**/flow/**.xml"};
+    private final static String[] _DEFAULT_SOURCE_PATTERNS = new String[]{"**/units/**.xml"};
 
     public static interface UnitMXBean {
 
@@ -149,35 +148,39 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
             final String pattern,
             final Map<String, String> params,
             final boolean usingFirstWhenMatchedMultiSource) throws Exception {
-
-        final int index = this._logidx.incrementAndGet();
-        final String now = new Date().toString();
-
         final String[] sources = searchUnitSourceOf(new String[]{pattern});
 
         if (null == sources) {
             LOG.warn("can't found unit source matched {}, newUnit {} failed", pattern, name);
-            addLog(Integer.toString(index), now + ": newUnit(" + name
+            addLog(" newUnit(" + name
                     + ") failed for can't found source matched ("
                     + pattern + ")");
             return null;
         } else if (sources.length > 1) {
-            if (usingFirstWhenMatchedMultiSource) {
-                LOG.warn("found unit source more than one matched {}, using first one to create unit {}",
-                        pattern, name);
-            } else {
+            if (!usingFirstWhenMatchedMultiSource) {
                 LOG.warn("found unit source more than one matched {}, failed to create unit {}/{}", pattern, name);
-                addLog(Integer.toString(index), now + ": newUnit(" + name
+                addLog(" newUnit(" + name
                         + ") failed for found unit source > 1 "
                         + pattern);
                 return null;
+            } else {
+                LOG.warn("found unit source more than one matched {}, using first one to create unit {}",
+                        pattern, name);
             }
         }
+
+        return createUnitFromSource(name, sources[0], params);
+    }
+    
+    public UnitMXBean createUnitFromSource(
+            final String name,
+            final String unitSource,
+            final Map<String, String> params) throws Exception {
 
         final String objectNameSuffix = genUnitSuffix(name);
         final Object mock = newMockUnitMXBean(name);
         if (!reserveRegistration(objectNameSuffix, mock)) {
-            addLog(Integer.toString(index), now + ": newUnit("
+            addLog(" newUnit("
                     + name
                     + ") failed for can't reserve "
                     + objectNameSuffix);
@@ -211,31 +214,32 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
                         ? parentNode._applicationContext 
                         : this._rootApplicationContext;
             
-//            if (LOG.isDebugEnabled()) {
-//                if (null != parentCtx) {
-//                    LOG.debug("found parent ctx {} for path {} ", parentCtx, parentPath);
-//                }
-//                else {
-//                    LOG.debug("can not found parent ctx for path {} ", parentPath);
-//                }
-//            }
+            if (LOG.isDebugEnabled()) {
+                if (null != parentCtx) {
+                    LOG.debug("found parent ctx {} for path {} ", parentCtx, parentPath);
+                }
+                else {
+                    LOG.debug("can not found parent ctx for path {} ", parentPath);
+                }
+            }
             
             final ConfigurableApplicationContext ctx =
                     createConfigurableApplicationContext(
                             parentCtx,
-                            sources[0], configurer);
+                            unitSource, 
+                            configurer);
 
             if ( null != parentNode) {
                 parentNode.addChild(name);
             }
-            final Node node = new Node(ctx, params);
+            final Node node = new Node(ctx, unitSource, params);
             this._units.put(name, node);
             
             final UnitMXBean unit =
                     newUnitMXBean(
                             name,
-                            sources[0],
-                            now,
+                            unitSource,
+                            new Date().toString(),
                             map2StringArray(params),
                             configurer.getTextedResolvedPlaceholdersAsStringArray(),
                             node.childrenUnits());
@@ -243,12 +247,12 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
 
             this._unitsRegister.replaceRegisteredMBean(objectNameSuffix, mock, unit);
 
-            addLog(Integer.toString(index), now + ": newUnit(" + name + ") succeed.");
+            addLog(" newUnit(" + name + ") succeed.");
 
             return unit;
         } catch (Exception e) {
             this._unitsRegister.unregisterMBean(objectNameSuffix);
-            addLog(Integer.toString(index), now + ": newUnit(" + name + ") failed for "
+            addLog(" newUnit(" + name + ") failed for "
                     + ExceptionUtils.exception2detail(e));
             throw e;
         }
@@ -372,20 +376,17 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
 
     @Override
     public void deleteUnit(final String name) {
-        final int index = this._logidx.incrementAndGet();
-            this._unitsRegister.unregisterMBean(genUnitSuffix(name));
-            final Node node = this._units.remove(name);
-            if (null != node) {
-                node._applicationContext.close();
-                addLog(Integer.toString(index),
-                        new Date().toString() + ": deleteUnit(name=" + name
-                                + ") succeed.)");
-            } else {
-                LOG.warn("unit ({})'s AbstractApplicationContext is null, unit maybe deleted already", name);
-                addLog(Integer.toString(index),
-                        new Date().toString() + ": deleteUnit(name=" + name
-                                + ") failed for AbstractApplicationContext is null.)");
-            }
+        this._unitsRegister.unregisterMBean(genUnitSuffix(name));
+        final Node node = this._units.remove(name);
+        if (null != node) {
+            node._applicationContext.close();
+            addLog(" deleteUnit(name=" + name
+                            + ") succeed.)");
+        } else {
+            LOG.warn("unit ({})'s ApplicationContext is null, unit maybe deleted already", name);
+            addLog(" deleteUnit(name=" + name
+                            + ") failed for AbstractApplicationContext is null.)");
+        }
     }
 
     @Override
@@ -450,8 +451,10 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
         this._logs.clear();
     }
 
-    private void addLog(final String id, final String msg) {
-        this._logs.add(id + ":" + msg + "\r\n");
+    private void addLog(final String msg) {
+        this._logs.add(this._logidx.incrementAndGet() 
+                + ":" + new Date().toString() 
+                + ":" + msg + "\r\n");
     }
 
     /**
@@ -463,23 +466,19 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
             final ApplicationContext parentCtx,
             final String unitSource,
             final PropertyPlaceholderConfigurer configurer) {
-        final AbstractApplicationContext topCtx =
+        final ApplicationContext topCtx =
                 new ClassPathXmlApplicationContext(
-                        new String[]{"org/jocean/ext/ebus/spring/unitParent.xml"}, 
-                        parentCtx);
+                    new String[]{"org/jocean/ext/ebus/spring/unitParent.xml"}, 
+                    parentCtx);
 
         final PropertyConfigurerFactory factory =
                 topCtx.getBean(PropertyConfigurerFactory.class);
 
         factory.setConfigurer(configurer);
 
-        final AbstractApplicationContext ctx =
-                new ClassPathXmlApplicationContext(
-                        new String[]{
-                                "org/jocean/ext/ebus/spring/Configurable.xml",
-                                unitSource},
-                        topCtx);
-        return ctx;
+        return new ClassPathXmlApplicationContext(
+                    new String[]{"org/jocean/ext/ebus/spring/Configurable.xml", unitSource},
+                    topCtx);
     }
 
     private String[] searchUnitSourceOf(final String[] sourcePatterns) {
@@ -514,8 +513,11 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
     }
 
     private static class Node {
-        Node(final ConfigurableApplicationContext applicationContext, final Map<String, String> params) {
+        Node(final ConfigurableApplicationContext applicationContext, 
+            final String unitSource, 
+            final Map<String, String> params) {
             this._applicationContext = applicationContext;
+            this._unitSource = unitSource;
             this._parameters = params;
         }
         
@@ -530,6 +532,7 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
         private final List<String> _children = new ArrayList<String>();
         private final ConfigurableApplicationContext _applicationContext;
         private final Map<String, String>   _parameters;
+        private final String _unitSource;
     }
     
     private String[] _sourcePatterns;
