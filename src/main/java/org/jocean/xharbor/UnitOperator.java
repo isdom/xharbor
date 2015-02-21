@@ -105,10 +105,15 @@ public class UnitOperator implements Operator<Object> {
 
     private String getTemplateFromSourceName(final String sourceName) {
         String  template = sourceName;
-        int idx = template.lastIndexOf(".");
+        int idx = template.lastIndexOf('.');
+        if ( -1 == idx ) {
+            idx = template.lastIndexOf('/');
+        }
+        
         if ( -1 != idx ) {
             template = template.substring(idx + 1);
         }
+        
         return template;
     }
     

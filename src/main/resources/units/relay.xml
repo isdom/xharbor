@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd">
+    
+    <bean id="cachedRouter" class="org.jocean.xharbor.route.RouteUtils" 
+        factory-method="buildCachedRouter">
+        <constructor-arg value="${router.objname:org.jocean:type=router}"/>
+        <constructor-arg ref="source"/>
+        <constructor-arg>
+            <bean class="org.jocean.xharbor.route.RouteObjectNameMaker" />
+        </constructor-arg>
+    </bean>
+    
+    <bean id="router" class="org.jocean.xharbor.route.RouteUtils" 
+        factory-method="compositeRouter">
+        <constructor-arg value="org.jocean.xharbor.api.Dispatcher"/>
+        <constructor-arg>
+            <bean class="org.jocean.xharbor.route.Request2RoutingInfo"/>
+        </constructor-arg>
+        <constructor-arg>
+            <array>
+                <ref bean="cachedRouter"/>
+            </array>
+        </constructor-arg>
+    </bean>     
+    
+    <bean id="relayFlow" class="org.jocean.xharbor.relay.RelayFlow" 
+        scope="prototype">
+        <constructor-arg ref="router" />
+        <constructor-arg ref="memoBuilder" />
+        <constructor-arg ref="noRoutingMemo" />
+    </bean>
+    
+    <bean id="relayAgent" class="org.jocean.xharbor.relay.RelayAgentImpl">
+        <constructor-arg ref="source" />
+        <lookup-method name="createRelayFlow" bean="relayFlow"/>
+    </bean>
+    
+    <bean id="routerUpdater" class="org.jocean.xharbor.util.ZKUpdater"
+        init-method="start" destroy-method="stop">
+        <constructor-arg ref="source"/>
+        <constructor-arg ref="zkClient"/>
+        <constructor-arg value="${gateway.rules.path}"/>
+        <constructor-arg>
+            <bean class="org.jocean.xharbor.util.RouteRulesOperator">
+                <constructor-arg>
+                    <bean class="org.jocean.xharbor.route.CachedRouterUpdater">
+                        <constructor-arg ref="cachedRouter"/>
+                    </bean>
+                </constructor-arg>
+                <constructor-arg ref="httpClientPool"/>
+                <constructor-arg ref="serviceMemo"/>
+                <constructor-arg ref="transformBuilder"/>
+            </bean>
+        </constructor-arg>
+    </bean>
+    
+</beans>

@@ -15,6 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.commons.io.FilenameUtils;
 import org.jocean.ext.unit.PropertyConfigurerFactory;
 import org.jocean.ext.unit.ValueAwarePlaceholderConfigurer;
 import org.jocean.ext.util.PackageUtils;
@@ -200,8 +201,22 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
                 configurer.setLocalOverride(true);//params(功能单元中的配置)覆盖全局配置
             }
 
+            final String parentPath = FilenameUtils.getPathNoEndSeparator(name);
+            final AbstractApplicationContext parentCtx = this._units.get(parentPath);
+            
+            if (LOG.isDebugEnabled()) {
+                if (null != parentCtx) {
+                    LOG.debug("found parent ctx {} for path {} ", parentCtx, parentPath);
+                }
+                else {
+                    LOG.debug("can not found parent ctx for path {} ", parentPath);
+                }
+            }
+            
             final AbstractApplicationContext ctx =
-                    createConfigurableApplicationContext(sources[0], configurer);
+                    createConfigurableApplicationContext(
+                            null != parentCtx ? parentCtx : this._rootApplicationContext,
+                            sources[0], configurer);
 
             final UnitMXBean unit =
                     newUnitMXBean(
@@ -392,7 +407,7 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
                     };
 
             try {
-                createConfigurableApplicationContext(source, configurer);
+                createConfigurableApplicationContext(null, source, configurer);
             } catch (StopInitCtxException ignored) {
             }
             infos.put(unitSource, configurer.getTextedResolvedPlaceholdersAsStringArray());
@@ -421,12 +436,13 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
      * @return
      */
     private AbstractApplicationContext createConfigurableApplicationContext(
+            final ApplicationContext parentCtx,
             final String unitSource,
             final PropertyPlaceholderConfigurer configurer) {
         final AbstractApplicationContext topCtx =
                 new ClassPathXmlApplicationContext(
                         new String[]{"org/jocean/ext/ebus/spring/unitParent.xml"}, 
-                        this._rootApplicationContext);
+                        parentCtx);
 
         final PropertyConfigurerFactory factory =
                 topCtx.getBean(PropertyConfigurerFactory.class);
