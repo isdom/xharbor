@@ -50,6 +50,8 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
         public String[] getPlaceholders();
 
         public String getCreateTimestamp();
+        
+        public String[] getChildrenUnits();
 
         public void close();
     }
@@ -223,18 +225,21 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
                             parentCtx,
                             sources[0], configurer);
 
+            if ( null != parentNode) {
+                parentNode.addChild(name);
+            }
+            final Node node = new Node(ctx, params);
+            this._units.put(name, node);
+            
             final UnitMXBean unit =
                     newUnitMXBean(
                             name,
                             sources[0],
                             now,
                             map2StringArray(params),
-                            configurer.getTextedResolvedPlaceholdersAsStringArray());
+                            configurer.getTextedResolvedPlaceholdersAsStringArray(),
+                            node.childrenUnits());
 
-            if ( null != parentNode) {
-                parentNode.addChild(name);
-            }
-            this._units.put(name, new Node(ctx, params));
 
             this._unitsRegister.replaceRegisteredMBean(objectNameSuffix, mock, unit);
 
@@ -277,7 +282,8 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
             final String source,
             final String now,
             final String[] params,
-            final String[] placeholders) {
+            final String[] placeholders,
+            final List<String> childrenUnits) {
         return new UnitMXBean() {
 
             @Override
@@ -308,6 +314,11 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
             @Override
             public String getName() {
                 return name;
+            }
+
+            @Override
+            public String[] getChildrenUnits() {
+                return childrenUnits.toArray(new String[0]);
             }
         };
     }
@@ -350,6 +361,11 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
             @Override
             public String getName() {
                 return name;
+            }
+
+            @Override
+            public String[] getChildrenUnits() {
+                return null;
             }
         };
     }
@@ -505,6 +521,10 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
         
         void addChild(final String child) {
             this._children.add(child);
+        }
+        
+        List<String> childrenUnits() {
+            return this._children;
         }
         
         private final List<String> _children = new ArrayList<String>();
