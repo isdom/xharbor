@@ -17,7 +17,10 @@ public class ZKUpdater<CTX> {
     public interface Operator<CTX> {
         public CTX createContext();
         
-        public CTX doAddOrUpdate(final CTX ctx, final String root, final TreeCacheEvent event) 
+        public CTX doAdd(final CTX ctx, final String root, final TreeCacheEvent event) 
+                throws Exception;
+        
+        public CTX doUpdate(final CTX ctx, final String root, final TreeCacheEvent event) 
                 throws Exception;
         
         public CTX doRemove(final CTX ctx, final String root, final TreeCacheEvent event) 
@@ -78,13 +81,13 @@ public class ZKUpdater<CTX> {
             @OnEvent(event = "NODE_ADDED")
             private BizStep nodeAdded(final TreeCacheEvent event) throws Exception {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("handler ({}) with event ({}), try to add or update aup", 
+                    LOG.debug("handler ({}) with event ({}), try to add or update operator", 
                             currentEventHandler(), event);
                 }
                 try {
-                    _operator.doAddOrUpdate(_context, _root, event);
+                    _operator.doAdd(_context, _root, event);
                 } catch (Exception e) {
-                    LOG.warn("exception when addOrUpdateToBuilder for event({}), detail:{}",
+                    LOG.warn("exception when doAdd for event({}), detail:{}",
                             event, ExceptionUtils.exception2detail(e));
                 }
                 
@@ -94,13 +97,13 @@ public class ZKUpdater<CTX> {
             @OnEvent(event = "NODE_REMOVED")
             private BizStep nodeRemoved(final TreeCacheEvent event) throws Exception {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("handler ({}) with event ({}), try to remove aup", 
+                    LOG.debug("handler ({}) with event ({}), try to remove operator", 
                             currentEventHandler(), event);
                 }
                 try {
                     _operator.doRemove(_context, _root, event);
                 } catch (Exception e) {
-                    LOG.warn("exception when removeFromBuilder for event({}), detail:{}",
+                    LOG.warn("exception when doRemove for event({}), detail:{}",
                             event, ExceptionUtils.exception2detail(e));
                 }
                 
@@ -109,7 +112,18 @@ public class ZKUpdater<CTX> {
             
             @OnEvent(event = "NODE_UPDATED")
             private BizStep nodeUpdated(final TreeCacheEvent event) throws Exception {
-                return nodeAdded(event);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("handler ({}) with event ({}), try to update operator", 
+                            currentEventHandler(), event);
+                }
+                try {
+                    _operator.doUpdate(_context, _root, event);
+                } catch (Exception e) {
+                    LOG.warn("exception when doUpdate for event({}), detail:{}",
+                            event, ExceptionUtils.exception2detail(e));
+                }
+                
+                return currentEventHandler();
             }
             
             @OnEvent(event = "INITIALIZED")
@@ -125,14 +139,14 @@ public class ZKUpdater<CTX> {
             @OnEvent(event = "NODE_ADDED")
             private BizStep nodeAdded(final TreeCacheEvent event) throws Exception {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("handler ({}) with event ({}), try to add or update rule", 
+                    LOG.debug("handler ({}) with event ({}), try to add operator", 
                             currentEventHandler(), event);
                 }
                 try {
                     safeUpdateCtx(
-                        _operator.applyContext(_operator.doAddOrUpdate(_context, _root, event)));
+                        _operator.applyContext(_operator.doAdd(_context, _root, event)));
                 } catch (Exception e) {
-                    LOG.warn("exception when addOrUpdateToBuilder for event({}), detail:{}",
+                    LOG.warn("exception when doAdd for event({}), detail:{}",
                             event, ExceptionUtils.exception2detail(e));
                 }
                 
@@ -142,14 +156,14 @@ public class ZKUpdater<CTX> {
             @OnEvent(event = "NODE_REMOVED")
             private BizStep nodeRemoved(final TreeCacheEvent event) throws Exception {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("handler ({}) with event ({}), try to remove rule", 
+                    LOG.debug("handler ({}) with event ({}), try to remove operator", 
                             currentEventHandler(), event);
                 }
                 try {
                     safeUpdateCtx(
                         _operator.applyContext(_operator.doRemove(_context, _root, event)));
                 } catch (Exception e) {
-                    LOG.warn("exception when removeFromBuilder for event({}), detail:{}",
+                    LOG.warn("exception when doRemove for event({}), detail:{}",
                             event, ExceptionUtils.exception2detail(e));
                 }
                 
@@ -158,7 +172,19 @@ public class ZKUpdater<CTX> {
             
             @OnEvent(event = "NODE_UPDATED")
             private BizStep nodeUpdated(final TreeCacheEvent event) throws Exception {
-                return nodeAdded(event);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("handler ({}) with event ({}), try to update operator", 
+                            currentEventHandler(), event);
+                }
+                try {
+                    safeUpdateCtx(
+                        _operator.applyContext(_operator.doUpdate(_context, _root, event)));
+                } catch (Exception e) {
+                    LOG.warn("exception when doUpdate for event({}), detail:{}",
+                            event, ExceptionUtils.exception2detail(e));
+                }
+                
+                return currentEventHandler();
             }
         }
         .freeze();

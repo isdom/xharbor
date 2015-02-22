@@ -55,7 +55,7 @@ public class RouteRulesOperator implements Operator<Router<RoutingInfo, Dispatch
     }
 
     @Override
-    public RoutingInfo2Dispatcher doAddOrUpdate(
+    public RoutingInfo2Dispatcher doAdd(
             final Router<RoutingInfo, Dispatcher> entity, 
             final String root, 
             final TreeCacheEvent event)
@@ -91,6 +91,15 @@ public class RouteRulesOperator implements Operator<Router<RoutingInfo, Dispatch
             }
             return null;
         }
+    }
+
+    @Override
+    public RoutingInfo2Dispatcher doUpdate(
+            final Router<RoutingInfo, Dispatcher> entity, 
+            final String root, 
+            final TreeCacheEvent event)
+            throws Exception {
+        return doAdd(entity, root, event);
     }
 
     @Override

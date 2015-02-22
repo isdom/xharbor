@@ -37,7 +37,7 @@ public class AUPOperator implements Operator<CompositeAUPBuilder> {
     }
 
     @Override
-    public CompositeAUPBuilder doAddOrUpdate(
+    public CompositeAUPBuilder doAdd(
             final CompositeAUPBuilder builder,
             final String root, 
             final TreeCacheEvent event) throws Exception {
@@ -54,6 +54,12 @@ public class AUPOperator implements Operator<CompositeAUPBuilder> {
         return null;
     }
 
+    @Override
+    public CompositeAUPBuilder doUpdate(final CompositeAUPBuilder builder, final String root, final TreeCacheEvent event)
+            throws Exception {
+        return doAdd(builder, root, event);
+    }
+    
     @Override
     public CompositeAUPBuilder doRemove(
             final CompositeAUPBuilder builder,

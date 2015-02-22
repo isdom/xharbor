@@ -37,7 +37,7 @@ public class GatewayLifecycleOperator implements Operator<Object> {
     }
 
     @Override
-    public Object doAddOrUpdate(
+    public Object doAdd(
             final Object ctx, 
             final String root, 
             final TreeCacheEvent event)
@@ -56,6 +56,12 @@ public class GatewayLifecycleOperator implements Operator<Object> {
         return ctx;
     }
 
+    @Override
+    public Object doUpdate(final Object ctx, final String root, final TreeCacheEvent event)
+            throws Exception {
+        return doAdd(ctx, root, event);
+    }
+    
     @Override
     public Object doRemove(
             final Object ctx, 

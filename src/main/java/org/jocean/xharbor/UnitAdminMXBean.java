@@ -4,11 +4,17 @@ import java.util.Map;
 
 public interface UnitAdminMXBean {
 
-    public void newUnit(final String name, final String template, final String[] params) throws Exception;
+    public boolean newUnit(
+            final String unitName, 
+            final String template, 
+            final String[] unitParameters);
 
-    public void newUnit(final String name, final String template, final Map<String, String> params) throws Exception;
+    public boolean newUnit(
+            final String unitName, 
+            final String template, 
+            final Map<String, String> unitParameters);
 
-    public void deleteUnit(final String name);
+    public boolean deleteUnit(final String unitName);
 
     public void deleteAllUnit();
 

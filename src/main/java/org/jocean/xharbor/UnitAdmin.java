@@ -124,105 +124,109 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
     }
 
     @Override
-    public void newUnit(final String name, final String pattern, final String[] params)
-            throws Exception {
-        newUnit(name, pattern, new HashMap<String, String>() {
+    public boolean newUnit(
+            final String unitName, 
+            final String pattern, 
+            final String[] unitParameters) {
+        return newUnit(unitName, pattern, new HashMap<String, String>() {
             private static final long serialVersionUID = 1L;
             {
                 //  确保偶数
-                for (int idx = 0; idx < (params.length / 2) * 2; idx += 2) {
-                    this.put(params[idx], params[idx + 1]);
+                for (int idx = 0; idx < (unitParameters.length / 2) * 2; idx += 2) {
+                    this.put(unitParameters[idx], unitParameters[idx + 1]);
                 }
             }
         });
     }
 
     @Override
-    public void newUnit(final String name, final String pattern, final Map<String, String> params)
-            throws Exception {
-        createUnit(name, pattern, params, false);
+    public boolean newUnit(
+            final String unitName, 
+            final String pattern, 
+            final Map<String, String> unitParameters) {
+        return null != createUnit(unitName, pattern, unitParameters, false);
     }
 
     public UnitMXBean createUnit(
-            final String name,
+            final String unitName,
             final String pattern,
-            final Map<String, String> params,
-            final boolean usingFirstWhenMatchedMultiSource) throws Exception {
+            final Map<String, String> unitParameters,
+            final boolean usingFirstWhenMatchedMultiSource) {
         final String[] sources = searchUnitSourceOf(new String[]{pattern});
 
         if (null == sources) {
-            LOG.warn("can't found unit source matched {}, newUnit {} failed", pattern, name);
-            addLog(" newUnit(" + name
+            LOG.warn("can't found unit source matched {}, newUnit {} failed", pattern, unitName);
+            addLog(" newUnit(" + unitName
                     + ") failed for can't found source matched ("
                     + pattern + ")");
             return null;
         } else if (sources.length > 1) {
             if (!usingFirstWhenMatchedMultiSource) {
-                LOG.warn("found unit source more than one matched {}, failed to create unit {}/{}", pattern, name);
-                addLog(" newUnit(" + name
+                LOG.warn("found unit source more than one matched {}, failed to create unit {}/{}", pattern, unitName);
+                addLog(" newUnit(" + unitName
                         + ") failed for found unit source > 1 "
                         + pattern);
                 return null;
             } else {
                 LOG.warn("found unit source more than one matched {}, using first one to create unit {}",
-                        pattern, name);
+                        pattern, unitName);
             }
         }
 
-        return createUnitFromSource(name, sources[0], params);
+        return doCreateUnit(unitName, sources[0], unitParameters);
     }
     
-    public UnitMXBean createUnitFromSource(
-            final String name,
+    private UnitMXBean doCreateUnit(
+            final String unitName,
             final String unitSource,
-            final Map<String, String> params) throws Exception {
+            final Map<String, String> unitParameters) {
 
-        final String objectNameSuffix = genUnitSuffix(name);
-        final Object mock = newMockUnitMXBean(name);
+        final String objectNameSuffix = genUnitSuffix(unitName);
+        final Object mock = newMockUnitMXBean(unitName);
         if (!reserveRegistration(objectNameSuffix, mock)) {
             addLog(" newUnit("
-                    + name
+                    + unitName
                     + ") failed for can't reserve "
                     + objectNameSuffix);
             throw new RuntimeException("can't reserve " + objectNameSuffix + ", may be already registered");
         }
 
+        final ValueAwarePlaceholderConfigurer configurer =
+                new ValueAwarePlaceholderConfigurer() {
+                    {
+                        this.setProperties(new Properties() {
+                            private static final long serialVersionUID = 1L;
+
+                            {
+                                this.putAll(unitParameters);
+                            }
+                        });
+
+                    }
+                };
+
+        if (this._rootPropertyFiles != null) {
+            configurer.setLocations(this._rootPropertyFiles);
+            configurer.setLocalOverride(true);//params(功能单元中的配置)覆盖全局配置
+        }
+
+        final Node parentNode = getParentNode(unitName);
+        final ApplicationContext parentCtx = 
+                null != parentNode 
+                    ? parentNode.applicationContext() 
+                    : this._rootApplicationContext;
+        
+        if (null == parentCtx) {
+            registerUnactiveUnit(
+                    unitName, 
+                    unitSource, 
+                    unitParameters,
+                    objectNameSuffix, 
+                    parentNode);
+            addLog(" newUnit(" + unitName + ") failed for null parentCtx");
+            return null;
+        }
         try {
-            final ValueAwarePlaceholderConfigurer configurer =
-                    new ValueAwarePlaceholderConfigurer() {
-                        {
-                            this.setProperties(new Properties() {
-                                private static final long serialVersionUID = 1L;
-
-                                {
-                                    this.putAll(params);
-                                }
-                            });
-
-                        }
-                    };
-
-            if (this._rootPropertyFiles != null) {
-                configurer.setLocations(this._rootPropertyFiles);
-                configurer.setLocalOverride(true);//params(功能单元中的配置)覆盖全局配置
-            }
-
-            final String parentPath = FilenameUtils.getPathNoEndSeparator(name);
-            final Node parentNode = this._units.get(parentPath);
-            final ApplicationContext parentCtx = 
-                    null != parentNode 
-                        ? parentNode._applicationContext 
-                        : this._rootApplicationContext;
-            
-            if (LOG.isDebugEnabled()) {
-                if (null != parentCtx) {
-                    LOG.debug("found parent ctx {} for path {} ", parentCtx, parentPath);
-                }
-                else {
-                    LOG.debug("can not found parent ctx for path {} ", parentPath);
-                }
-            }
-            
             final ConfigurableApplicationContext ctx =
                     createConfigurableApplicationContext(
                             parentCtx,
@@ -230,35 +234,98 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
                             configurer);
 
             if ( null != parentNode) {
-                parentNode.addChild(name);
+                parentNode.addChild(unitName);
             }
-            final Node node = new Node(ctx, unitSource, params);
-            this._units.put(name, node);
+            final Node node = new Node(ctx, unitName, unitSource, unitParameters);
+            this._units.put(unitName, node);
             
             final UnitMXBean unit =
                     newUnitMXBean(
-                            name,
+                            unitName,
                             unitSource,
                             new Date().toString(),
-                            map2StringArray(params),
+                            map2StringArray(unitParameters),
                             configurer.getTextedResolvedPlaceholdersAsStringArray(),
                             node.childrenUnits());
 
-
             this._unitsRegister.replaceRegisteredMBean(objectNameSuffix, mock, unit);
 
-            addLog(" newUnit(" + name + ") succeed.");
+            addLog(" newUnit(" + unitName + ") succeed.");
 
             return unit;
         } catch (Exception e) {
-            this._unitsRegister.unregisterMBean(objectNameSuffix);
-            addLog(" newUnit(" + name + ") failed for "
+            registerUnactiveUnit(
+                    unitName, 
+                    unitSource, 
+                    unitParameters,
+                    objectNameSuffix, 
+                    parentNode);
+            LOG.warn("exception when createUnit for {}, detail:{}", unitName, ExceptionUtils.exception2detail(e));
+            addLog(" newUnit(" + unitName + ") failed for "
                     + ExceptionUtils.exception2detail(e));
-            throw e;
+            return null;
         }
     }
 
+    /**
+     * @param unitName
+     * @return
+     */
+    private Node getParentNode(final String unitName) {
+        final String parentPath = FilenameUtils.getPathNoEndSeparator(unitName);
+        final Node parentNode = "".equals(parentPath) ? null : this._units.get(parentPath);
+        if (LOG.isDebugEnabled()) {
+            if (null != parentNode) {
+                LOG.debug("found parent node {} for path {} ", parentNode, parentPath);
+            }
+            else {
+                LOG.debug("can not found parent node for path {} ", parentPath);
+            }
+        }
+        return parentNode;
+    }
 
+    /**
+     * @param unitName
+     * @param unitSource
+     * @param unitParameters
+     * @param objectNameSuffix
+     * @param parentNode
+     */
+    private void registerUnactiveUnit(
+            final String unitName,
+            final String unitSource, 
+            final Map<String, String> unitParameters,
+            final String objectNameSuffix, 
+            final Node parentNode) {
+        if ( null != parentNode) {
+            parentNode.addChild(unitName);
+        }
+        final Node node = new Node(null, unitName, unitSource, unitParameters);
+        this._units.put(unitName, node);
+        
+        this._unitsRegister.unregisterMBean(objectNameSuffix);
+    }
+
+    public UnitMXBean updateUnit(
+            final String unitName,
+            final Map<String, String> newUnitParameters) throws Exception {
+        if (null == this._units.get(unitName)) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("can't found unit named {}, update failed.", unitName);
+            }
+            addLog(" can't found unit named "+ unitName + ", update failed.");
+            return null;
+        }
+        final Node[] nodes = doDeleteUnit(unitName).toArray(new Node[0]);
+        final UnitMXBean mbean = doCreateUnit(nodes[0]._unitName, nodes[0]._unitSource, newUnitParameters);
+        for (int idx = 1; idx < nodes.length; idx++) {
+            final Node node = nodes[idx];
+            doCreateUnit(node._unitName, node._unitSource, node._unitParameters);
+        }
+        return mbean;
+    }
+    
     /**
      * @param params
      * @return
@@ -375,17 +442,33 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
     }
 
     @Override
-    public void deleteUnit(final String name) {
-        this._unitsRegister.unregisterMBean(genUnitSuffix(name));
-        final Node node = this._units.remove(name);
+    public boolean deleteUnit(final String unitName) {
+        return null != doDeleteUnit(unitName);
+    }
+    
+    public List<Node> doDeleteUnit(final String unitName) {
+        this._unitsRegister.unregisterMBean(genUnitSuffix(unitName));
+        final Node node = this._units.remove(unitName);
         if (null != node) {
-            node._applicationContext.close();
-            addLog(" deleteUnit(name=" + name
-                            + ") succeed.)");
+            final List<Node> nodesDeleted = new ArrayList<>();
+            nodesDeleted.add(node);
+            for (String child : node.childrenUnitsAsArray()) {
+                final List<Node> nodes = doDeleteUnit(child);
+                if (null != nodes) {
+                    nodesDeleted.addAll(nodes);
+                }
+            }
+            node.closeApplicationContext();
+            final Node parentNode = getParentNode(unitName);
+            if (null!=parentNode) {
+                parentNode.removeChild(unitName);
+            }
+            addLog(" deleteUnit(name=" + unitName + ") succeed.)");
+            return nodesDeleted;
         } else {
-            LOG.warn("unit ({})'s ApplicationContext is null, unit maybe deleted already", name);
-            addLog(" deleteUnit(name=" + name
-                            + ") failed for AbstractApplicationContext is null.)");
+            LOG.warn("can't found unit named {}, maybe deleted already", unitName);
+            addLog(" deleteUnit(name=" + unitName + ") failed for Internal Node is null.)");
+            return null;
         }
     }
 
@@ -513,26 +596,47 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
     }
 
     private static class Node {
-        Node(final ConfigurableApplicationContext applicationContext, 
+        Node(final ConfigurableApplicationContext applicationContext,
+            final String unitName,
             final String unitSource, 
-            final Map<String, String> params) {
+            final Map<String, String> unitParameters) {
             this._applicationContext = applicationContext;
+            this._unitName = unitName;
             this._unitSource = unitSource;
-            this._parameters = params;
+            this._unitParameters = unitParameters;
+        }
+        
+        ApplicationContext applicationContext() {
+            return this._applicationContext;
+        }
+        
+        void closeApplicationContext() {
+            if (null != this._applicationContext) {
+                this._applicationContext.close();
+            }
         }
         
         void addChild(final String child) {
             this._children.add(child);
         }
         
+        void removeChild(final String child) {
+            this._children.remove(child);
+        }
+        
         List<String> childrenUnits() {
             return this._children;
         }
         
+        String[] childrenUnitsAsArray() {
+            return this._children.toArray(new String[0]);
+        }
+        
         private final List<String> _children = new ArrayList<String>();
         private final ConfigurableApplicationContext _applicationContext;
-        private final Map<String, String>   _parameters;
+        private final String _unitName;
         private final String _unitSource;
+        private final Map<String, String>   _unitParameters;
     }
     
     private String[] _sourcePatterns;

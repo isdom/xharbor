@@ -35,7 +35,7 @@ public class UnitOperator implements Operator<Object> {
     }
 
     @Override
-    public Object doAddOrUpdate(
+    public Object doAdd(
             final Object ctx, 
             final String root, 
             final TreeCacheEvent event)
@@ -44,7 +44,7 @@ public class UnitOperator implements Operator<Object> {
         final String pathName = parseSourceFromPath(root, data.getPath());
         if ( null != pathName ) {
             if ( LOG.isDebugEnabled()) {
-                LOG.debug("create or update unit with {}", pathName);
+                LOG.debug("create unit with {}", pathName);
             }
             this._unitAdmin.deleteUnit(pathName);
             
@@ -79,6 +79,46 @@ public class UnitOperator implements Operator<Object> {
         return ctx;
     }
 
+    @Override
+    public Object doUpdate(
+            final Object ctx, 
+            final String root, 
+            final TreeCacheEvent event)
+            throws Exception {
+        final ChildData data = event.getData();
+        final String pathName = parseSourceFromPath(root, data.getPath());
+        if ( null != pathName ) {
+            if ( LOG.isDebugEnabled()) {
+                LOG.debug("update unit with {}", pathName);
+            }
+            final InputStream is = null != data.getData() 
+                        ? new ByteArrayInputStream(data.getData()) 
+                        : null;
+            
+            try {
+                final Properties props =  new Properties();
+                if (null != is) {
+                    props.load( is );
+                }
+                
+                this._unitAdmin.updateUnit(
+                        pathName,
+                        new HashMap<String, String>() {
+                            private static final long serialVersionUID = 1L;
+                        {
+                            for ( Map.Entry<Object,Object> entry : props.entrySet() ) {
+                                this.put(entry.getKey().toString(), entry.getValue().toString());
+                            }
+                        }});
+            } finally {
+                if ( null != is) {
+                    is.close();
+                }
+            }
+        }
+        return ctx;
+    }
+    
     @Override
     public Object doRemove(
             final Object ctx, 
