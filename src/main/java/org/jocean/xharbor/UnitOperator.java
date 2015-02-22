@@ -4,14 +4,14 @@
 package org.jocean.xharbor;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Properties;
 
 import org.apache.commons.io.FilenameUtils;
 import org.apache.curator.framework.recipes.cache.ChildData;
 import org.apache.curator.framework.recipes.cache.TreeCacheEvent;
+import org.jocean.xharbor.UnitAdminMXBean.UnitMXBean;
 import org.jocean.xharbor.util.ZKUpdater.Operator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +36,26 @@ public class UnitOperator implements Operator<Object> {
         return null;
     }
 
+    /**
+     * @param data
+     * @throws IOException
+     */
+    private Properties loadProperties(final byte[] data) throws IOException {
+        try (
+            final InputStream is = null != data
+                    ? new ByteArrayInputStream(data) 
+                    : null;
+        ) {
+            return new Properties() {
+                private static final long serialVersionUID = 1L;
+            {
+                if (null != is) {
+                    this.load( is );
+                }
+            }};
+        }
+    }
+    
     @Override
     public Object doAdd(
             final Object ctx, 
@@ -46,31 +66,20 @@ public class UnitOperator implements Operator<Object> {
         final String pathName = parseSourceFromPath(root, data.getPath());
         if ( null != pathName ) {
             if ( LOG.isDebugEnabled()) {
-                LOG.debug("create unit with {}", pathName);
+                LOG.debug("creating unit named {}", pathName);
             }
-            this._unitAdmin.deleteUnit(pathName);
-            
-            final String pattern = "**"+ getTemplateFromFullPathName(pathName) + ".xml";
-            final InputStream is = null != data.getData() 
-                        ? new ByteArrayInputStream(data.getData()) 
-                        : null;
-            
-            try {
-                final Properties props =  new Properties();
-                if (null != is) {
-                    props.load( is );
-                }
-                
+            final UnitMXBean unit = 
                 this._unitAdmin.createUnit(
                         pathName,
-                        pattern,
-                        Maps.fromProperties(props),
+                        "**"+ getTemplateFromFullPathName(pathName) + ".xml",
+                        Maps.fromProperties(loadProperties(data.getData())),
                         true);
-            } finally {
-                if ( null != is) {
-                    is.close();
-                }
+            if (null == unit) {
+                LOG.info("create unit {} failed.", pathName);
+            } else {
+                LOG.info("create unit {} success with active status:{}", pathName, unit.isActive());
             }
+            
         }
         return ctx;
     }
@@ -85,31 +94,16 @@ public class UnitOperator implements Operator<Object> {
         final String pathName = parseSourceFromPath(root, data.getPath());
         if ( null != pathName ) {
             if ( LOG.isDebugEnabled()) {
-                LOG.debug("update unit with {}", pathName);
+                LOG.debug("updating unit named {}", pathName);
             }
-            final InputStream is = null != data.getData() 
-                        ? new ByteArrayInputStream(data.getData()) 
-                        : null;
-            
-            try {
-                final Properties props =  new Properties();
-                if (null != is) {
-                    props.load( is );
-                }
-                
+            final UnitMXBean unit = 
                 this._unitAdmin.updateUnit(
                         pathName,
-                        new HashMap<String, String>() {
-                            private static final long serialVersionUID = 1L;
-                        {
-                            for ( Map.Entry<Object,Object> entry : props.entrySet() ) {
-                                this.put(entry.getKey().toString(), entry.getValue().toString());
-                            }
-                        }});
-            } finally {
-                if ( null != is) {
-                    is.close();
-                }
+                        Maps.fromProperties(loadProperties(data.getData())));
+            if (null == unit) {
+                LOG.info("update unit {} failed.", pathName);
+            } else {
+                LOG.info("update unit {} success with active status:{}", pathName, unit.isActive());
             }
         }
         return ctx;
@@ -122,12 +116,17 @@ public class UnitOperator implements Operator<Object> {
             final TreeCacheEvent event)
             throws Exception {
         final ChildData data = event.getData();
-        final String sourceName = parseSourceFromPath(root, data.getPath());
-        if (null != sourceName) {
+        final String pathName = parseSourceFromPath(root, data.getPath());
+        if (null != pathName) {
             if ( LOG.isDebugEnabled()) {
-                LOG.debug("remove unit for {}", sourceName);
+                LOG.debug("removing unit for {}", pathName);
             }
-            this._unitAdmin.deleteUnit(sourceName);
+            if ( this._unitAdmin.deleteUnit(pathName) ) {
+                LOG.info("remove unit {} success", pathName);
+            }
+            else {
+                LOG.info("remove unit {} failure", pathName);
+            }
         }
         return ctx;
     }

@@ -39,31 +39,6 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
 
     private final static String[] _DEFAULT_SOURCE_PATTERNS = new String[]{"**/units/**.xml"};
 
-    public static interface UnitMXBean {
-
-        public boolean isActive();
-        
-        public String getName();
-
-        public String getSource();
-
-        public String[] getParameters();
-
-        public String[] getPlaceholders();
-
-        public String getCreateTimestamp();
-        
-        public String[] getChildrenUnits();
-
-        public void close();
-    }
-
-    public static interface SourceMXBean {
-
-        public String[] getPlaceholders();
-
-    }
-
     private static final class StopInitCtxException extends RuntimeException {
 
         private static final long serialVersionUID = 1L;
@@ -227,7 +202,7 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
                     objectNameSuffix, 
                     parentNode,
                     mock);
-            addLog(" newUnit(" + unitName + ") failed for null parentCtx");
+            addLog(" newUnit(" + unitName + ") failed for unactive parent.");
             return null;
         }
         try {
@@ -327,7 +302,7 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
 
     public UnitMXBean updateUnit(
             final String unitName,
-            final Map<String, String> newUnitParameters) throws Exception {
+            final Map<String, String> newUnitParameters) {
         if (null == this._units.get(unitName)) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("can't found unit named {}, update failed.", unitName);
@@ -484,11 +459,11 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
             if (null!=parentNode) {
                 parentNode.removeChild(unitName);
             }
-            addLog(" deleteUnit(name=" + unitName + ") succeed.)");
+            addLog(" deleteUnit(name=" + unitName + ") success.)");
             return nodesDeleted;
         } else {
             LOG.warn("can't found unit named {}, maybe deleted already", unitName);
-            addLog(" deleteUnit(name=" + unitName + ") failed for Internal Node is null.)");
+            addLog(" deleteUnit(name=" + unitName + ") failure.)");
             return null;
         }
     }
@@ -653,6 +628,13 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
             return this._children.toArray(new String[0]);
         }
         
+        @Override
+        public String toString() {
+            return "Node [unitName=" + _unitName + ", applicationContext="
+                    + _applicationContext + ", unitSource=" + _unitSource
+                    + ", children's count=" + _children.size() + "]";
+        }
+
         private final List<String> _children = new ArrayList<>();
         private final ConfigurableApplicationContext _applicationContext;
         private final String _unitName;

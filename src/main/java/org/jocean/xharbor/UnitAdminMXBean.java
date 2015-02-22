@@ -3,6 +3,31 @@ package org.jocean.xharbor;
 import java.util.Map;
 
 public interface UnitAdminMXBean {
+    
+    public static interface UnitMXBean {
+
+        public boolean isActive();
+        
+        public String getName();
+
+        public String getSource();
+
+        public String[] getParameters();
+
+        public String[] getPlaceholders();
+
+        public String getCreateTimestamp();
+        
+        public String[] getChildrenUnits();
+
+        public void close();
+    }
+
+    public static interface SourceMXBean {
+
+        public String[] getPlaceholders();
+
+    }
 
     public boolean newUnit(
             final String unitName, 
