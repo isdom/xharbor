@@ -16,6 +16,8 @@ import org.jocean.xharbor.util.ZKUpdater.Operator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.Maps;
+
 /**
  * @author isdom
  *
@@ -62,13 +64,7 @@ public class UnitOperator implements Operator<Object> {
                 this._unitAdmin.createUnit(
                         pathName,
                         pattern,
-                        new HashMap<String, String>() {
-                            private static final long serialVersionUID = 1L;
-                        {
-                            for ( Map.Entry<Object,Object> entry : props.entrySet() ) {
-                                this.put(entry.getKey().toString(), entry.getValue().toString());
-                            }
-                        }},
+                        Maps.fromProperties(props),
                         true);
             } finally {
                 if ( null != is) {

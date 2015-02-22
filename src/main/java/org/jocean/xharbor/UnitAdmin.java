@@ -5,6 +5,7 @@ import java.lang.reflect.Field;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -623,7 +624,7 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
             this._applicationContext = applicationContext;
             this._unitName = unitName;
             this._unitSource = unitSource;
-            this._unitParameters = unitParameters;
+            this._unitParameters = Collections.unmodifiableMap(unitParameters);
         }
         
         ApplicationContext applicationContext() {
