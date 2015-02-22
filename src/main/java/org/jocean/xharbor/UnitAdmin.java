@@ -40,6 +40,8 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
 
     public static interface UnitMXBean {
 
+        public boolean isActive();
+        
         public String getName();
 
         public String getSource();
@@ -222,7 +224,8 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
                     unitSource, 
                     unitParameters,
                     objectNameSuffix, 
-                    parentNode);
+                    parentNode,
+                    mock);
             addLog(" newUnit(" + unitName + ") failed for null parentCtx");
             return null;
         }
@@ -241,6 +244,7 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
             
             final UnitMXBean unit =
                     newUnitMXBean(
+                            null!=ctx,
                             unitName,
                             unitSource,
                             new Date().toString(),
@@ -259,7 +263,8 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
                     unitSource, 
                     unitParameters,
                     objectNameSuffix, 
-                    parentNode);
+                    parentNode,
+                    mock);
             LOG.warn("exception when createUnit for {}, detail:{}", unitName, ExceptionUtils.exception2detail(e));
             addLog(" newUnit(" + unitName + ") failed for "
                     + ExceptionUtils.exception2detail(e));
@@ -291,20 +296,32 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
      * @param unitParameters
      * @param objectNameSuffix
      * @param parentNode
+     * @param mock 
      */
     private void registerUnactiveUnit(
             final String unitName,
             final String unitSource, 
             final Map<String, String> unitParameters,
             final String objectNameSuffix, 
-            final Node parentNode) {
+            final Node parentNode, 
+            final Object mock) {
         if ( null != parentNode) {
             parentNode.addChild(unitName);
         }
         final Node node = new Node(null, unitName, unitSource, unitParameters);
         this._units.put(unitName, node);
         
-        this._unitsRegister.unregisterMBean(objectNameSuffix);
+        final UnitMXBean unit =
+                newUnitMXBean(
+                        false,
+                        unitName,
+                        unitSource,
+                        new Date().toString(),
+                        map2StringArray(unitParameters),
+                        null,
+                        node.childrenUnits());
+
+        this._unitsRegister.replaceRegisteredMBean(objectNameSuffix, mock, unit);
     }
 
     public UnitMXBean updateUnit(
@@ -340,15 +357,8 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
         }}.toArray(new String[0]);
     }
 
-    /**
-     * @param name
-     * @param source
-     * @param now
-     * @param params
-     * @param placeholders
-     * @return
-     */
     private UnitMXBean newUnitMXBean(
+            final boolean isActive,
             final String name,
             final String source,
             final String now,
@@ -357,6 +367,11 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
             final List<String> childrenUnits) {
         return new UnitMXBean() {
 
+            @Override
+            public boolean isActive() {
+                return isActive;
+            }
+            
             @Override
             public String getSource() {
                 return source;
@@ -405,6 +420,11 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
     private Object newMockUnitMXBean(final String name) {
         return new UnitMXBean() {
 
+            @Override
+            public boolean isActive() {
+                return false;
+            }
+            
             @Override
             public String getSource() {
                 return null;
@@ -632,7 +652,7 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
             return this._children.toArray(new String[0]);
         }
         
-        private final List<String> _children = new ArrayList<String>();
+        private final List<String> _children = new ArrayList<>();
         private final ConfigurableApplicationContext _applicationContext;
         private final String _unitName;
         private final String _unitSource;
