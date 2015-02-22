@@ -5,7 +5,8 @@
         http://www.springframework.org/schema/beans/spring-beans.xsd">
     
     <bean id="cachedRouter" class="org.jocean.xharbor.route.RouteUtils" 
-        factory-method="buildCachedRouter">
+        factory-method="buildCachedRouter"
+        destroy-method="destroy">
         <constructor-arg value="${router.objname:org.jocean:type=router}"/>
         <constructor-arg ref="source"/>
         <constructor-arg>

@@ -102,6 +102,12 @@ public class RouteUtils {
                                         }
                                     });
                         }
-                    }});
+                    }},
+                    new Runnable() {
+                        @Override
+                        public void run() {
+                            routerMbeanSupport.unregisterAllMBeans();
+                            urisMBeanSupport.unregisterAllMBeans();
+                        }});
     }
 }

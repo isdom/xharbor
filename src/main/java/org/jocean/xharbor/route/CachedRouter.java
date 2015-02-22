@@ -60,7 +60,8 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT> {
     public CachedRouter(final EventReceiverSource source, 
             final CacheVisitor<INPUT, OUTPUT> cacheVisitor,
             final OnRouterUpdated<INPUT, OUTPUT> onRouterUpdated, 
-            final OnRouted<INPUT, OUTPUT> onRouted) {
+            final OnRouted<INPUT, OUTPUT> onRouted,
+            final Runnable onDestroy) {
         if ( null != cacheVisitor ) {
             try {
                 cacheVisitor.visit(this._cache);
@@ -72,6 +73,7 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT> {
         
         this._onRouterUpdated = onRouterUpdated;
         this._onRouted = onRouted;
+        this._onDestroy = onDestroy;
         this._implUpdater = new UpdateImplFlow() {{
                 source.create(this, this.UPDATE);
             }}.queryInterfaceInstance(ImplUpdater.class);
@@ -126,10 +128,15 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT> {
     
     public void destroy() {
         this._cache.clear();
+        if (null!=this._onDestroy) {
+            this._onDestroy.run();
+        }
     }
     
     private final OnRouterUpdated<INPUT, OUTPUT> _onRouterUpdated;
     private final OnRouted<INPUT, OUTPUT> _onRouted;
+    private final Runnable _onDestroy;
+    
     private final AtomicReference<Router<INPUT, OUTPUT>> _implRef = 
             new AtomicReference<Router<INPUT, OUTPUT>>(null);
     
