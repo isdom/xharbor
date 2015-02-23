@@ -20,6 +20,8 @@ public interface UnitAdminMXBean {
         
         public String[] getChildrenUnits();
 
+        public String   unactiveReason();
+        
         public void close();
     }
 

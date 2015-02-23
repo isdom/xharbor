@@ -17,20 +17,24 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.io.FilenameUtils;
-import org.jocean.ext.unit.PropertyConfigurerFactory;
 import org.jocean.ext.unit.ValueAwarePlaceholderConfigurer;
 import org.jocean.ext.util.PackageUtils;
 import org.jocean.ext.util.ant.SelectorUtils;
 import org.jocean.idiom.ExceptionUtils;
+import org.jocean.j2se.MBeanRegister;
 import org.jocean.j2se.MBeanRegisterSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.config.PropertyPlaceholderConfigurer;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
+import org.springframework.context.ApplicationListener;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.context.event.ApplicationContextEvent;
+import org.springframework.context.event.ContextClosedEvent;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 import org.springframework.core.io.Resource;
 import org.springframework.util.ReflectionUtils;
@@ -201,14 +205,16 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
                     unitParameters,
                     objectNameSuffix, 
                     parentNode,
-                    mock);
-            addLog(" newUnit(" + unitName + ") failed for unactive parent.");
+                    mock,
+                    "newUnit(" + unitName + ") failed for unactive parent("+parentNode._unitName + ").");
+            addLog(" newUnit(" + unitName + ") failed for unactive parent("+parentNode._unitName + ").");
             return null;
         }
         try {
             final ConfigurableApplicationContext ctx =
                     createConfigurableApplicationContext(
                             parentCtx,
+                            "org.jocean:type=units,unit=" + unitName,
                             unitSource, 
                             configurer);
 
@@ -226,7 +232,8 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
                             new Date().toString(),
                             map2StringArray(unitParameters),
                             configurer.getTextedResolvedPlaceholdersAsStringArray(),
-                            node.childrenUnits());
+                            node.childrenUnits(),
+                            "newUnit(" + unitName + ") succeed.");
 
             this._unitsRegister.replaceRegisteredMBean(objectNameSuffix, mock, unit);
 
@@ -240,7 +247,8 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
                     unitParameters,
                     objectNameSuffix, 
                     parentNode,
-                    mock);
+                    mock,
+                    "newUnit(" + unitName + ") failed for "+ ExceptionUtils.exception2detail(e));
             LOG.warn("exception when createUnit for {}, detail:{}", unitName, ExceptionUtils.exception2detail(e));
             addLog(" newUnit(" + unitName + ") failed for "
                     + ExceptionUtils.exception2detail(e));
@@ -280,7 +288,8 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
             final Map<String, String> unitParameters,
             final String objectNameSuffix, 
             final Node parentNode, 
-            final Object mock) {
+            final Object mock,
+            final String unactiveReason) {
         if ( null != parentNode) {
             parentNode.addChild(unitName);
         }
@@ -295,7 +304,8 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
                         new Date().toString(),
                         map2StringArray(unitParameters),
                         null,
-                        node.childrenUnits());
+                        node.childrenUnits(),
+                        unactiveReason);
 
         this._unitsRegister.replaceRegisteredMBean(objectNameSuffix, mock, unit);
     }
@@ -340,7 +350,8 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
             final String now,
             final String[] params,
             final String[] placeholders,
-            final List<String> childrenUnits) {
+            final List<String> childrenUnits,
+            final String unactiveReason) {
         return new UnitMXBean() {
 
             @Override
@@ -382,11 +393,16 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
             public String[] getChildrenUnits() {
                 return childrenUnits.toArray(new String[0]);
             }
+
+            @Override
+            public String unactiveReason() {
+                return unactiveReason;
+            }
         };
     }
 
-    private String genUnitSuffix(final String name) {
-        return "name=" + name;
+    private String genUnitSuffix(final String unitName) {
+        return "unit=" + unitName;
     }
 
     private boolean reserveRegistration(final String objectNameSuffix, final Object mock) {
@@ -432,6 +448,11 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
 
             @Override
             public String[] getChildrenUnits() {
+                return null;
+            }
+
+            @Override
+            public String unactiveReason() {
                 return null;
             }
         };
@@ -511,7 +532,7 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
                     };
 
             try {
-                createConfigurableApplicationContext(null, source, configurer);
+                createConfigurableApplicationContext(null, "", source, configurer);
             } catch (StopInitCtxException ignored) {
             }
             infos.put(unitSource, configurer.getTextedResolvedPlaceholdersAsStringArray());
@@ -538,26 +559,39 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
 
     /**
      * @param unitSource
+     * @param unitSource2 
      * @param configurer
      * @return
      */
     private ConfigurableApplicationContext createConfigurableApplicationContext(
             final ApplicationContext parentCtx,
-            final String unitSource,
+            final String objectNameSuffix,
+            final String unitSource, 
             final PropertyPlaceholderConfigurer configurer) {
-        final ApplicationContext topCtx =
-                new ClassPathXmlApplicationContext(
-                    new String[]{"org/jocean/ext/ebus/spring/unitParent.xml"}, 
+        final MBeanRegister register = new MBeanRegisterSupport(objectNameSuffix, null);
+        
+        final ConfigurableApplicationContext ctx = new ClassPathXmlApplicationContext(
+                    new String[]{unitSource},
+                    false,
                     parentCtx);
+        ctx.addBeanFactoryPostProcessor(configurer);
+        ctx.addBeanFactoryPostProcessor(new BeanFactoryPostProcessor() {
+            @Override
+            public void postProcessBeanFactory(
+                    final ConfigurableListableBeanFactory beanFactory)
+                    throws BeansException {
+                beanFactory.addBeanPostProcessor(new MBeanRegisterSetter(register));
+            }});
+        ctx.addApplicationListener(new ApplicationListener<ApplicationContextEvent>() {
+            @Override
+            public void onApplicationEvent(final ApplicationContextEvent event) {
+                if (event instanceof ContextClosedEvent) {
+                    register.destroy();
+                }
+            }});
 
-        final PropertyConfigurerFactory factory =
-                topCtx.getBean(PropertyConfigurerFactory.class);
-
-        factory.setConfigurer(configurer);
-
-        return new ClassPathXmlApplicationContext(
-                    new String[]{"org/jocean/ext/ebus/spring/Configurable.xml", unitSource},
-                    topCtx);
+        ctx.refresh();
+        return ctx;
     }
 
     private String[] searchUnitSourceOf(final String[] sourcePatterns) {
@@ -648,9 +682,9 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
 
     private Resource[] _rootPropertyFiles = null;
 
-    private final MBeanRegisterSupport _sourcesRegister;
+    private final MBeanRegister _sourcesRegister;
 
-    private final MBeanRegisterSupport _unitsRegister;
+    private final MBeanRegister _unitsRegister;
 
     private final Map<String, Node> _units = new ConcurrentHashMap<>();
 
