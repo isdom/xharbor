@@ -56,12 +56,18 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT> {
         this._implUpdater.updateImpl(routerImpl);
     }
 
+    public CachedRouter(final EventReceiverSource source) {
+        this._source = source;
+    }
+    
     @SuppressWarnings("unchecked")
-    public CachedRouter(final EventReceiverSource source, 
-            final CacheVisitor<INPUT, OUTPUT> cacheVisitor,
-            final OnRouterUpdated<INPUT, OUTPUT> onRouterUpdated, 
-            final OnRouted<INPUT, OUTPUT> onRouted,
-            final Runnable onDestroy) {
+    public void start() {
+        this._implUpdater = new UpdateImplFlow() {{
+            _source.create(this, this.UPDATE);
+        }}.queryInterfaceInstance(ImplUpdater.class);
+    }
+    
+    public void setCacheVisitor(final CacheVisitor<INPUT, OUTPUT> cacheVisitor) {
         if ( null != cacheVisitor ) {
             try {
                 cacheVisitor.visit(this._cache);
@@ -70,13 +76,14 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT> {
                         cacheVisitor, ExceptionUtils.exception2detail(e));
             }
         }
-        
+    }
+    
+    public void setOnRouterUpdated(final OnRouterUpdated<INPUT, OUTPUT> onRouterUpdated) {
         this._onRouterUpdated = onRouterUpdated;
+    }
+    
+    public void setOnRouted(final OnRouted<INPUT, OUTPUT> onRouted) {
         this._onRouted = onRouted;
-        this._onDestroy = onDestroy;
-        this._implUpdater = new UpdateImplFlow() {{
-                source.create(this, this.UPDATE);
-            }}.queryInterfaceInstance(ImplUpdater.class);
     }
     
     private interface ImplUpdater<I, O> {
@@ -92,13 +99,14 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT> {
                 final Router<INPUT, OUTPUT> prevImpl = _implRef.getAndSet(newImpl);
                 // clear all cached routing
                 _cache.clear();
+                final OnRouterUpdated<INPUT, OUTPUT> onRouterUpdated = _onRouterUpdated;
                 try {
-                    if ( null != _onRouterUpdated ) {
-                        _onRouterUpdated.visit(prevImpl, newImpl);
+                    if ( null != onRouterUpdated ) {
+                        onRouterUpdated.visit(prevImpl, newImpl);
                     }
                 } catch (Exception e) {
                     LOG.warn("exception when call onCacheCleared({}), detail: {}",
-                            _onRouterUpdated, ExceptionUtils.exception2detail(e));
+                            onRouterUpdated, ExceptionUtils.exception2detail(e));
                 }
                 
                 return currentEventHandler();
@@ -106,13 +114,14 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT> {
             
             @OnEvent(event = "onRouted")
             private BizStep onRouted(final INPUT input) {
+                final OnRouted<INPUT, OUTPUT> onRouted = _onRouted;
                 try {
-                    if ( null != _onRouted ) {
-                        _onRouted.visit(input, _cache.get(input));
+                    if ( null != onRouted ) {
+                        onRouted.visit(input, _cache.get(input));
                     }
                 } catch (Exception e) {
                     LOG.warn("exception when call onRouted({}) with ctx({}), detail: {}",
-                            _onRouted, input, ExceptionUtils.exception2detail(e));
+                            onRouted, input, ExceptionUtils.exception2detail(e));
                 }
 
                 return currentEventHandler();
@@ -128,19 +137,17 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT> {
     
     public void destroy() {
         this._cache.clear();
-        if (null!=this._onDestroy) {
-            this._onDestroy.run();
-        }
     }
     
-    private final OnRouterUpdated<INPUT, OUTPUT> _onRouterUpdated;
-    private final OnRouted<INPUT, OUTPUT> _onRouted;
-    private final Runnable _onDestroy;
+    private final EventReceiverSource _source;
+    
+    private volatile OnRouted<INPUT, OUTPUT> _onRouted;
+    private volatile OnRouterUpdated<INPUT, OUTPUT> _onRouterUpdated;
     
     private final AtomicReference<Router<INPUT, OUTPUT>> _implRef = 
             new AtomicReference<Router<INPUT, OUTPUT>>(null);
     
-    private final ImplUpdater<INPUT, OUTPUT> _implUpdater;
+    private ImplUpdater<INPUT, OUTPUT> _implUpdater;
     private final SimpleCache<INPUT, OUTPUT> _cache = new SimpleCache<INPUT, OUTPUT>(
             //  ifAbsent
             new Function<INPUT, OUTPUT>() {

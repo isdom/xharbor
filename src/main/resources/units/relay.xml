@@ -4,16 +4,18 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
     
-    <bean id="cachedRouter" class="org.jocean.xharbor.route.RouteUtils" 
-        factory-method="buildCachedRouter"
-        destroy-method="destroy">
-        <constructor-arg value="${router.objname:org.jocean:type=router}"/>
+    <bean id="cachedRouter" class="org.jocean.xharbor.route.CachedRouter" 
+        init-method="start" destroy-method="destroy">
         <constructor-arg ref="source"/>
+    </bean>
+    
+    <bean class="org.jocean.xharbor.route.CahcedRouterMBeanSetter" >
+        <constructor-arg ref="cachedRouter"/>
         <constructor-arg>
             <bean class="org.jocean.xharbor.route.RouteObjectNameMaker" />
         </constructor-arg>
     </bean>
-    
+        
     <bean id="router" class="org.jocean.xharbor.route.RouteUtils" 
         factory-method="compositeRouter">
         <constructor-arg value="org.jocean.xharbor.api.Dispatcher"/>

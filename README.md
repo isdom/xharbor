@@ -116,5 +116,15 @@ TODO:
        relay unit +--> acceptor unit: 6572
                   |
                   +--> acceptor unit: 8888
+     (done)
+     
+  40、将AUP(ApplyUrlencode4Post)以Spring方式加载到系统，去掉 AUPOperator，可以考虑按照 
+       relay unit +--> acceptor unit: 6572
+                  |
+                  +--> acceptor unit: 8888
+                  |
+                  +--> AUPunit 
+     的模式加载。
+     
   
   

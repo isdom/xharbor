@@ -395,7 +395,7 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
             }
 
             @Override
-            public String unactiveReason() {
+            public String getUnactiveReason() {
                 return unactiveReason;
             }
         };
@@ -452,7 +452,7 @@ public class UnitAdmin implements UnitAdminMXBean, ApplicationContextAware {
             }
 
             @Override
-            public String unactiveReason() {
+            public String getUnactiveReason() {
                 return null;
             }
         };

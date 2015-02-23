@@ -24,7 +24,6 @@ import org.jocean.xharbor.relay.RelayFlow;
 import org.jocean.xharbor.route.CachedRouter;
 import org.jocean.xharbor.route.CachedRouterUpdater;
 import org.jocean.xharbor.route.Request2RoutingInfo;
-import org.jocean.xharbor.route.RouteObjectNameMaker;
 import org.jocean.xharbor.route.RouteUtils;
 import org.jocean.xharbor.spi.HttpRequestTransformer;
 import org.jocean.xharbor.util.RouteRulesOperator;
@@ -60,9 +59,10 @@ public class RepositoryImpl implements BusinessRepository{
     }
 
     private CachedRouter<RoutingInfo, Dispatcher> createRouter(final String zkPath) {
-        return RouteUtils.buildCachedRouter("org.jocean:type=router,config="+zkPath, 
-                this._source, 
-                new RouteObjectNameMaker());
+//        return RouteUtils.buildCachedRouter("org.jocean:type=router,config="+zkPath, 
+//                this._source, 
+//                new RouteObjectNameMaker());
+        return null;
     }
             
     private final EventReceiverSource _source;
