@@ -77,7 +77,7 @@
     
     <bean id="noRoutingMemo" class="org.jocean.xharbor.util.RoutingInfoMemoImpl"/>
    
-    <bean id="zkClient" class="org.jocean.xharbor.util.ZKUtils"
+    <bean id="zkClient" class="org.jocean.j2se.zk.ZKUtils"
         factory-method="buildWithExhibitorEnsembleProvider"
         init-method="start"
         destroy-method="close">
@@ -115,15 +115,15 @@
     </bean>
  -->
      
-    <bean id="unitAdmin" class="org.jocean.xharbor.UnitAdmin"/>
+    <bean id="unitAgent" class="org.jocean.j2se.unit.UnitAgent"/>
     
-    <bean id="unitUpdater" class="org.jocean.xharbor.util.ZKUpdater">
+    <bean id="unitUpdater" class="org.jocean.j2se.zk.ZKUpdater">
         <constructor-arg ref="source"/>
         <constructor-arg ref="zkClient"/>
         <constructor-arg value="${zk.rules.path:/demo}/units"/>
         <constructor-arg>
-            <bean class="org.jocean.xharbor.UnitOperator">
-                <constructor-arg ref="unitAdmin"/>
+            <bean class="org.jocean.j2se.unit.UnitOperator">
+                <constructor-arg ref="unitAgent"/>
             </bean>
         </constructor-arg>
     </bean>
@@ -140,7 +140,7 @@
                 <entry key="org.jocean:name=serviceMemo"    value-ref="serviceMemo"/>
                 <entry key="org.jocean:name=noRouting"      value-ref="noRoutingMemo"/>
                 <entry key="org.jocean:type=router,name=stats" value-ref="statsRegister"/>
-                <entry key="org.jocean:name=unitAdmin"      value-ref="unitAdmin"/>
+                <entry key="org.jocean:name=unitAgent"      value-ref="unitAgent"/>
             </map>
         </property>
     </bean>

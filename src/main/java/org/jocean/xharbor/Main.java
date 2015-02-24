@@ -5,7 +5,7 @@ package org.jocean.xharbor;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import org.jocean.xharbor.util.ZKUpdater;
+import org.jocean.j2se.zk.ZKUpdater;
 import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 

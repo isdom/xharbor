@@ -43,7 +43,7 @@
     
     <bean id="compositeBuilder" class="org.jocean.xharbor.transform.CompositeHRTBuilder"/>
      
-    <bean id="routerUpdater" class="org.jocean.xharbor.util.ZKUpdater"
+    <bean id="routerUpdater" class="org.jocean.j2se.zk.ZKUpdater"
         init-method="start" destroy-method="stop">
         <constructor-arg ref="source"/>
         <constructor-arg ref="zkClient"/>
