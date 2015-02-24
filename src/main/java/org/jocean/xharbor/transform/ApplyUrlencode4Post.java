@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
  * @author isdom
  *
  */
-public class ApplyUrlencode4Post implements Cloneable, HttpRequestTransformer, HttpRequestTransformer.Builder {
+public class ApplyUrlencode4Post implements HttpRequestTransformer, HttpRequestTransformer.Builder {
     
     private static final Logger LOG = LoggerFactory
             .getLogger(ApplyUrlencode4Post.class);
@@ -39,19 +39,23 @@ public class ApplyUrlencode4Post implements Cloneable, HttpRequestTransformer, H
             : false;
     }
 
-    @Override
-    protected ApplyUrlencode4Post clone() throws CloneNotSupportedException {
-        return new ApplyUrlencode4Post(
-                this._path, this._noapplyFeature, this._applyKeys);
-    }
-    
     public ApplyUrlencode4Post(
             final String path, 
             final String noapplyFeature,
-            final String[] applyKeys) {
+            final String[] applyKeys,
+            final CompositeHRTBuilder composite) {
         this._path = path;
         this._noapplyFeature = noapplyFeature;
         this._applyKeys = applyKeys;
+        this._composite = composite;
+    }
+    
+    public void start() {
+        this._composite.addBuilder(this);
+    }
+    
+    public void destroy() {
+        this._composite.removeBuilder(this);
     }
     
     public String path() {
@@ -194,4 +198,5 @@ public class ApplyUrlencode4Post implements Cloneable, HttpRequestTransformer, H
     private final String _path;
     private final String _noapplyFeature;
     private final String[] _applyKeys;
+    private final CompositeHRTBuilder _composite;
 }

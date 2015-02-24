@@ -77,10 +77,6 @@
     
     <bean id="noRoutingMemo" class="org.jocean.xharbor.util.RoutingInfoMemoImpl"/>
    
-    <bean id="transformBuilder" class="org.jocean.j2se.spring.BeanProxy">
-        <constructor-arg value="org.jocean.xharbor.spi.HttpRequestTransformer.Builder"/>
-    </bean>
-     
     <bean id="zkClient" class="org.jocean.xharbor.util.ZKUtils"
         factory-method="buildWithExhibitorEnsembleProvider"
         init-method="start"
@@ -104,7 +100,9 @@
             </bean>
         </constructor-arg>
     </bean>
-<!--<bean id="zkClient" class="org.apache.curator.framework.CuratorFrameworkFactory"
+    
+<!--
+    <bean id="zkClient" class="org.apache.curator.framework.CuratorFrameworkFactory"
         factory-method="newClient"
         init-method="start">
         <constructor-arg value="${zk.address:121.41.45.51:2181}"/>
@@ -115,22 +113,8 @@
             </bean>
         </constructor-arg>
     </bean>
--->    
-    <bean id="aupUpdaterRules" class="org.jocean.j2se.spring.BeanProxy">
-        <constructor-arg value="org.jocean.idiom.Visitor"/>
-    </bean>
-    
-    <bean id="aupUpdater" class="org.jocean.xharbor.util.ZKUpdater">
-        <constructor-arg ref="source"/>
-        <constructor-arg ref="zkClient"/>
-        <constructor-arg value="${zk.rules.path:/demo}/aups"/>
-        <constructor-arg>
-            <bean class="org.jocean.xharbor.transform.AUPOperator">
-                <constructor-arg ref="aupUpdaterRules"/>
-            </bean>
-        </constructor-arg>
-    </bean>
-
+ -->
+     
     <bean id="unitAdmin" class="org.jocean.xharbor.UnitAdmin"/>
     
     <bean id="unitUpdater" class="org.jocean.xharbor.util.ZKUpdater">
@@ -144,28 +128,6 @@
         </constructor-arg>
     </bean>
  
-<!--     <bean id="businessRepository" class="org.jocean.xharbor.unused.RepositoryImpl">
-        <constructor-arg ref="source" />
-        <constructor-arg ref="zkClient" />
-        <constructor-arg ref="memoBuilder" />
-        <constructor-arg ref="serviceMemo" />
-        <constructor-arg ref="noRoutingMemo" />
-        <constructor-arg ref="httpClientPool" />
-        <constructor-arg ref="transformBuilder"/>
-    </bean>
-    
-    <bean id="gatewayUpdater" class="org.jocean.xharbor.util.ZKUpdater">
-        <constructor-arg ref="source"/>
-        <constructor-arg ref="zkClient"/>
-        <constructor-arg value="${zk.rules.path:/demo}/gateways"/>
-        <constructor-arg>
-            <bean class="org.jocean.xharbor.unused.GatewayLifecycleOperator">
-                <constructor-arg ref="businessRepository"/>
-            </bean>
-        </constructor-arg>
-    </bean>
- -->
-     
     <bean id="directMemory" class="org.jocean.xharbor.util.DirectMemoryIndicator"/>
     
     <bean id="exporter" class="org.springframework.jmx.export.MBeanExporter"

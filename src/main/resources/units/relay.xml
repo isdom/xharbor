@@ -41,6 +41,8 @@
         <lookup-method name="createRelayFlow" bean="relayFlow"/>
     </bean>
     
+    <bean id="compositeBuilder" class="org.jocean.xharbor.transform.CompositeHRTBuilder"/>
+     
     <bean id="routerUpdater" class="org.jocean.xharbor.util.ZKUpdater"
         init-method="start" destroy-method="stop">
         <constructor-arg ref="source"/>
@@ -55,7 +57,7 @@
                 </constructor-arg>
                 <constructor-arg ref="httpClientPool"/>
                 <constructor-arg ref="serviceMemo"/>
-                <constructor-arg ref="transformBuilder"/>
+                <constructor-arg ref="compositeBuilder"/>
             </bean>
         </constructor-arg>
     </bean>

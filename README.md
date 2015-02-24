@@ -124,7 +124,12 @@ TODO:
                   +--> acceptor unit: 8888
                   |
                   +--> AUPunit 
-     的模式加载。
+     的模式加载。 (done)
      
+  41、实现RouteRules的采用独立的Spring Ctx方式加载，替换RouteRulesOperator
+  
+  42、实现 ZK Spring 属性文件的引用模式，可通过特殊标记引用已经存在的Unit定义
+  
+  43、结合42 简化方式实现需求 28
   
   
