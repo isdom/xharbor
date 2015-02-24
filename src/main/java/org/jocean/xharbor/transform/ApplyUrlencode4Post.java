@@ -111,9 +111,7 @@ public class ApplyUrlencode4Post implements Cloneable, HttpRequestTransformer, H
             return null;
         }
         
-        final InputStream is = new ByteBufInputStream(content.slice());
-        
-        try {
+        try (InputStream is = new ByteBufInputStream(content.slice())) {
             String msg = IOUtils.toString(is, "UTF-8");
             if ( -1 != msg.indexOf(this._noapplyFeature) ) {
                 if (LOG.isDebugEnabled()) {
@@ -167,8 +165,6 @@ public class ApplyUrlencode4Post implements Cloneable, HttpRequestTransformer, H
         } catch (Exception e) {
             LOG.warn("exception when IOUtils.toString, detail:{}", 
                     ExceptionUtils.exception2detail(e));
-        } finally {
-            IOUtils.closeQuietly(is);
         }
         
         return null;
