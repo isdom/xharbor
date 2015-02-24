@@ -6,7 +6,7 @@ package org.jocean.xharbor.api;
 import java.util.ArrayList;
 
 import org.jocean.idiom.InterfaceUtils;
-import org.jocean.xharbor.util.BizMemo;
+import org.jocean.idiom.stats.BizMemo;
 
 /**
  * @author isdom

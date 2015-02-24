@@ -4,12 +4,16 @@
 package org.jocean.xharbor.util;
 
 import java.net.URI;
+import java.util.List;
 
 import org.jocean.idiom.Function;
 import org.jocean.idiom.InterfaceUtils;
 import org.jocean.idiom.SimpleCache;
 import org.jocean.idiom.Tuple;
 import org.jocean.idiom.Visitor2;
+import org.jocean.idiom.stats.TimeIntervalMemo;
+import org.jocean.j2se.stats.BizMemoSupportMBean;
+import org.jocean.j2se.stats.TIMemoImplOfRanges;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.RelayMemo.RESULT;
 import org.jocean.xharbor.api.RelayMemo.STEP;
@@ -57,8 +61,15 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
         return normalizeString(uri.toString());
     }
     
-    private static class RelayTIMemoImpl extends TIMemoImplOfRanges {
+    private static class TIMemoImpl extends TIMemoImplOfRanges
+        implements InfoListMaker {
         
+        @Override
+        public void addInfoList(final List<String> infos) {
+            for ( int idx = 0; idx < this._names.length; idx++ ) {
+                infos.add(this._names[idx] +":"+ this._counters[idx].get());
+            }
+        }
         private static final Range<Long> MT30S = Range.atLeast(30000L);
         private static final Range<Long> LT30S = Range.closedOpen(10000L, 30000L);
         private static final Range<Long> LT10S = Range.closedOpen(5000L, 10000L);
@@ -69,7 +80,7 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
         private static final Range<Long> LT10MS = Range.closedOpen(0L, 10L);
 
         @SuppressWarnings("unchecked")
-        public RelayTIMemoImpl() {
+        public TIMemoImpl() {
               super(new String[]{
                       "lt10ms",
                       "lt100ms",
@@ -92,25 +103,35 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
           }
     }
     
-    private static class RelayMemoImpl extends BizMemoImpl<RelayMemoImpl, STEP, RESULT> 
-        implements RelayMemo {
+    private static class RelayMemoImpl extends BizMemoSupportMBean<RelayMemoImpl, STEP, RESULT> 
+        implements RelayMemo, InfoListMaker {
         
         public RelayMemoImpl() {
             super(STEP.class, RESULT.class);
+        }
+        
+        @Override
+        public void addInfoList(final List<String> infos) {
+            for (STEP step : this._steps) {
+                infos.add("STEP:" + step.name() +":"+ this._stepCounters[step.ordinal()].get());
+            }
+            for (RESULT result : this._results) {
+                infos.add("RESULT:" + result.name() +":"+ this._resultCounters[result.ordinal()].get());
+            }
         }
     }
     
     private final Visitor2<String, InfoListMaker> _register;
     
-    private Function<Tuple, RelayTIMemoImpl> _ttlMemoMaker = new Function<Tuple, RelayTIMemoImpl>() {
+    private Function<Tuple, TIMemoImpl> _ttlMemoMaker = new Function<Tuple, TIMemoImpl>() {
         @Override
-        public RelayTIMemoImpl apply(final Tuple tuple) {
-            return new RelayTIMemoImpl();
+        public TIMemoImpl apply(final Tuple tuple) {
+            return new TIMemoImpl();
         }};
         
-    private Visitor2<Tuple, RelayTIMemoImpl> _ttlMemoRegister = new Visitor2<Tuple, RelayTIMemoImpl>() {
+    private Visitor2<Tuple, TIMemoImpl> _ttlMemoRegister = new Visitor2<Tuple, TIMemoImpl>() {
         @Override
-        public void visit(final Tuple tuple, final RelayTIMemoImpl newMemo) throws Exception {
+        public void visit(final Tuple tuple, final TIMemoImpl newMemo) throws Exception {
             final StringBuilder sb = new StringBuilder();
             Character splitter = null;
             //                      for last Enum<?>
@@ -140,8 +161,8 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
             }
         }};
             
-    private SimpleCache<Tuple, RelayTIMemoImpl> _ttlMemos  = 
-            new SimpleCache<Tuple, RelayTIMemoImpl>(this._ttlMemoMaker, this._ttlMemoRegister);
+    private SimpleCache<Tuple, TIMemoImpl> _ttlMemos  = 
+            new SimpleCache<Tuple, TIMemoImpl>(this._ttlMemoMaker, this._ttlMemoRegister);
     
     private final Function<Tuple, RelayMemoImpl> _bizMemoMaker = 
             new Function<Tuple, RelayMemoImpl>() {
