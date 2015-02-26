@@ -123,7 +123,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         this._memoBuilder = memoBuilder;
         this._noRoutingMemo = noRoutingMemo;
         
-        addFlowLifecycleListener(RELAY_LIFECYCLE_LISTENER);
+        addFlowLifecycleListener(LIFECYCLE_LISTENER);
     }
     
     RelayFlow attach(
@@ -876,7 +876,24 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         }
     }
 
-    private static final FlowLifecycleListener<RelayFlow> RELAY_LIFECYCLE_LISTENER = 
+    /**
+     * @throws Exception
+     */
+    private void destructor() throws Exception {
+        if (null != this._forceFinishedTimer) {
+            this._forceFinishedTimer.detach();
+            this._forceFinishedTimer = null;
+        }
+        ReferenceCountUtil.safeRelease(this._httpRequest);
+        if (null!=this._httpResponse) {
+            ReferenceCountUtil.safeRelease(this._httpResponse);
+        }
+        this.releaseAllContents();
+        //  replace logger to nop logger to disable all log message after this destroy
+        this._proxyLogger.setImpl(NOPLogger.NOP_LOGGER);
+    }
+
+    private static final FlowLifecycleListener<RelayFlow> LIFECYCLE_LISTENER = 
             new FlowLifecycleListener<RelayFlow>() {
 
         @Override
@@ -889,17 +906,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         @Override
         public void afterFlowDestroy(final RelayFlow flow)
                 throws Exception {
-            if (null != flow._forceFinishedTimer) {
-                flow._forceFinishedTimer.detach();
-                flow._forceFinishedTimer = null;
-            }
-            ReferenceCountUtil.safeRelease(flow._httpRequest);
-            if (null!=flow._httpResponse) {
-                ReferenceCountUtil.safeRelease(flow._httpResponse);
-            }
-            flow.releaseAllContents();
-            //  replace logger to nop logger to disable all log message after flow destroy
-            flow._proxyLogger.setImpl(NOPLogger.NOP_LOGGER);
+            flow.destructor();
         }
     };
     
@@ -916,7 +923,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     private RelayMemo _memo;
     private Guide _guide;
     private HttpClient _httpClient;
-    private final List<HttpContent> _contents = new ArrayList<HttpContent>();
+    private final List<HttpContent> _contents = new ArrayList<>();
     private boolean _recvHttpRequestComplete = false;
     
     private final ValidationId _guideId = new ValidationId();
