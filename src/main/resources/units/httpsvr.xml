@@ -4,9 +4,9 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
     
-    <bean id="httpServer" class="org.jocean.xharbor.HttpGatewayServer"
+    <bean id="httpServer" class="org.jocean.httpserver.HttpServer"
         init-method="start" destroy-method="stop">
-        <property name="relayAgent" ref="relayAgent"/>
+        <property name="serverAgent" ref="serverAgent"/>
         <property name="acceptPort" value="${http.port:8080}" />
         <property name="acceptIp" value="${http.ip:0.0.0.0}" />
         <property name="logByteStream" value="${http.isLogByteStream:true}"/>

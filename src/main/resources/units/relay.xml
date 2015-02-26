@@ -36,7 +36,7 @@
         <constructor-arg ref="noRoutingMemo" />
     </bean>
     
-    <bean id="relayAgent" class="org.jocean.xharbor.relay.RelayAgentImpl">
+    <bean id="serverAgent" class="org.jocean.xharbor.relay.RelayAgent">
         <constructor-arg ref="source" />
         <lookup-method name="createRelayFlow" bean="relayFlow"/>
     </bean>

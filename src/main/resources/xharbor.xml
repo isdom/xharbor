@@ -117,7 +117,8 @@
      
     <bean id="unitAgent" class="org.jocean.j2se.unit.UnitAgent"/>
     
-    <bean id="unitUpdater" class="org.jocean.j2se.zk.ZKUpdater">
+    <bean id="unitUpdater" class="org.jocean.j2se.zk.ZKUpdater"
+        init-method="start" destroy-method="stop">
         <constructor-arg ref="source"/>
         <constructor-arg ref="zkClient"/>
         <constructor-arg value="${zk.rules.path:/demo}/units"/>

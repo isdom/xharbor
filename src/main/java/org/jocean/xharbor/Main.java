@@ -3,10 +3,7 @@
  */
 package org.jocean.xharbor;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-
-import org.jocean.j2se.zk.ZKUpdater;
-import org.springframework.context.support.AbstractApplicationContext;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 
 /**
@@ -17,12 +14,10 @@ public class Main {
     
     public static void main(String[] args) throws Exception {
         
-        @SuppressWarnings("resource")
-        final AbstractApplicationContext ctx =
+        @SuppressWarnings({ "unused", "resource" })
+        final ApplicationContext ctx =
                 new ClassPathXmlApplicationContext(
                         new String[]{"xharbor.xml"});
-        
-        checkNotNull(ctx.getBean("unitUpdater", ZKUpdater.class)).start();
     }
 
 }

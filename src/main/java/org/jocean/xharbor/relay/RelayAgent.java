@@ -8,22 +8,22 @@ import io.netty.handler.codec.http.HttpRequest;
 
 import org.jocean.event.api.EventReceiverSource;
 import org.jocean.event.api.EventUtils;
-import org.jocean.xharbor.api.RelayAgent;
+import org.jocean.httpserver.ServerAgent;
 
 /**
  * @author isdom
  *
  */
-public abstract class RelayAgentImpl implements RelayAgent {
-    public RelayAgentImpl(final EventReceiverSource source) {
+public abstract class RelayAgent implements ServerAgent {
+    public RelayAgent(final EventReceiverSource source) {
         this._source = source;
     }
     
     @Override
-    public RelayTask createRelayTask(
+    public ServerTask createServerTask(
             final ChannelHandlerContext channelCtx, 
             final HttpRequest httpRequest) {
-        return EventUtils.buildInterfaceAdapter(RelayTask.class,  
+        return EventUtils.buildInterfaceAdapter(ServerTask.class,  
             this._source.createFromInnerState(
                 createRelayFlow().attach(channelCtx, httpRequest).WAIT));
     }
