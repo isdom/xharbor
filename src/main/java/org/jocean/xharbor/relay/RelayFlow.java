@@ -174,7 +174,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         private final Callable<BizStep> _ifHttpLost;
     }
     
-    private void safeDetachHttp() {
+    private void safeDetachHttpClient() {
         if (null != this._guide) {
             try {
                 this._guide.detach();
@@ -197,7 +197,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             if (LOG.isDebugEnabled()) {
                 LOG.debug("relay for uri:{} progress canceled", safeGetServiceUri());
             }
-            safeDetachHttp();
+            safeDetachHttpClient();
             if (null != this._ifDetached) {
                 try {
                     this._ifDetached.run();
@@ -499,7 +499,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         }
 
         private BizStep retryFor(final RESULT result, final HttpResponse response) throws Exception {
-            safeDetachHttp();
+            safeDetachHttpClient();
             _memo.endBizStep(STEP.RECV_RESP, _watch4Step.stopAndRestart());
             final long ttl = _watch4Result.stopAndRestart();
             _memo.incBizResult(result, ttl);
@@ -556,7 +556,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             _memo.endBizStep(STEP.RECV_RESP, _watch4Step.stopAndRestart());
             
             //  release relay's http client
-            safeDetachHttp();
+            safeDetachHttpClient();
             
             // content 的内容仅保证在事件 onLastHttpContentReceived 处理方法中有效
             // 而channelCtx.writeAndFlush完成后，会主动调用 ReferenceCountUtil.release 释放content
