@@ -221,8 +221,8 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     }
 
     private final Object CACHE_HTTPCONTENT = new Object() {
-        @OnEvent(event = "sendHttpContent")
-        private BizStep onSendHttpContent(final HttpContent httpContent) {
+        @OnEvent(event = "onHttpContent")
+        private BizStep cacheHttpContent(final HttpContent httpContent) {
 
             updateRecvHttpRequestState(httpContent);
             _contents.add(ReferenceCountUtil.retain(httpContent));
@@ -302,8 +302,8 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     }
 
     public final BizStep RESP_401 = new BizStep("relay.RESP_401") {
-        @OnEvent(event = "sendHttpContent")
-        private BizStep onSendHttpContent(final HttpContent httpContent) {
+        @OnEvent(event = "onHttpContent")
+        private BizStep consumeHttpContent(final HttpContent httpContent) {
             updateRecvHttpRequestState(httpContent);
             if (isRecvHttpRequestComplete()) {
                 response401Unauthorized();
@@ -345,8 +345,8 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     }
 
     public final BizStep RESP_200OK = new BizStep("relay.RESP_200OK") {
-        @OnEvent(event = "sendHttpContent")
-        private BizStep onSendHttpContent(final HttpContent httpContent) {
+        @OnEvent(event = "onHttpContent")
+        private BizStep consumeHttpContent(final HttpContent httpContent) {
             updateRecvHttpRequestState(httpContent);
             if (isRecvHttpRequestComplete()) {
                 responseDefault200OK();
@@ -430,8 +430,8 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     .freeze();
 
     private final BizStep TRANSFERCONTENT = new BizStep("relay.TRANSFERCONTENT") {
-        @OnEvent(event = "sendHttpContent")
-        private BizStep onSendHttpContent(final HttpContent httpContent) {
+        @OnEvent(event = "onHttpContent")
+        private BizStep recvHttpContentAndTransfer(final HttpContent httpContent) {
 
             updateRecvHttpRequestState(httpContent);
             _contents.add(ReferenceCountUtil.retain(httpContent));
