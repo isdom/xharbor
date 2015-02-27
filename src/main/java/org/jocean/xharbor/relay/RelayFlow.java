@@ -7,13 +7,11 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
-import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.ReferenceCountUtil;
 
@@ -30,7 +28,6 @@ import org.jocean.httpclient.api.Guide;
 import org.jocean.httpclient.api.Guide.GuideReactor;
 import org.jocean.httpclient.api.HttpClient;
 import org.jocean.httpclient.api.HttpClient.HttpReactor;
-import org.jocean.idiom.Detachable;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.ProxyBuilder;
 import org.jocean.idiom.Slf4jLoggerSource;
@@ -71,6 +68,18 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     private static final Logger LOG = LoggerFactory
             .getLogger(RelayFlow.class);
     
+    
+    private final FlowLifecycleListener<RelayFlow> memoUnauthorizedAction = new FlowLifecycleListener<RelayFlow>() {
+        @Override
+        public void afterEventReceiverCreated(RelayFlow flow,
+                EventReceiver receiver) throws Exception {
+        }
+        @Override
+        public void afterFlowDestroy(RelayFlow flow)
+                throws Exception {
+            _memo.incBizResult(RESULT.HTTP_UNAUTHORIZED, _watch4Result.stopAndRestart());
+        }};
+        
     @Override
     public String toString() {
         return "RelayFlow [httpRequest=" + _requestData + ", httpClient="
@@ -205,9 +214,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     private final Object CACHE_HTTPCONTENT = new Object() {
         @OnEvent(event = "onHttpContent")
         private BizStep cacheHttpContent(final HttpContent httpContent) {
-
             _requestData.addContent(httpContent);
-            
             return currentEventHandler();
         }
     };
@@ -243,7 +250,8 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             _memo = _memoBuilder.build(_target, info);
             
             if (_target.isNeedAuthorization(_requestData.request())) {
-                return  waitforRequestFinishedAndResponse401Unauthorized();
+                setEndReason("relay.HTTP_UNAUTHORIZED");
+                return waitforRequestFinishedAndResponse401Unauthorized();
             }
             
             _transformer = _target.getHttpRequestTransformerOf(_requestData.request());
@@ -279,86 +287,33 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     .freeze();
 
     private BizStep waitforRequestFinishedAndResponse401Unauthorized() {
-        if ( this._requestData.isRequestFully()) {
-            response401Unauthorized();
-            return null;
-        }
-        else {
-            return RESP_401;
-        }
-    }
-
-    public final BizStep RESP_401 = new BizStep("relay.RESP_401") {
-        @OnEvent(event = "onHttpContent")
-        private BizStep consumeHttpContent(final HttpContent httpContent) {
-            _requestData.addContent(httpContent);
-            if (_requestData.isRequestFully()) {
-                response401Unauthorized();
-                return null;
-            }
-            else {
-                return currentEventHandler();
-            }
-        }
-    }
-    .handler(handlersOf(new ONDETACH(new Runnable() {
-        @Override
-        public void run() {
-            memoDetachResult();
-        }})))
-    .freeze();
-    
-    private void response401Unauthorized() {
-        final HttpResponse response = new DefaultFullHttpResponse(
-                this._requestData.request().getProtocolVersion(), HttpResponseStatus.UNAUTHORIZED);
-        HttpHeaders.setHeader(response, HttpHeaders.Names.WWW_AUTHENTICATE, "Basic realm=\"iplusmed\"");
-        HttpHeaders.setHeader(response, HttpHeaders.Names.CONTENT_LENGTH, 0);
-        final ChannelFuture future = this._channelCtx.writeAndFlush(response);
-        if ( !HttpHeaders.isKeepAlive(this._requestData.request())) {
-            future.addListener(ChannelFutureListener.CLOSE);
-        }
-        _memo.incBizResult(RESULT.HTTP_UNAUTHORIZED, _watch4Result.stopAndRestart());
-        setEndReason("relay.HTTP_UNAUTHORIZED");
+        addFlowLifecycleListener(memoUnauthorizedAction);
+        final BizStep step = BizStepBuilder.waitforRequestFinishedAndResponse401Unauthorized
+                .build(_requestData, _channelCtx);
+        return (null != step)
+            ? step.handler(handlersOf(new ONDETACH(new Runnable() {
+                    @Override
+                    public void run() {
+                        removeFlowLifecycleListener(memoUnauthorizedAction);
+                        memoDetachResult();
+                    }})))
+                .freeze()
+            : step
+            ;
     }
     
     private BizStep waitforRequestFinishedAndResponse200OK() {
-        if (this._requestData.isRequestFully()) {
-            responseDefault200OK();
-            return null;
-        }
-        else {
-            return RESP_200OK;
-        }
-    }
-
-    public final BizStep RESP_200OK = new BizStep("relay.RESP_200OK") {
-        @OnEvent(event = "onHttpContent")
-        private BizStep consumeHttpContent(final HttpContent httpContent) {
-            _requestData.addContent(httpContent);
-            if (_requestData.isRequestFully()) {
-                responseDefault200OK();
-                return null;
-            }
-            else {
-                return currentEventHandler();
-            }
-        }
-    }
-    .handler(handlersOf(new ONDETACH(new Runnable() {
-        @Override
-        public void run() {
-            memoDetachResult();
-        }})))
-    .freeze();
-    
-    private void responseDefault200OK() {
-        final HttpResponse response = new DefaultFullHttpResponse(
-                this._requestData.request().getProtocolVersion(), HttpResponseStatus.OK);
-        HttpHeaders.setHeader(response, HttpHeaders.Names.CONTENT_LENGTH, 0);
-        final ChannelFuture future = this._channelCtx.writeAndFlush(response);
-        if ( !HttpHeaders.isKeepAlive( this._requestData.request()) ) {
-            future.addListener(ChannelFutureListener.CLOSE);
-        }
+        final BizStep step = BizStepBuilder.waitforRequestFinishedAndResponse200OK
+                .build(this._requestData, this._channelCtx);
+        return (null != step)
+            ? step.handler(handlersOf(new ONDETACH(new Runnable() {
+                    @Override
+                    public void run() {
+                        memoDetachResult();
+                    }})))
+                .freeze()
+            : step
+            ;
     }
     
     private final BizStep OBTAINING = new BizStep("relay.OBTAINING") {
@@ -395,7 +350,6 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             }
             else {
                 _memo.endBizStep(STEP.TRANSFER_CONTENT, _watch4Step.stopAndRestart());
-                tryStartForceFinishedTimer();
                 _memo.beginBizStep(STEP.RECV_RESP);
                 return RECVRESP;
             }
@@ -432,7 +386,6 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                     tryTransformAndReplaceHttpRequestOnce();
                     transferHttpRequestAndContents();
                 }
-                tryStartForceFinishedTimer();
                 _memo.endBizStep(STEP.TRANSFER_CONTENT, _watch4Step.stopAndRestart());
                 _memo.beginBizStep(STEP.RECV_RESP);
                 return RECVRESP;
@@ -616,34 +569,6 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                 .queryInterfaceInstance(HttpReactor.class);
     }
 
-    private void tryStartForceFinishedTimer() {
-        if (null == this._forceFinishedTimer && this._timeoutFromActived > 0) {
-            this._forceFinishedTimer = this.selfExectionLoop().schedule(
-                    new Runnable() {
-                        @Override
-                        public void run() {
-                            try {
-                                if (LOG.isDebugEnabled()) {
-                                    LOG.debug(
-                                            "uri:{} force finished timeout, so force detach.",
-                                            safeGetServiceUri());
-                                }
-                                _forceFinishedTimer = null;
-                                selfEventReceiver().acceptEvent("detach");
-                            } catch (Exception e) {
-                                LOG.warn(
-                                        "exception when acceptEvent detach by force finished for uri:{}, detail:{}",
-                                        safeGetServiceUri(),
-                                        ExceptionUtils.exception2detail(e));
-                            }
-                        }
-                    }, this._timeoutFromActived);
-        }
-    }
-
-    /**
-     * @return
-     */
     @SuppressWarnings("unchecked")
     private GuideReactor<Integer> genGuideReactor() {
         return (GuideReactor<Integer>) this
@@ -716,30 +641,17 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         }
     }
 
-    /**
-     * @param ttl
-     * @return
-     * @throws Exception
-     */
     private BizStep launchRetry(final long ttl) throws Exception {
         _memo.incBizResult(RESULT.RELAY_RETRY, ttl);
         selfEventReceiver().acceptEvent("startRelay");
         return WAIT;
     }
 
-    /**
-     * @param response
-     * @return
-     */
     private static boolean isHttpClientError(final HttpResponse response) {
         return response.getStatus().code() >= 400 
             && response.getStatus().code() < 500;
     }
 
-    /**
-     * @param response
-     * @return
-     */
     private static boolean isHttpServerError(final HttpResponse response) {
         return response.getStatus().code() >= 500 
             && response.getStatus().code() < 600;
@@ -820,14 +732,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         }
     }
 
-    /**
-     * @throws Exception
-     */
     private void destructor() throws Exception {
-        if (null != this._forceFinishedTimer) {
-            this._forceFinishedTimer.detach();
-            this._forceFinishedTimer = null;
-        }
         this._requestData.clear();
         if (null!=this._httpResponse) {
             ReferenceCountUtil.safeRelease(this._httpResponse);
@@ -867,8 +772,6 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     private Target _target;
     private RelayMemo _memo;
 
-    private Detachable _forceFinishedTimer;
-    private long _timeoutFromActived = -1;
     private final StopWatch _watch4Step = new StopWatch();
     private final StopWatch _watch4Result = new StopWatch();
 }
