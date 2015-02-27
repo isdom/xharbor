@@ -36,6 +36,7 @@ import org.jocean.idiom.ProxyBuilder;
 import org.jocean.idiom.Slf4jLoggerSource;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.ValidationId;
+import org.jocean.idiom.Visitor;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.RelayMemo.RESULT;
@@ -799,9 +800,11 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
 
     private void transferHttpRequestAndContents() {
         transferHttpRequest();
-        for (HttpContent content : _requestData._contents) {
-            transferHttpContent(content);
-        }
+        this._requestData.foreachContent(new Visitor<HttpContent>() {
+            @Override
+            public void visit(final HttpContent content) throws Exception {
+                transferHttpContent(content);
+            }});
     }
 
     /**

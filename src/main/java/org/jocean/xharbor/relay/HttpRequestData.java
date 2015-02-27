@@ -12,7 +12,15 @@ import io.netty.util.ReferenceCountUtil;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jocean.idiom.ExceptionUtils;
+import org.jocean.idiom.Visitor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class HttpRequestData {
+    
+    private static final Logger LOG = LoggerFactory
+            .getLogger(HttpRequestData.class);
     
     @Override
     public String toString() {
@@ -51,6 +59,18 @@ public class HttpRequestData {
         updateRecvHttpRequestState(content);
     }
     
+    public void foreachContent(final Visitor<HttpContent> visitor) {
+        for ( HttpContent content : this._contents) {
+            try {
+                visitor.visit(content);
+            } catch (Exception e) {
+                LOG.warn("exception when invoke {}'s visit for content {}, detail: {}", 
+                    visitor, content,
+                    ExceptionUtils.exception2detail(e));
+            }
+        }
+    }
+    
     public void clear() {
         ReferenceCountUtil.safeRelease(this._httpRequest);
         this._httpRequest = null;
@@ -73,6 +93,6 @@ public class HttpRequestData {
     }
 
     private HttpRequest _httpRequest;
-    public final List<HttpContent> _contents = new ArrayList<>();
+    private final List<HttpContent> _contents = new ArrayList<>();
     private boolean _isRequestFully = false;
 }
