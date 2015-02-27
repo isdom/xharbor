@@ -35,7 +35,6 @@ import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.ProxyBuilder;
 import org.jocean.idiom.Slf4jLoggerSource;
 import org.jocean.idiom.StopWatch;
-import org.jocean.idiom.ValidationId;
 import org.jocean.idiom.Visitor;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.RelayMemo;
@@ -74,8 +73,8 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     
     @Override
     public String toString() {
-        return "RelayFlow [httpRequest=" + _requestData + ", guideId="
-                + _guideId + ", httpClientId=" + _httpClientId + "]";
+        return "RelayFlow [httpRequest=" + _requestData + ", httpClient="
+                + _httpClientWrapper + "]";
     }
 
     private final ProxyBuilder<Logger> _proxyLogger = new ProxyBuilder<Logger>(Logger.class);
@@ -169,19 +168,6 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         
         private final Callable<BizStep> _ifHttpLost;
     }
-    
-    private void safeDetachHttpClient() {
-        if (null != this._guide) {
-            try {
-                this._guide.detach();
-            } catch (Throwable e) {
-                LOG.warn(
-                        "exception when detach http handle for uri:{}, detail:{}",
-                        this.safeGetServiceUri(), ExceptionUtils.exception2detail(e));
-            }
-            this._guide = null;
-        }
-    }
 
     private final class ONDETACH {
         public ONDETACH(final Runnable ifDetached) {
@@ -193,7 +179,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             if (LOG.isDebugEnabled()) {
                 LOG.debug("relay for uri:{} progress canceled", safeGetServiceUri());
             }
-            safeDetachHttpClient();
+            _httpClientWrapper.detachHttpClient();
             if (null != this._ifDetached) {
                 try {
                     this._ifDetached.run();
@@ -271,7 +257,13 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             
             _memo.beginBizStep(STEP.OBTAINING_HTTPCLIENT);
             
-            startObtainHttpClient();
+            _httpClientWrapper.startObtainHttpClient(
+                    _target.getGuideBuilder(),
+                    genGuideReactor(),
+                    new Guide.DefaultRequirement()
+                        .uri(_target.serviceUri())
+                        .priority(0)
+                );
             return OBTAINING;
         }
     }
@@ -385,7 +377,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                 LOG.debug("send http request {}", _requestData);
             }
             
-            _httpClient = httpclient;
+            _httpClientWrapper.setHttpClient(httpclient);
             
             if (needTransformHttpRequest()) {
                 if (_requestData.isRequestFully() ) {
@@ -492,7 +484,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         }
 
         private BizStep retryFor(final RESULT result, final HttpResponse response) throws Exception {
-            safeDetachHttpClient();
+            _httpClientWrapper.detachHttpClient();
             _memo.endBizStep(STEP.RECV_RESP, _watch4Step.stopAndRestart());
             final long ttl = _watch4Result.stopAndRestart();
             _memo.incBizResult(result, ttl);
@@ -549,7 +541,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             _memo.endBizStep(STEP.RECV_RESP, _watch4Step.stopAndRestart());
             
             //  release relay's http client
-            safeDetachHttpClient();
+            _httpClientWrapper.detachHttpClient();
             
             // content 的内容仅保证在事件 onLastHttpContentReceived 处理方法中有效
             // 而channelCtx.writeAndFlush完成后，会主动调用 ReferenceCountUtil.release 释放content
@@ -649,18 +641,6 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         }
     }
 
-    private void startObtainHttpClient() {
-        this._guide = this._target.getGuideBuilder().createHttpClientGuide();
-        
-        this._guide.obtainHttpClient(
-                this._guideId.updateIdAndGet(),
-                genGuideReactor(),
-                new Guide.DefaultRequirement()
-                        .uri(this._target.serviceUri())
-                        .priority(0)
-                );
-    }
-
     /**
      * @return
      */
@@ -671,26 +651,26 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     }
 
     private boolean isValidGuideId(final int guideId) {
-        final boolean ret = this._guideId.isValidId(guideId);
+        final boolean ret = this._httpClientWrapper.validateGuideId(guideId);
         if (!ret) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug(
-                        "RelayFlow({})/{}/{}: special guide id({}) is !NOT! current guide id ({}), just ignore.",
+                        "RelayFlow({})/{}/{}: special guide id({}) is !MISMATCH! current httpclientWrapper ({}), just ignore.",
                         this, currentEventHandler().getName(), currentEvent(),
-                        guideId, this._guideId);
+                        guideId, this._httpClientWrapper);
             }
         }
         return ret;
     }
 
     private boolean isValidHttpClientId(final int httpClientId) {
-        final boolean ret = this._httpClientId.isValidId(httpClientId);
+        final boolean ret = this._httpClientWrapper.validateHttpClientId(httpClientId);
         if (!ret) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug(
-                        "RelayFlow({})/{}/{}: special httpclient id({}) is !NOT! current httpclient id ({}), just ignore.",
+                        "RelayFlow({})/{}/{}: special httpclient id({}) is !MISMATCH! current httpclientWrapper ({}), just ignore.",
                         this, currentEventHandler().getName(), currentEvent(),
-                        httpClientId, this._httpClientId);
+                        httpClientId, this._httpClientWrapper);
             }
         }
         return ret;
@@ -772,7 +752,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         this._requestData.request().setUri(
             this._target.rewritePath(this._requestData.request().getUri()));
         try {
-            this._httpClient.sendHttpRequest(this._httpClientId.updateIdAndGet(),
+            this._httpClientWrapper.sendHttpRequest(
                 this._requestData.request(), genHttpReactor());
         }
         catch (Exception e) {
@@ -788,7 +768,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
      */
     private void transferHttpContent(final HttpContent content) {
         try {
-            this._httpClient.sendHttpContent(content);
+            this._httpClientWrapper.sendHttpContent(content);
         }
         catch (Exception e) {
             LOG.error(
@@ -879,17 +859,14 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     private HttpRequestTransformer _transformer = null;
     
     private final HttpRequestData _requestData = new HttpRequestData();
+    private final HttpClientWrapper _httpClientWrapper = new HttpClientWrapper();
 
     private ChannelHandlerContext _channelCtx;
     private HttpResponse _httpResponse = null;
     
     private Target _target;
     private RelayMemo _memo;
-    private Guide _guide;
-    private HttpClient _httpClient;
-    
-    private final ValidationId _guideId = new ValidationId();
-    private final ValidationId _httpClientId = new ValidationId();
+
     private Detachable _forceFinishedTimer;
     private long _timeoutFromActived = -1;
     private final StopWatch _watch4Step = new StopWatch();
