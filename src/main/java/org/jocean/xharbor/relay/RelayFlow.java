@@ -23,6 +23,7 @@ import org.jocean.event.api.AbstractFlow;
 import org.jocean.event.api.BizStep;
 import org.jocean.event.api.EventReceiver;
 import org.jocean.event.api.FlowLifecycleListener;
+import org.jocean.event.api.FlowStateChangedListener;
 import org.jocean.event.api.annotation.OnEvent;
 import org.jocean.httpclient.api.Guide;
 import org.jocean.httpclient.api.Guide.GuideReactor;
@@ -129,6 +130,22 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         this._noRoutingMemo = noRoutingMemo;
         
         addFlowLifecycleListener(LIFECYCLE_LISTENER);
+        this.addFlowStateChangedListener(new FlowStateChangedListener<RelayFlow, BizStep>() {
+			@Override
+			public void onStateChanged(
+					final RelayFlow flow, 
+					final BizStep prev,
+					final BizStep next, 
+					final String causeEvent, 
+					final Object[] causeArgs)
+					throws Exception {
+				LOG.debug("onStateChanged: prev:{} next:{} event:{}", prev, next, causeEvent);
+				if (null==next && "detach".equals(causeEvent)) {
+					// means flow end by detach event
+					endBizStep(-1);
+					memoDetachResult();
+				}
+			}});
     }
     
     RelayFlow attach(
@@ -228,7 +245,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                     @Override
                     public void run() {
                         removeFlowLifecycleListener(memoUnauthorizedAction);
-                        memoDetachResult();
+//                        memoDetachResult();
                     }})))
                 .freeze()
             : null
@@ -239,12 +256,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         final BizStep step = BizStepBuilder.waitforRequestFinishedAndResponse200OK
                 .build(this._requestData, this._channelCtx);
         return (null != step)
-            ? step.handler(handlersOf(new ONDETACH(new Runnable() {
-                    @Override
-                    public void run() {
-                        memoDetachResult();
-                    }})))
-                .freeze()
+            ? step.handler(handlersOf(new ONDETACH(null))).freeze()
             : null
             ;
     }
@@ -286,14 +298,14 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             
             _transformer = _target.getHttpRequestTransformerOf(_requestData.request());
             
-            _memo.beginBizStep(STEP.ROUTING);
-            _memo.endBizStep(STEP.ROUTING, _watch4Step.stopAndRestart());
+            beginBizStep(STEP.ROUTING);
+            endBizStep(_watch4Step.stopAndRestart());
             
             if ( LOG.isDebugEnabled() ) {
                 LOG.debug("dispatch to ({}) for request({})", serviceUri(), _requestData);
             }
             
-            _memo.beginBizStep(STEP.OBTAINING_HTTPCLIENT);
+            beginBizStep(STEP.OBTAINING_HTTPCLIENT);
             
             _httpClientWrapper.startObtainHttpClient(
                     _target.getGuideBuilder(),
@@ -313,8 +325,8 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                 return BizStep.CURRENT_BIZSTEP;
             }
 
-            _memo.endBizStep(STEP.OBTAINING_HTTPCLIENT, _watch4Step.stopAndRestart());
-            _memo.beginBizStep(STEP.TRANSFER_CONTENT);
+            endBizStep(_watch4Step.stopAndRestart());
+            beginBizStep(STEP.TRANSFER_CONTENT);
             
             _httpClientWrapper.setHttpClient(httpclient);
             
@@ -331,15 +343,10 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
         @Override
         public BizStep call() throws Exception {
-            _memo.endBizStep(STEP.OBTAINING_HTTPCLIENT, -1);
+            endBizStep(-1);
             return launchRetry(memoHttplostResult(RESULT.CONNECTDESTINATION_FAILURE, true));
         }})))
-    .handler(handlersOf(new ONDETACH(new Runnable() {
-        @Override
-        public void run() {
-            _memo.endBizStep(STEP.OBTAINING_HTTPCLIENT, -1);
-            memoDetachResult();
-        }})))
+    .handler(handlersOf(new ONDETACH(null)))
     .freeze();
 
 	private BizStep recvFullContentAndDoTransformThenGoto(
@@ -353,9 +360,8 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                         this._watch4Result.pauseAndContinue());
     		}
     		transferHttpRequestAndContents();
-    		this._memo.endBizStep(STEP.TRANSFER_CONTENT, 
-    				this._watch4Step.stopAndRestart());
-    		this._memo.beginBizStep(STEP.RECV_RESP);
+    		endBizStep(this._watch4Step.stopAndRestart());
+    		beginBizStep(STEP.RECV_RESP);
     		return stepOfNext;
         }
         else {
@@ -405,24 +411,18 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
         @Override
         public BizStep call() throws Exception {
-            _memo.endBizStep(STEP.TRANSFER_CONTENT, -1);
+            endBizStep(-1);
             return launchRetry(memoHttplostResult(RESULT.RELAY_FAILURE, true));
         }})))
-    .handler(handlersOf(new ONDETACH(new Runnable() {
-        @Override
-        public void run() {
-            _memo.endBizStep(STEP.TRANSFER_CONTENT, -1);
-            memoDetachResult();
-        }})))
+    .handler(handlersOf(new ONDETACH(null)))
     .freeze();
     
 	private BizStep recvAndTransferAllContentsThenGoto(
 			final BizStep stepOfRecvAllContents,
 			final BizStep stepOfNext) {
         if (this._requestData.isRequestFully()) {
-    		this._memo.endBizStep(STEP.TRANSFER_CONTENT, 
-    				this._watch4Step.stopAndRestart());
-    		this._memo.beginBizStep(STEP.RECV_RESP);
+    		endBizStep(this._watch4Step.stopAndRestart());
+    		beginBizStep(STEP.RECV_RESP);
     		return stepOfNext;
         }
         else {
@@ -441,15 +441,10 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
         @Override
         public BizStep call() throws Exception {
-            _memo.endBizStep(STEP.TRANSFER_CONTENT, -1);
+            endBizStep(-1);
             return launchRetry(memoHttplostResult(RESULT.RELAY_FAILURE, true));
         }})))
-    .handler(handlersOf(new ONDETACH(new Runnable() {
-        @Override
-        public void run() {
-            _memo.endBizStep(STEP.TRANSFER_CONTENT, -1);
-            memoDetachResult();
-        }})))
+    .handler(handlersOf(new ONDETACH(null)))
     .freeze();
         
     private final BizStep RECVRESP = new BizStep("relay.RECVRESP") {
@@ -484,7 +479,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
 
         private BizStep retryFor(final RESULT result, final HttpResponse response) throws Exception {
             _httpClientWrapper.detachHttpClient();
-            _memo.endBizStep(STEP.RECV_RESP, _watch4Step.stopAndRestart());
+            endBizStep(_watch4Step.stopAndRestart());
             final long ttl = _watch4Result.stopAndRestart();
             _memo.incBizResult(result, ttl);
             LOG.warn("{},retry\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]\nresponse:[{}]",
@@ -495,15 +490,10 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
         @Override
         public BizStep call() throws Exception {
-            _memo.endBizStep(STEP.RECV_RESP, -1);
+            endBizStep(-1);
             return launchRetry(memoHttplostResult(RESULT.RELAY_FAILURE, true));
         }})))
-    .handler(handlersOf(new ONDETACH(new Runnable() {
-        @Override
-        public void run() {
-            _memo.endBizStep(STEP.RECV_RESP, -1);
-            memoDetachResult();
-        }})))
+    .handler(handlersOf(new ONDETACH(null)))
     .freeze();
 
     private final BizStep RECVCONTENT_TMPL = new BizStep("relay.RECVCONTENT.template") {
@@ -537,7 +527,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                 LOG.debug("channel for {} recv last http content {}", serviceUri(), content);
             }
             
-            _memo.endBizStep(STEP.RECV_RESP, _watch4Step.stopAndRestart());
+            endBizStep(_watch4Step.stopAndRestart());
             
             //  release relay's http client
             _httpClientWrapper.detachHttpClient();
@@ -554,12 +544,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             return null;
         }
     }
-    .handler(handlersOf(new ONDETACH(new Runnable() {
-        @Override
-        public void run() {
-            _memo.endBizStep(STEP.RECV_RESP, -1);
-            memoDetachResult();
-        }})))
+    .handler(handlersOf(new ONDETACH(null)))
     .freeze();
 
     private BizStep buildRecvContentByConnectionEntity() {
@@ -579,7 +564,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                                 LOG.warn("exception when close {}, detail: {}", 
                                         _channelCtx, ExceptionUtils.exception2detail(e));
                             }
-                            _memo.endBizStep(STEP.RECV_RESP, -1);
+                            endBizStep(-1);
                             memoHttplostResult(RESULT.RELAY_FAILURE, false);
                             setEndReason("relay.RELAY_FAILURE");
                             return null;
@@ -597,7 +582,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                                 LOG.debug("channel for {} is Connection: close, so just mark RELAY_SUCCESS and close peer.", 
                                         serviceUri());
                             }
-                            _memo.endBizStep(STEP.RECV_RESP, _watch4Step.stopAndRestart());
+                            endBizStep(_watch4Step.stopAndRestart());
                             _channelCtx.flush().close();
                             memoRelaySuccessResult("HTTP10.RELAY_SUCCESS");
                             setEndReason("relay.HTTP10.RELAY_SUCCESS");
@@ -760,6 +745,20 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             flow.destructor();
         }
     };
+    
+    private void beginBizStep(final STEP step) {
+    	this._currentRelayStep = step;
+        this._memo.beginBizStep(step);
+    }
+    
+    private void endBizStep(final long ttl) {
+    	if (null != this._currentRelayStep) {
+	    	this._memo.endBizStep(this._currentRelayStep, ttl);
+	    	this._currentRelayStep = null;
+    	}
+    }
+    
+    private STEP	_currentRelayStep = null;
     
     private final RelayMemo.Builder _memoBuilder;
     private final RoutingInfoMemo _noRoutingMemo;
