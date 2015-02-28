@@ -148,12 +148,12 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         private BizStep onHttpLost(final int guideId)
                 throws Exception {
             if (!isValidGuideId(guideId)) {
-                return currentEventHandler();
+                return BizStep.CURRENT_BIZSTEP;
             }
             if (LOG.isDebugEnabled()) {
                 LOG.debug("{}/{}: http for {} lost.", 
                         currentEventHandler().getName(), currentEvent(), 
-                        safeGetServiceUri());
+                        serviceUri());
             }
             if (null != this._ifHttpLost) {
                 try {
@@ -186,7 +186,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         @OnEvent(event = "detach")
         private BizStep onDetach() throws Exception {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("relay for uri:{} progress canceled", safeGetServiceUri());
+                LOG.debug("relay for uri:{} progress canceled", serviceUri());
             }
             _httpClientWrapper.detachHttpClient();
             if (null != this._ifDetached) {
@@ -215,7 +215,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         @OnEvent(event = "onHttpContent")
         private BizStep cacheHttpContent(final HttpContent httpContent) {
             _requestData.addContent(httpContent);
-            return currentEventHandler();
+            return BizStep.CURRENT_BIZSTEP;
         }
     };
     
@@ -239,19 +239,19 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                         _requestData, _channelCtx.channel());
                 _noRoutingMemo.incRoutingInfo(info);
                 setEndReason("relay.NOROUTING");
-                return  waitforRequestFinishedAndResponse200OK();
+                return  recvFullRequestAndResponse200OK();
             }
             
             if (MONITOR_CHECKALIVE.equalsIgnoreCase(_target.serviceUri().toString())) {
                 setEndReason("relay.CHECKALIVE."+_target.serviceUri().toString().replace(':', '-'));
-                return  waitforRequestFinishedAndResponse200OK();
+                return  recvFullRequestAndResponse200OK();
             }
             
             _memo = _memoBuilder.build(_target, info);
             
             if (_target.isNeedAuthorization(_requestData.request())) {
                 setEndReason("relay.HTTP_UNAUTHORIZED");
-                return waitforRequestFinishedAndResponse401Unauthorized();
+                return recvFullRequestAndResponse401Unauthorized();
             }
             
             _transformer = _target.getHttpRequestTransformerOf(_requestData.request());
@@ -260,7 +260,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             _memo.endBizStep(STEP.ROUTING, _watch4Step.stopAndRestart());
             
             if ( LOG.isDebugEnabled() ) {
-                LOG.debug("dispatch to ({}) for request({})", safeGetServiceUri(), _requestData);
+                LOG.debug("dispatch to ({}) for request({})", serviceUri(), _requestData);
             }
             
             _memo.beginBizStep(STEP.OBTAINING_HTTPCLIENT);
@@ -281,12 +281,12 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         public void run() {
             _memo.incBizResult(RESULT.SOURCE_CANCELED, -1);
             LOG.warn("SOURCE_CANCELED\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]",
-                    -1, _requestData, safeGetServiceUri());
+                    -1, _requestData, serviceUri());
             setEndReason("relay.SOURCE_CANCELED");
         }})))
     .freeze();
 
-    private BizStep waitforRequestFinishedAndResponse401Unauthorized() {
+    private BizStep recvFullRequestAndResponse401Unauthorized() {
         addFlowLifecycleListener(memoUnauthorizedAction);
         final BizStep step = BizStepBuilder.waitforRequestFinishedAndResponse401Unauthorized
                 .build(_requestData, _channelCtx);
@@ -298,11 +298,11 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                         memoDetachResult();
                     }})))
                 .freeze()
-            : step
+            : null
             ;
     }
     
-    private BizStep waitforRequestFinishedAndResponse200OK() {
+    private BizStep recvFullRequestAndResponse200OK() {
         final BizStep step = BizStepBuilder.waitforRequestFinishedAndResponse200OK
                 .build(this._requestData, this._channelCtx);
         return (null != step)
@@ -312,7 +312,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                         memoDetachResult();
                     }})))
                 .freeze()
-            : step
+            : null
             ;
     }
     
@@ -322,36 +322,20 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                 final int guideId,
                 final HttpClient httpclient) {
             if (!isValidGuideId(guideId)) {
-                return currentEventHandler();
+                return BizStep.CURRENT_BIZSTEP;
             }
 
             _memo.endBizStep(STEP.OBTAINING_HTTPCLIENT, _watch4Step.stopAndRestart());
             _memo.beginBizStep(STEP.TRANSFER_CONTENT);
             
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("send http request {}", _requestData);
-            }
-            
             _httpClientWrapper.setHttpClient(httpclient);
             
-            if (needTransformHttpRequest()) {
-                if (_requestData.isRequestFully() ) {
-                    tryTransformAndReplaceHttpRequestOnce();
-                }
-                else {
-                    return TRANSFERCONTENT;
-                }
-            }
-            
-            transferHttpRequestAndContents();
-            
-            if ( !_requestData.isRequestFully() ) {
-                return TRANSFERCONTENT;
+            if (null!=_transformer) {
+            	return recvFullContentAndDoTransformThenGoto(RECVCONTENT_TRANSFORMREQ, RECVRESP);
             }
             else {
-                _memo.endBizStep(STEP.TRANSFER_CONTENT, _watch4Step.stopAndRestart());
-                _memo.beginBizStep(STEP.RECV_RESP);
-                return RECVRESP;
+	            transferHttpRequestAndContents();
+	            return recvAndTransferAllContentsThenGoto(TRANSFERCONTENT, RECVRESP);
             }
         }
     }
@@ -370,26 +354,100 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         }})))
     .freeze();
 
+	private BizStep recvFullContentAndDoTransformThenGoto(
+			final BizStep stepOfRecvFullContent,
+			final BizStep stepOfNext) {
+        if (this._requestData.isRequestFully()) {
+    		if (transformAndReplaceHttpRequest()) {
+                //  add transform request count and record from relay begin 
+                //  until transform complete 's time cost 
+                this._memo.incBizResult(RESULT.TRANSFORM_REQUEST, 
+                        this._watch4Result.pauseAndContinue());
+    		}
+    		transferHttpRequestAndContents();
+    		this._memo.endBizStep(STEP.TRANSFER_CONTENT, 
+    				this._watch4Step.stopAndRestart());
+    		this._memo.beginBizStep(STEP.RECV_RESP);
+    		return stepOfNext;
+        }
+        else {
+            return stepOfRecvFullContent;
+        }
+	}
+    
+    private boolean transformAndReplaceHttpRequest() {
+        final FullHttpRequest newRequest = transformToFullHttpRequest();
+        if (null!=newRequest) {
+            try {
+                this._requestData.clear();
+                this._requestData.setHttpRequest(newRequest);
+                return true;
+            } finally {
+                newRequest.release();
+            }
+        }
+        else {
+            return false;
+        }
+    }
+    
+    private FullHttpRequest transformToFullHttpRequest() {
+        if (null!=this._transformer) {
+            final HttpRequest req = this._requestData.request();
+            final ByteBuf content = this._requestData.retainFullContent();
+            try {
+                return this._transformer.transform(req, content);
+            } finally {
+                content.release();
+                this._transformer = null;
+            }
+        }
+        else {
+            return null;
+        }
+    }
+    
+    private final BizStep RECVCONTENT_TRANSFORMREQ = new BizStep("relay.RECVCONTENT_AND_TRANSFORMREQ") {
+        @OnEvent(event = "onHttpContent")
+        private BizStep recvHttpContentAndTransformRequest(final HttpContent httpContent) {
+            _requestData.addContent(httpContent);
+            return recvFullContentAndDoTransformThenGoto(BizStep.CURRENT_BIZSTEP, RECVRESP);
+        }
+    }
+    .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
+        @Override
+        public BizStep call() throws Exception {
+            _memo.endBizStep(STEP.TRANSFER_CONTENT, -1);
+            return launchRetry(memoHttplostResult(RESULT.RELAY_FAILURE, true));
+        }})))
+    .handler(handlersOf(new ONDETACH(new Runnable() {
+        @Override
+        public void run() {
+            _memo.endBizStep(STEP.TRANSFER_CONTENT, -1);
+            memoDetachResult();
+        }})))
+    .freeze();
+    
+	private BizStep recvAndTransferAllContentsThenGoto(
+			final BizStep stepOfRecvAllContents,
+			final BizStep stepOfNext) {
+        if (this._requestData.isRequestFully()) {
+    		this._memo.endBizStep(STEP.TRANSFER_CONTENT, 
+    				this._watch4Step.stopAndRestart());
+    		this._memo.beginBizStep(STEP.RECV_RESP);
+    		return stepOfNext;
+        }
+        else {
+            return stepOfRecvAllContents;
+        }
+	}
+	
     private final BizStep TRANSFERCONTENT = new BizStep("relay.TRANSFERCONTENT") {
         @OnEvent(event = "onHttpContent")
         private BizStep recvHttpContentAndTransfer(final HttpContent httpContent) {
             _requestData.addContent(httpContent);
-            if (!needTransformHttpRequest()) {
-                transferHttpContent(httpContent);
-            }
-            
-            if ( !_requestData.isRequestFully() ) {
-                return currentEventHandler();
-            }
-            else {
-                if (needTransformHttpRequest()) {
-                    tryTransformAndReplaceHttpRequestOnce();
-                    transferHttpRequestAndContents();
-                }
-                _memo.endBizStep(STEP.TRANSFER_CONTENT, _watch4Step.stopAndRestart());
-                _memo.beginBizStep(STEP.RECV_RESP);
-                return RECVRESP;
-            }
+            transferHttpContent(httpContent);
+            return recvAndTransferAllContentsThenGoto(BizStep.CURRENT_BIZSTEP, RECVRESP);
         }
     }
     .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
@@ -411,10 +469,10 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         private BizStep responseReceived(final int httpClientId,
                 final HttpResponse response) throws Exception {
             if (!isValidHttpClientId(httpClientId)) {
-                return currentEventHandler();
+                return BizStep.CURRENT_BIZSTEP;
             }
             if (LOG.isDebugEnabled()) {
-                LOG.debug("channel for {} recv response {}", safeGetServiceUri(), response);
+                LOG.debug("channel for {} recv response {}", serviceUri(), response);
             }
             
             if ( _target.isCheckResponseStatus() ) {
@@ -429,7 +487,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             
             //  http response will never be changed, so record it
             _httpResponse = ReferenceCountUtil.retain(response);
-            _channelCtx.write(ReferenceCountUtil.retain(_httpResponse));
+            _channelCtx.write(ReferenceCountUtil.retain(response));
             
             //  TODO consider 响应为1xx，204，304相应或者head请求，则直接忽视掉消息实体内容。
             //  当满足上述情况时，是否应该直接结束转发流程。
@@ -442,7 +500,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             final long ttl = _watch4Result.stopAndRestart();
             _memo.incBizResult(result, ttl);
             LOG.warn("{},retry\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]\nresponse:[{}]",
-                    result.name(), ttl / (float)1000.0, _requestData, safeGetServiceUri(), response);
+                    result.name(), ttl / (float)1000.0, _requestData, serviceUri(), response);
             return launchRetry(ttl);
         }
     }
@@ -465,11 +523,11 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         private BizStep contentReceived(final int httpClientId,
                 final HttpContent content) throws Exception {
             if (!isValidHttpClientId(httpClientId)) {
-                return currentEventHandler();
+                return BizStep.CURRENT_BIZSTEP;
             }
             
             if (LOG.isDebugEnabled()) {
-                LOG.debug("channel for {} recv http content {}", safeGetServiceUri(), content);
+                LOG.debug("channel for {} recv http content {}", serviceUri(), content);
             }
             
             // content 的内容仅保证在事件 onHttpContentReceived 处理方法中有效
@@ -477,18 +535,18 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             // 因此需要先使用 ReferenceCountUtil.retain 增加一次引用计数
             _channelCtx.write(
                 ReferenceCountUtil.retain(content));
-            return currentEventHandler();
+            return BizStep.CURRENT_BIZSTEP;
         }
 
         @OnEvent(event = "onLastHttpContentReceived")
         private BizStep lastContentReceived(final int httpClientId,
                 final LastHttpContent content) throws Exception {
             if (!isValidHttpClientId(httpClientId)) {
-                return currentEventHandler();
+                return BizStep.CURRENT_BIZSTEP;
             }
 
             if (LOG.isDebugEnabled()) {
-                LOG.debug("channel for {} recv last http content {}", safeGetServiceUri(), content);
+                LOG.debug("channel for {} recv last http content {}", serviceUri(), content);
             }
             
             _memo.endBizStep(STEP.RECV_RESP, _watch4Step.stopAndRestart());
@@ -549,7 +607,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                         public BizStep call() {
                             if (LOG.isDebugEnabled()) {
                                 LOG.debug("channel for {} is Connection: close, so just mark RELAY_SUCCESS and close peer.", 
-                                        safeGetServiceUri());
+                                        serviceUri());
                             }
                             _memo.endBizStep(STEP.RECV_RESP, _watch4Step.stopAndRestart());
                             _channelCtx.flush().close();
@@ -562,8 +620,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         }
     }
     
-        
-    @SuppressWarnings("unchecked")
+	@SuppressWarnings("unchecked")
     private HttpReactor<Integer> genHttpReactor() {
         return (HttpReactor<Integer>) this
                 .queryInterfaceInstance(HttpReactor.class);
@@ -601,46 +658,6 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         return ret;
     }
 
-    private boolean needTransformHttpRequest() {
-        return null!=this._transformer;
-    }
-
-    private boolean tryTransformAndReplaceHttpRequestOnce() {
-        final FullHttpRequest newRequest = transformToFullHttpRequestOnce();
-        if (null!=newRequest) {
-            try {
-                this._requestData.clear();
-                this._requestData.setHttpRequest(newRequest);
-                //  add transform request count and record from relay begin 
-                //  until transform complete 's time cost 
-                this._memo.incBizResult(RESULT.TRANSFORM_REQUEST, 
-                        this._watch4Result.pauseAndContinue());
-                return true;
-            } finally {
-                newRequest.release();
-            }
-        }
-        else {
-            return false;
-        }
-    }
-    
-    private FullHttpRequest transformToFullHttpRequestOnce() {
-        if (null!=this._transformer) {
-            final HttpRequest req = this._requestData.request();
-            final ByteBuf content = this._requestData.retainFullContent();
-            try {
-                return this._transformer.transform(req, content);
-            } finally {
-                content.release();
-                this._transformer = null;
-            }
-        }
-        else {
-            return null;
-        }
-    }
-
     private BizStep launchRetry(final long ttl) throws Exception {
         _memo.incBizResult(RESULT.RELAY_RETRY, ttl);
         selfEventReceiver().acceptEvent("startRelay");
@@ -664,6 +681,9 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         this._requestData.request().setUri(
             this._target.rewritePath(this._requestData.request().getUri()));
         try {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("send http request {}", _requestData);
+            }
             this._httpClientWrapper.sendHttpRequest(
                 this._requestData.request(), genHttpReactor());
         }
@@ -675,9 +695,6 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         }
     }
 
-    /**
-     * @param content
-     */
     private void transferHttpContent(final HttpContent content) {
         try {
             this._httpClientWrapper.sendHttpContent(content);
@@ -702,7 +719,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     /**
      * @return
      */
-    private String safeGetServiceUri() {
+    private String serviceUri() {
         return null != this._target ? this._target.serviceUri().toString() : "non-uri";
     }
 
@@ -710,7 +727,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         final long ttl = _watch4Result.stopAndRestart();
         _memo.incBizResult(RESULT.SOURCE_CANCELED, ttl);
         LOG.warn("SOURCE_CANCELED\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]",
-                ttl / (float)1000.0, _requestData, safeGetServiceUri());
+                ttl / (float)1000.0, _requestData, serviceUri());
         setEndReason("relay.SOURCE_CANCELED");
     }
 
@@ -719,7 +736,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         _memo.incBizResult(result, ttl);
         LOG.warn("{},{}\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]",
                 result.name(), (isRetry ? "retry" : "not retry"), 
-                ttl / (float)1000.0, _requestData, safeGetServiceUri());
+                ttl / (float)1000.0, _requestData, serviceUri());
         return ttl;
     }
 
@@ -728,15 +745,13 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         _memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
         if (this._target.isShowInfoLog()) {
             LOG.info("{}\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]\nresponse:[{}]",
-                    successName, ttl / (float)1000.0, _requestData, safeGetServiceUri(), _httpResponse);
+                    successName, ttl / (float)1000.0, _requestData, serviceUri(), _httpResponse);
         }
     }
 
     private void destructor() throws Exception {
         this._requestData.clear();
-        if (null!=this._httpResponse) {
-            ReferenceCountUtil.safeRelease(this._httpResponse);
-        }
+        ReferenceCountUtil.safeRelease(this._httpResponse);
         //  replace logger to nop logger to disable all log message after this destroy
         this._proxyLogger.setImpl(NOPLogger.NOP_LOGGER);
     }
