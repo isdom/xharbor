@@ -12,10 +12,14 @@ import io.netty.handler.codec.http.LastHttpContent;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.concurrent.atomic.AtomicReference;
 
+import org.jocean.event.api.BizStep;
 import org.jocean.event.api.EventReceiver;
 import org.jocean.event.api.EventReceiverSource;
 import org.jocean.event.api.EventUtils;
+import org.jocean.event.api.FlowStateChangedListener;
+import org.jocean.event.api.internal.EventHandler;
 import org.jocean.event.core.FlowContainer;
 import org.jocean.httpclient.api.Guide;
 import org.jocean.httpclient.api.GuideBuilder;
@@ -67,6 +71,10 @@ public class RelayFlowTestCase {
 	final EventReceiverSource source = 
 			new FlowContainer("test").genEventReceiverSource(exectionLoop);
 	
+	Object _guideCtx;
+	Guide.GuideReactor<Object> _reactor;
+	boolean _isReturnHttpClient = true;
+	
 	final GuideBuilder guideBuilder = new GuideBuilder() {
 		@Override
 		public Guide createHttpClientGuide() {
@@ -79,23 +87,27 @@ public class RelayFlowTestCase {
 						GuideReactor<CTX> reactor, Requirement requirement) {
 					LOG.debug("call obtainHttpClient");
 					
-					try {
-						reactor.onHttpClientObtained(ctx, new HttpClient() {
-
-							@Override
-							public <CTX> void sendHttpRequest(
-									final CTX ctx,
-									final HttpRequest request,
-									final HttpReactor<CTX> reactor) throws Exception {
-								LOG.debug("call sendHttpRequest:{}", request);
-							}
-
-							@Override
-							public void sendHttpContent(HttpContent content)
-									throws Exception {
-								LOG.debug("call sendHttpContent:{}", content);
-							}});
-					} catch (Exception e) {
+					_guideCtx = ctx;
+					_reactor = (GuideReactor<Object>)reactor;
+					if (_isReturnHttpClient) {
+						try {
+							reactor.onHttpClientObtained(ctx, new HttpClient() {
+	
+								@Override
+								public <CTX> void sendHttpRequest(
+										final CTX ctx,
+										final HttpRequest request,
+										final HttpReactor<CTX> reactor) throws Exception {
+									LOG.debug("call sendHttpRequest:{}", request);
+								}
+	
+								@Override
+								public void sendHttpContent(HttpContent content)
+										throws Exception {
+									LOG.debug("call sendHttpContent:{}", content);
+								}});
+						} catch (Exception e) {
+						}
 					}
 				}};
 		}};
@@ -242,5 +254,35 @@ public class RelayFlowTestCase {
 		task.onHttpContent(LastHttpContent.EMPTY_LAST_CONTENT);
 		
 		assertEquals(lastStep, RelayMemo.STEP.RECV_RESP);
+	}
+
+	@Test
+	public void testRelayRetry() throws Exception {
+		final HttpRequest httpRequest = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/test");
+		final RelayFlow relay = new RelayFlow(router, memoBuilder, null);
+		
+		// enable return httpclient
+		_isReturnHttpClient = true;
+		final EventReceiver receiver =  source.createFromInnerState(
+				relay.attach(null, httpRequest).INIT);
+		
+		final AtomicReference<BizStep> current = new AtomicReference<BizStep>();
+		relay.addFlowStateChangedListener(new FlowStateChangedListener<RelayFlow, BizStep>() {
+
+			@Override
+			public void onStateChanged(RelayFlow flow, BizStep prev,
+					BizStep next, String causeEvent, Object[] causeArgs)
+					throws Exception {
+				current.set((BizStep)next);
+			}});
+		
+		final ServerTask task = EventUtils.buildInterfaceAdapter(ServerTask.class, receiver);
+		task.onHttpContent(LastHttpContent.EMPTY_LAST_CONTENT);
+		
+		// disable return httpclient
+		_isReturnHttpClient = false;
+		_reactor.onHttpClientLost(_guideCtx);
+		assertEquals(lastResult, RelayMemo.RESULT.RELAY_RETRY);
+		assertEquals(current.get(), relay.INIT);
 	}
 }

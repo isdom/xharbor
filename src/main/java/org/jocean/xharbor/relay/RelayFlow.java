@@ -17,7 +17,6 @@ import io.netty.util.ReferenceCountUtil;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.Callable;
 
 import org.jocean.event.api.AbstractFlow;
 import org.jocean.event.api.BizStep;
@@ -119,6 +118,52 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         }
     }
 
+    private static final FlowLifecycleListener<RelayFlow> LIFECYCLE_LISTENER = 
+            new FlowLifecycleListener<RelayFlow>() {
+        @Override
+        public void afterEventReceiverCreated(
+                final RelayFlow flow, final EventReceiver receiver)
+                throws Exception {
+            receiver.acceptEvent("init");
+        }
+        @Override
+        public void afterFlowDestroy(final RelayFlow flow)
+                throws Exception {
+            flow.destructor();
+        }
+    };
+    
+    private void whenStateChanged(
+    		final BizStep prev,
+			final BizStep next, 
+			final String causeEvent, 
+			final Object[] causeArgs)
+			throws Exception {
+		LOG.debug("onStateChanged: prev:{} next:{} event:{}", prev, next, causeEvent);
+		if ( RECVRESP == next) {
+			beginBizStep(STEP.RECV_RESP);
+		}
+		if (null==next && "detach".equals(causeEvent)) {
+			// means flow end by detach event
+			endBizStep(-1);
+			memoDetachResult();
+		}
+	}
+    
+    private static final FlowStateChangedListener<RelayFlow, BizStep> STATECHANGED_LISTENER = 
+		new FlowStateChangedListener<RelayFlow, BizStep>() {
+		@Override
+		public void onStateChanged(
+				final RelayFlow flow, 
+				final BizStep prev,
+				final BizStep next, 
+				final String causeEvent, 
+				final Object[] causeArgs)
+				throws Exception {
+			flow.whenStateChanged(prev, next, causeEvent, causeArgs);
+		}
+	};
+    
     public RelayFlow(
             final Router<HttpRequest, Dispatcher> router, 
             final RelayMemo.Builder memoBuilder,
@@ -130,25 +175,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         this._noRoutingMemo = noRoutingMemo;
         
         addFlowLifecycleListener(LIFECYCLE_LISTENER);
-        this.addFlowStateChangedListener(new FlowStateChangedListener<RelayFlow, BizStep>() {
-			@Override
-			public void onStateChanged(
-					final RelayFlow flow, 
-					final BizStep prev,
-					final BizStep next, 
-					final String causeEvent, 
-					final Object[] causeArgs)
-					throws Exception {
-				LOG.debug("onStateChanged: prev:{} next:{} event:{}", prev, next, causeEvent);
-				if (RECVRESP == next) {
-					beginBizStep(STEP.RECV_RESP);
-				}
-				if (null==next && "detach".equals(causeEvent)) {
-					// means flow end by detach event
-					endBizStep(-1);
-					memoDetachResult();
-				}
-			}});
+        addFlowStateChangedListener(STATECHANGED_LISTENER);
     }
     
     RelayFlow attach(
@@ -157,45 +184,6 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         this._requestData.setHttpRequest(httpRequest);
         this._channelCtx = channelCtx;
         return this;
-    }
-
-    private final class ONHTTPLOST {
-        public ONHTTPLOST(final Callable<BizStep> ifHttpLost) {
-            this._ifHttpLost = ifHttpLost;
-        }
-        
-        @OnEvent(event = "onHttpClientLost")
-        private BizStep onHttpLost(final int guideId)
-                throws Exception {
-            if (!isValidGuideId(guideId)) {
-                return BizStep.CURRENT_BIZSTEP;
-            }
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("{}/{}: http for {} lost.", 
-                        currentEventHandler().getName(), currentEvent(), 
-                        serviceUri());
-            }
-            if (null != this._ifHttpLost) {
-                try {
-                    return this._ifHttpLost.call();
-                }
-                catch(Throwable e) {
-                    LOG.warn("exception when invoke {}, detail: {}", 
-                            this._ifHttpLost, ExceptionUtils.exception2detail(e));
-                }
-            }
-            try {
-                _channelCtx.close();
-            }
-            catch(Throwable e) {
-                LOG.warn("exception when close {}, detail: {}", 
-                        _channelCtx, ExceptionUtils.exception2detail(e));
-            }
-            setEndReason("relay.HTTPLOST");
-            return null;
-        }
-        
-        private final Callable<BizStep> _ifHttpLost;
     }
 
     private final class ONDETACH {
@@ -231,12 +219,28 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         private final Runnable _ifDetached;
     }
 
-    private final Object CACHE_HTTPCONTENT = new Object() {
-        @OnEvent(event = "onHttpContent")
-        private BizStep cacheHttpContent(final HttpContent httpContent) {
-            _requestData.addContent(httpContent);
-            return BizStep.CURRENT_BIZSTEP;
+    private final class RETRY_WHENHTTPLOST {
+    	RETRY_WHENHTTPLOST(final RESULT result) {
+    		this._result = result;
+    	}
+        @OnEvent(event = "onHttpClientLost")
+        private BizStep onHttpLost(final int guideId)
+                throws Exception {
+            if (!isValidGuideId(guideId)) {
+                return BizStep.CURRENT_BIZSTEP;
+            }
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("{}/{}: http for {} lost.", 
+                        currentEventHandler().getName(), currentEvent(), 
+                        serviceUri());
+            }
+            endBizStep(-1);
+            _memo.incBizResult(RESULT.RELAY_RETRY, memoHttplostResult(_result, true));
+            selfEventReceiver().acceptEvent("init");
+            return INIT;
         }
+        
+        private final RESULT _result;
     };
     
     private BizStep recvFullRequestAndResponse401Unauthorized() {
@@ -248,7 +252,6 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                     @Override
                     public void run() {
                         removeFlowLifecycleListener(memoUnauthorizedAction);
-//                        memoDetachResult();
                     }})))
                 .freeze()
             : null
@@ -338,14 +341,14 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
 	            return recvFullContentThenRecvResp(TRANSFERCONTENT, null);
             }
         }
+        
+        @OnEvent(event = "onHttpContent")
+        private BizStep cacheHttpContent(final HttpContent httpContent) {
+            _requestData.addContent(httpContent);
+            return BizStep.CURRENT_BIZSTEP;
+        }
     }
-    .handler(handlersOf(CACHE_HTTPCONTENT))
-    .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
-        @Override
-        public BizStep call() throws Exception {
-            endBizStep(-1);
-            return launchRetry(memoHttplostResult(RESULT.CONNECTDESTINATION_FAILURE, true));
-        }})))
+    .handler(handlersOf(new RETRY_WHENHTTPLOST(RESULT.CONNECTDESTINATION_FAILURE)))
     .handler(handlersOf(new ONDETACH(null)))
     .freeze();
 
@@ -362,6 +365,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         }
 	}
     
+	//	TODO: merge to HttpRequestData
 	private final Runnable _transformRequestAndTransferAll = new Runnable() {
 		@Override
 		public void run() {
@@ -415,29 +419,19 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         			BizStep.CURRENT_BIZSTEP, _transformRequestAndTransferAll);
         }
     }
-    .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
-        @Override
-        public BizStep call() throws Exception {
-            endBizStep(-1);
-            return launchRetry(memoHttplostResult(RESULT.RELAY_FAILURE, true));
-        }})))
+    .handler(handlersOf(new RETRY_WHENHTTPLOST(RESULT.RELAY_FAILURE)))
     .handler(handlersOf(new ONDETACH(null)))
     .freeze();
     
     private final BizStep TRANSFERCONTENT = new BizStep("relay.TRANSFERCONTENT") {
         @OnEvent(event = "onHttpContent")
-        private BizStep recvHttpContentAndTransfer(final HttpContent httpContent) {
+        private BizStep recvAndTransferHttpContent(final HttpContent httpContent) {
             _requestData.addContent(httpContent);
             transferHttpContent(httpContent);
             return recvFullContentThenRecvResp(BizStep.CURRENT_BIZSTEP, null);
         }
     }
-    .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
-        @Override
-        public BizStep call() throws Exception {
-            endBizStep(-1);
-            return launchRetry(memoHttplostResult(RESULT.RELAY_FAILURE, true));
-        }})))
+    .handler(handlersOf(new RETRY_WHENHTTPLOST(RESULT.RELAY_FAILURE)))
     .handler(handlersOf(new ONDETACH(null)))
     .freeze();
         
@@ -468,7 +462,16 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             
             //  TODO consider 响应为1xx，204，304相应或者head请求，则直接忽视掉消息实体内容。
             //  当满足上述情况时，是否应该直接结束转发流程。
-            return buildRecvContentByConnectionEntity();
+            
+            //  ref : http://blog.csdn.net/yankai0219/article/details/8269922
+            // 1、在http1.1及之后版本。如果是keep alive，则content-length和chunk必然是二选一。
+            //   若是非keep alive(Connection: close)，则和http1.0一样, Server侧通过 socket 关闭来表示消息结束
+            // 2、在Http 1.0及之前版本中，content-length字段可有可无。Server侧通过 socket 关闭来表示消息结束
+            return HttpHeaders.isKeepAlive(_requestData.request())
+            		? RECVCONTENT_KEEPALIVE
+                    // Connection: close
+            		: RECVCONTENT_CLOSE
+    				;
         }
 
         private BizStep retryFor(final RESULT result, final HttpResponse response) throws Exception {
@@ -480,17 +483,18 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                     result.name(), ttl / (float)1000.0, _requestData, serviceUri(), response);
             return launchRetry(ttl);
         }
+        
+        private BizStep launchRetry(final long ttl) throws Exception {
+            _memo.incBizResult(RESULT.RELAY_RETRY, ttl);
+            selfEventReceiver().acceptEvent("init");
+            return INIT;
+        }
     }
-    .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
-        @Override
-        public BizStep call() throws Exception {
-            endBizStep(-1);
-            return launchRetry(memoHttplostResult(RESULT.RELAY_FAILURE, true));
-        }})))
+    .handler(handlersOf(new RETRY_WHENHTTPLOST(RESULT.RELAY_FAILURE)))
     .handler(handlersOf(new ONDETACH(null)))
     .freeze();
 
-    private final BizStep RECVCONTENT_TMPL = new BizStep("relay.RECVCONTENT.template") {
+    private final Object RECVCONTENT = new Object() {
         @OnEvent(event = "onHttpContentReceived")
         private BizStep contentReceived(final int httpClientId,
                 final HttpContent content) throws Exception {
@@ -537,55 +541,58 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             setEndReason("relay.RELAY_SUCCESS");
             return null;
         }
+    };
+
+    private final BizStep RECVCONTENT_KEEPALIVE = new BizStep("relay.RECVCONTENT.KeepAlive") {
+        @OnEvent(event = "onHttpClientLost")
+        private BizStep onHttpLost(final int guideId)
+                throws Exception {
+            if (!isValidGuideId(guideId)) {
+                return BizStep.CURRENT_BIZSTEP;
+            }
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("{}/{}: http for {} lost.", 
+                        currentEventHandler().getName(), currentEvent(), 
+                        serviceUri());
+            }
+            try {
+                _channelCtx.close();
+            }
+            catch(Throwable e) {
+                LOG.warn("exception when close {}, detail: {}", 
+                        _channelCtx, ExceptionUtils.exception2detail(e));
+            }
+            endBizStep(-1);
+            memoHttplostResult(RESULT.RELAY_FAILURE, false);
+            setEndReason("relay.RELAY_FAILURE");
+            return null;
+        }
     }
+    .handler(handlersOf(RECVCONTENT))
     .handler(handlersOf(new ONDETACH(null)))
     .freeze();
-
-    private BizStep buildRecvContentByConnectionEntity() {
-        //  ref : http://blog.csdn.net/yankai0219/article/details/8269922
-        // 1、在http1.1及之后版本。如果是keep alive，则content-length和chunk必然是二选一。
-        //   若是非keep alive(Connection: close)，则和http1.0一样, Server侧通过 socket 关闭来表示消息结束
-        // 2、在Http 1.0及之前版本中，content-length字段可有可无。Server侧通过 socket 关闭来表示消息结束
-        if ( HttpHeaders.isKeepAlive(_requestData.request()) ) {
-            return RECVCONTENT_TMPL
-                    .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
-                        @Override
-                        public BizStep call() {
-                            try {
-                                _channelCtx.close();
-                            }
-                            catch(Throwable e) {
-                                LOG.warn("exception when close {}, detail: {}", 
-                                        _channelCtx, ExceptionUtils.exception2detail(e));
-                            }
-                            endBizStep(-1);
-                            memoHttplostResult(RESULT.RELAY_FAILURE, false);
-                            setEndReason("relay.RELAY_FAILURE");
-                            return null;
-                        }})))
-                    .rename("relay.RECVCONTENT.KeepAlive")
-                    .freeze();
-        }
-        else {
-            // Connection: close
-            return RECVCONTENT_TMPL
-                    .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
-                        @Override
-                        public BizStep call() {
-                            if (LOG.isDebugEnabled()) {
-                                LOG.debug("channel for {} is Connection: close, so just mark RELAY_SUCCESS and close peer.", 
-                                        serviceUri());
-                            }
-                            endBizStep();
-                            _channelCtx.flush().close();
-                            memoRelaySuccessResult("HTTP10.RELAY_SUCCESS");
-                            setEndReason("relay.HTTP10.RELAY_SUCCESS");
-                            return null;
-                        }})))
-                    .rename("relay.RECVCONTENT.Close")
-                    .freeze();
+    
+    private final BizStep RECVCONTENT_CLOSE = new BizStep("relay.RECVCONTENT.Close") {
+        @OnEvent(event = "onHttpClientLost")
+        private BizStep onHttpLost(final int guideId)
+                throws Exception {
+            if (!isValidGuideId(guideId)) {
+                return BizStep.CURRENT_BIZSTEP;
+            }
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("channel for {} is Connection: close, so just mark RELAY_SUCCESS and close peer.", 
+                        serviceUri());
+            }
+            endBizStep();
+            _channelCtx.flush().close();
+            memoRelaySuccessResult("HTTP10.RELAY_SUCCESS");
+            setEndReason("relay.HTTP10.RELAY_SUCCESS");
+            return null;
         }
     }
+    .handler(handlersOf(RECVCONTENT))
+    .handler(handlersOf(new ONDETACH(null)))
+    .freeze();
     
 	@SuppressWarnings("unchecked")
     private HttpReactor<Integer> genHttpReactor() {
@@ -623,12 +630,6 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             }
         }
         return ret;
-    }
-
-    private BizStep launchRetry(final long ttl) throws Exception {
-        _memo.incBizResult(RESULT.RELAY_RETRY, ttl);
-        selfEventReceiver().acceptEvent("init");
-        return INIT;
     }
 
     private static boolean isHttpClientError(final HttpResponse response) {
@@ -723,23 +724,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         this._proxyLogger.setImpl(NOPLogger.NOP_LOGGER);
     }
 
-    private static final FlowLifecycleListener<RelayFlow> LIFECYCLE_LISTENER = 
-            new FlowLifecycleListener<RelayFlow>() {
-
-        @Override
-        public void afterEventReceiverCreated(
-                final RelayFlow flow, final EventReceiver receiver)
-                throws Exception {
-            receiver.acceptEvent("init");
-        }
-
-        @Override
-        public void afterFlowDestroy(final RelayFlow flow)
-                throws Exception {
-            flow.destructor();
-        }
-    };
-    
+    //	TODO extract begin/end Step class with currentRelayStep
     private void beginBizStep(final STEP step) {
     	endBizStep();
     	this._currentRelayStep = step;
