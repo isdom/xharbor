@@ -140,6 +140,9 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
 					final Object[] causeArgs)
 					throws Exception {
 				LOG.debug("onStateChanged: prev:{} next:{} event:{}", prev, next, causeEvent);
+				if (RECVRESP == next) {
+					beginBizStep(STEP.RECV_RESP);
+				}
 				if (null==next && "detach".equals(causeEvent)) {
 					// means flow end by detach event
 					endBizStep(-1);
@@ -299,7 +302,6 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             _transformer = _target.getHttpRequestTransformerOf(_requestData.request());
             
             beginBizStep(STEP.ROUTING);
-            endBizStep(_watch4Step.stopAndRestart());
             
             if ( LOG.isDebugEnabled() ) {
                 LOG.debug("dispatch to ({}) for request({})", serviceUri(), _requestData);
@@ -325,17 +327,15 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                 return BizStep.CURRENT_BIZSTEP;
             }
 
-            endBizStep(_watch4Step.stopAndRestart());
             beginBizStep(STEP.TRANSFER_CONTENT);
-            
             _httpClientWrapper.setHttpClient(httpclient);
-            
             if (null!=_transformer) {
-            	return recvFullContentAndDoTransformThenGoto(RECVCONTENT_TRANSFORMREQ, RECVRESP);
+            	return recvFullContentThenRecvResp(
+            			RECVCONTENT_TRANSFORMREQ, _transformRequestAndTransferAll);
             }
             else {
 	            transferHttpRequestAndContents();
-	            return recvAndTransferAllContentsThenGoto(TRANSFERCONTENT, RECVRESP);
+	            return recvFullContentThenRecvResp(TRANSFERCONTENT, null);
             }
         }
     }
@@ -349,63 +349,70 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     .handler(handlersOf(new ONDETACH(null)))
     .freeze();
 
-	private BizStep recvFullContentAndDoTransformThenGoto(
-			final BizStep stepOfRecvFullContent,
-			final BizStep stepOfNext) {
+	private BizStep recvFullContentThenRecvResp(
+			final BizStep recvContent, final Runnable whenRecvFully) {
         if (this._requestData.isRequestFully()) {
-    		if (transformAndReplaceHttpRequest()) {
-                //  add transform request count and record from relay begin 
-                //  until transform complete 's time cost 
-                this._memo.incBizResult(RESULT.TRANSFORM_REQUEST, 
-                        this._watch4Result.pauseAndContinue());
-    		}
-    		transferHttpRequestAndContents();
-    		endBizStep(this._watch4Step.stopAndRestart());
-    		beginBizStep(STEP.RECV_RESP);
-    		return stepOfNext;
+        	if (null != whenRecvFully) {
+        		whenRecvFully.run();
+        	}
+    		return RECVRESP;
         }
         else {
-            return stepOfRecvFullContent;
+            return recvContent;
         }
 	}
     
-    private boolean transformAndReplaceHttpRequest() {
-        final FullHttpRequest newRequest = transformToFullHttpRequest();
-        if (null!=newRequest) {
-            try {
-                this._requestData.clear();
-                this._requestData.setHttpRequest(newRequest);
-                return true;
-            } finally {
-                newRequest.release();
-            }
-        }
-        else {
-            return false;
-        }
-    }
+	private final Runnable _transformRequestAndTransferAll = new Runnable() {
+		@Override
+		public void run() {
+    		if (transformAndReplaceHttpRequest()) {
+                //  add transform request count and record from relay begin 
+                //  until transform complete 's time cost 
+                _memo.incBizResult(RESULT.TRANSFORM_REQUEST, 
+                        _watch4Result.pauseAndContinue());
+    		}
+    		transferHttpRequestAndContents();
+		}
+		
+	    private boolean transformAndReplaceHttpRequest() {
+	        final FullHttpRequest newRequest = transformToFullHttpRequest();
+	        if (null!=newRequest) {
+	            try {
+	                _requestData.clear();
+	                _requestData.setHttpRequest(newRequest);
+	                return true;
+	            } finally {
+	                newRequest.release();
+	            }
+	        }
+	        else {
+	            return false;
+	        }
+	    }
+	    
+	    private FullHttpRequest transformToFullHttpRequest() {
+	        if (null!=_transformer) {
+	            final HttpRequest req = _requestData.request();
+	            final ByteBuf content = _requestData.retainFullContent();
+	            try {
+	                return _transformer.transform(req, content);
+	            } finally {
+	                content.release();
+	                _transformer = null;
+	            }
+	        }
+	        else {
+	            return null;
+	        }
+	    }
+	};
     
-    private FullHttpRequest transformToFullHttpRequest() {
-        if (null!=this._transformer) {
-            final HttpRequest req = this._requestData.request();
-            final ByteBuf content = this._requestData.retainFullContent();
-            try {
-                return this._transformer.transform(req, content);
-            } finally {
-                content.release();
-                this._transformer = null;
-            }
-        }
-        else {
-            return null;
-        }
-    }
-    
-    private final BizStep RECVCONTENT_TRANSFORMREQ = new BizStep("relay.RECVCONTENT_AND_TRANSFORMREQ") {
+    private final BizStep RECVCONTENT_TRANSFORMREQ = new BizStep("relay.RECVCONTENT_TRANSFORMREQ") {
         @OnEvent(event = "onHttpContent")
         private BizStep recvHttpContentAndTransformRequest(final HttpContent httpContent) {
             _requestData.addContent(httpContent);
-            return recvFullContentAndDoTransformThenGoto(BizStep.CURRENT_BIZSTEP, RECVRESP);
+        	return recvFullContentThenRecvResp(
+        			BizStep.CURRENT_BIZSTEP, _transformRequestAndTransferAll);
         }
     }
     .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
@@ -417,25 +424,12 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     .handler(handlersOf(new ONDETACH(null)))
     .freeze();
     
-	private BizStep recvAndTransferAllContentsThenGoto(
-			final BizStep stepOfRecvAllContents,
-			final BizStep stepOfNext) {
-        if (this._requestData.isRequestFully()) {
-    		endBizStep(this._watch4Step.stopAndRestart());
-    		beginBizStep(STEP.RECV_RESP);
-    		return stepOfNext;
-        }
-        else {
-            return stepOfRecvAllContents;
-        }
-	}
-	
     private final BizStep TRANSFERCONTENT = new BizStep("relay.TRANSFERCONTENT") {
         @OnEvent(event = "onHttpContent")
         private BizStep recvHttpContentAndTransfer(final HttpContent httpContent) {
             _requestData.addContent(httpContent);
             transferHttpContent(httpContent);
-            return recvAndTransferAllContentsThenGoto(BizStep.CURRENT_BIZSTEP, RECVRESP);
+            return recvFullContentThenRecvResp(BizStep.CURRENT_BIZSTEP, null);
         }
     }
     .handler(handlersOf(new ONHTTPLOST(new Callable<BizStep>() {
@@ -479,7 +473,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
 
         private BizStep retryFor(final RESULT result, final HttpResponse response) throws Exception {
             _httpClientWrapper.detachHttpClient();
-            endBizStep(_watch4Step.stopAndRestart());
+            endBizStep();
             final long ttl = _watch4Result.stopAndRestart();
             _memo.incBizResult(result, ttl);
             LOG.warn("{},retry\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]\nresponse:[{}]",
@@ -527,7 +521,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                 LOG.debug("channel for {} recv last http content {}", serviceUri(), content);
             }
             
-            endBizStep(_watch4Step.stopAndRestart());
+            endBizStep();
             
             //  release relay's http client
             _httpClientWrapper.detachHttpClient();
@@ -582,7 +576,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                                 LOG.debug("channel for {} is Connection: close, so just mark RELAY_SUCCESS and close peer.", 
                                         serviceUri());
                             }
-                            endBizStep(_watch4Step.stopAndRestart());
+                            endBizStep();
                             _channelCtx.flush().close();
                             memoRelaySuccessResult("HTTP10.RELAY_SUCCESS");
                             setEndReason("relay.HTTP10.RELAY_SUCCESS");
@@ -747,6 +741,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     };
     
     private void beginBizStep(final STEP step) {
+    	endBizStep();
     	this._currentRelayStep = step;
         this._memo.beginBizStep(step);
     }
@@ -755,6 +750,12 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     	if (null != this._currentRelayStep) {
 	    	this._memo.endBizStep(this._currentRelayStep, ttl);
 	    	this._currentRelayStep = null;
+    	}
+    }
+    
+    private void endBizStep() {
+    	if (null != this._currentRelayStep) {
+    		endBizStep(this._watch4Step.stopAndRestart());
     	}
     }
     

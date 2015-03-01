@@ -4,9 +4,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 import io.netty.handler.codec.http.DefaultHttpRequest;
+import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.LastHttpContent;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -17,6 +19,7 @@ import org.jocean.event.api.EventUtils;
 import org.jocean.event.core.FlowContainer;
 import org.jocean.httpclient.api.Guide;
 import org.jocean.httpclient.api.GuideBuilder;
+import org.jocean.httpclient.api.HttpClient;
 import org.jocean.httpserver.ServerAgent.ServerTask;
 import org.jocean.idiom.Detachable;
 import org.jocean.idiom.ExectionLoop;
@@ -75,6 +78,25 @@ public class RelayFlowTestCase {
 				public <CTX> void obtainHttpClient(CTX ctx,
 						GuideReactor<CTX> reactor, Requirement requirement) {
 					LOG.debug("call obtainHttpClient");
+					
+					try {
+						reactor.onHttpClientObtained(ctx, new HttpClient() {
+
+							@Override
+							public <CTX> void sendHttpRequest(
+									final CTX ctx,
+									final HttpRequest request,
+									final HttpReactor<CTX> reactor) throws Exception {
+								LOG.debug("call sendHttpRequest:{}", request);
+							}
+
+							@Override
+							public void sendHttpContent(HttpContent content)
+									throws Exception {
+								LOG.debug("call sendHttpContent:{}", content);
+							}});
+					} catch (Exception e) {
+					}
 				}};
 		}};
 		
@@ -206,6 +228,19 @@ public class RelayFlowTestCase {
 		
 		assertEquals(lastResult, RelayMemo.RESULT.SOURCE_CANCELED);
 		assertNull(lastStep);
+		assertEquals(relay.getEndReason(), "relay.SOURCE_CANCELED");
 	}
 
+	@Test
+	public void testRecvResp() throws Exception {
+		final HttpRequest httpRequest = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/test");
+		final RelayFlow relay = new RelayFlow(router, memoBuilder, null);
+		final EventReceiver receiver =  source.createFromInnerState(
+				relay.attach(null, httpRequest).INIT);
+		
+		final ServerTask task = EventUtils.buildInterfaceAdapter(ServerTask.class, receiver);
+		task.onHttpContent(LastHttpContent.EMPTY_LAST_CONTENT);
+		
+		assertEquals(lastStep, RelayMemo.STEP.RECV_RESP);
+	}
 }

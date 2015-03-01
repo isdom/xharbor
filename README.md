@@ -134,3 +134,6 @@ TODO:
   
   44、梳理 RelayFlow 单个Java文件: 将 HttpRequest / request's HttpContent 以及相关方法 组织在一起，etc
   
+  45、使用 Mock or Hamcrest to build Unit TestCase.
+  
+  
