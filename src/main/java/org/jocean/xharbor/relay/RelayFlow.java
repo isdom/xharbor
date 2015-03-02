@@ -282,13 +282,28 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
 
             beginBizStep(STEP.TRANSFER_CONTENT);
             _httpClientWrapper.setHttpClient(httpclient);
-            if (null!=_transformer) {
-            	return recvFullContentThenRecvResp(
-            			RECVCONTENT_TRANSFORMREQ, _transformRequestAndTransferAll);
+            if (null==_transformer) {
+	            transferHttpRequestAndContents();
+            	return _requestData.recvFullContentThenGoto(
+            			"relay.TRANSFERCONTENT",
+            			new Visitor<HttpContent>() {
+							@Override
+							public void visit(final HttpContent httpContent) throws Exception {
+		            			transferHttpContent(httpContent);
+							}},
+            			null,
+            			RECVRESP,
+            			new RETRY_WHENHTTPLOST(RESULT.RELAY_FAILURE),
+            			ONDETACH);
             }
             else {
-	            transferHttpRequestAndContents();
-	            return recvFullContentThenRecvResp(TRANSFERCONTENT, null);
+            	return _requestData.recvFullContentThenGoto(
+            			"relay.RECVCONTENT_TRANSFORMREQ",
+            			null,
+            			_transformRequestAndTransferAll,
+            			RECVRESP,
+            			new RETRY_WHENHTTPLOST(RESULT.RELAY_FAILURE),
+            			ONDETACH);
             }
         }
         
@@ -299,51 +314,36 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         }
 
         private BizStep recvFullRequestAndResponse401Unauthorized() {
-            final FlowStateChangedListener<RelayFlow,BizStep> memoUnauthorized = new FlowStateChangedListener<RelayFlow,BizStep>() {
-				@Override
-				public void onStateChanged(RelayFlow flow, BizStep prev,
-						BizStep next, String causeEvent, Object[] causeArgs)
-						throws Exception {
-					if (null==next && !("detach".equals(causeEvent))) {
-						// means flow will end and !NOT! cause by detach, so it must by end by response 401 finsihed
-						_memo.incBizResult(RESULT.HTTP_UNAUTHORIZED, _watch4Result.stopAndRestart());
-					}
-				}};
-            addFlowStateChangedListener(memoUnauthorized);
-            final BizStep step = BizStepBuilder.waitforRequestFinishedAndResponse401Unauthorized
-                    .build(_requestData, _channelCtx);
-            return (null != step)
-                ? step.handler(handlersOf(ONDETACH)).freeze()
-                : null
-                ;
+        	return _requestData.recvFullContentThenGoto(
+        			"relay.RESP_401",
+        			null,
+        			new Runnable() {
+						@Override
+						public void run() {
+							_memo.incBizResult(RESULT.HTTP_UNAUTHORIZED, _watch4Result.stopAndRestart());
+							_requestData.response401Unauthorized("Basic realm=\"iplusmed\"", _channelCtx);
+						}},
+        			null,
+        			ONDETACH);
         }
         
         private BizStep recvFullRequestAndResponse200OK() {
-            final BizStep step = BizStepBuilder.waitforRequestFinishedAndResponse200OK
-                    .build(_requestData, _channelCtx);
-            return (null != step)
-                ? step.handler(handlersOf(ONDETACH)).freeze()
-                : null
-                ;
+        	return _requestData.recvFullContentThenGoto(
+        			"relay.RESP_200OK",
+        			null,
+        			new Runnable() {
+						@Override
+						public void run() {
+							_requestData.response200OK(_channelCtx);
+						}},
+        			null,
+        			ONDETACH);
         }
     }
     .handler(handlersOf(new RETRY_WHENHTTPLOST(RESULT.CONNECTDESTINATION_FAILURE)))
     .handler(handlersOf(ONDETACH))
     .freeze();
 
-	private BizStep recvFullContentThenRecvResp(
-			final BizStep recvContent, final Runnable whenRecvFully) {
-        if (this._requestData.isRequestFully()) {
-        	if (null != whenRecvFully) {
-        		whenRecvFully.run();
-        	}
-    		return RECVRESP;
-        }
-        else {
-            return recvContent;
-        }
-	}
-    
 	//	TODO: merge to HttpRequestData
 	private final Runnable _transformRequestAndTransferAll = new Runnable() {
 		@Override
@@ -389,30 +389,6 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
 	        }
 	    }
 	};
-    
-    private final BizStep RECVCONTENT_TRANSFORMREQ = new BizStep("relay.RECVCONTENT_TRANSFORMREQ") {
-        @OnEvent(event = "onHttpContent")
-        private BizStep recvHttpContentAndTransformRequest(final HttpContent httpContent) {
-            _requestData.addContent(httpContent);
-        	return recvFullContentThenRecvResp(
-        			BizStep.CURRENT_BIZSTEP, _transformRequestAndTransferAll);
-        }
-    }
-    .handler(handlersOf(new RETRY_WHENHTTPLOST(RESULT.RELAY_FAILURE)))
-    .handler(handlersOf(ONDETACH))
-    .freeze();
-    
-    private final BizStep TRANSFERCONTENT = new BizStep("relay.TRANSFERCONTENT") {
-        @OnEvent(event = "onHttpContent")
-        private BizStep recvAndTransferHttpContent(final HttpContent httpContent) {
-            _requestData.addContent(httpContent);
-            transferHttpContent(httpContent);
-            return recvFullContentThenRecvResp(BizStep.CURRENT_BIZSTEP, null);
-        }
-    }
-    .handler(handlersOf(new RETRY_WHENHTTPLOST(RESULT.RELAY_FAILURE)))
-    .handler(handlersOf(ONDETACH))
-    .freeze();
         
     private final BizStep RECVRESP = new BizStep("relay.RECVRESP") {
         @OnEvent(event = "onHttpResponseReceived")
