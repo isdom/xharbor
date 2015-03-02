@@ -3,11 +3,9 @@
  */
 package org.jocean.xharbor.relay;
 
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
@@ -300,7 +298,18 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             	return _requestData.recvFullContentThenGoto(
             			"relay.RECVCONTENT_TRANSFORMREQ",
             			null,
-            			_transformRequestAndTransferAll,
+            			new Runnable() {
+            				@Override
+            				public void run() {
+            		    		if (_requestData.transformAndReplace(_transformer)) {
+            		                //  add transform request count and record from relay begin 
+            		                //  until transform complete 's time cost 
+            		                _memo.incBizResult(RESULT.TRANSFORM_REQUEST, 
+            		                        _watch4Result.pauseAndContinue());
+            		    		}
+            		    		_transformer = null;
+            		    		transferHttpRequestAndContents();
+            				}},
             			RECVRESP,
             			new RETRY_WHENHTTPLOST(RESULT.RELAY_FAILURE),
             			ONDETACH);
@@ -344,52 +353,6 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     .handler(handlersOf(ONDETACH))
     .freeze();
 
-	//	TODO: merge to HttpRequestData
-	private final Runnable _transformRequestAndTransferAll = new Runnable() {
-		@Override
-		public void run() {
-    		if (transformAndReplaceHttpRequest()) {
-                //  add transform request count and record from relay begin 
-                //  until transform complete 's time cost 
-                _memo.incBizResult(RESULT.TRANSFORM_REQUEST, 
-                        _watch4Result.pauseAndContinue());
-    		}
-    		transferHttpRequestAndContents();
-		}
-		
-	    private boolean transformAndReplaceHttpRequest() {
-	        final FullHttpRequest newRequest = transformToFullHttpRequest();
-	        if (null!=newRequest) {
-	            try {
-	                _requestData.clear();
-	                _requestData.setHttpRequest(newRequest);
-	                return true;
-	            } finally {
-	                newRequest.release();
-	            }
-	        }
-	        else {
-	            return false;
-	        }
-	    }
-	    
-	    private FullHttpRequest transformToFullHttpRequest() {
-	        if (null!=_transformer) {
-	            final HttpRequest req = _requestData.request();
-	            final ByteBuf content = _requestData.retainFullContent();
-	            try {
-	                return _transformer.transform(req, content);
-	            } finally {
-	                content.release();
-	                _transformer = null;
-	            }
-	        }
-	        else {
-	            return null;
-	        }
-	    }
-	};
-        
     private final BizStep RECVRESP = new BizStep("relay.RECVRESP") {
         @OnEvent(event = "onHttpResponseReceived")
         private BizStep responseReceived(final int httpClientId,

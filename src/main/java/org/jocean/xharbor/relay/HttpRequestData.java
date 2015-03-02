@@ -24,6 +24,7 @@ import org.jocean.event.api.annotation.OnEvent;
 import org.jocean.event.api.internal.DefaultInvoker;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.Visitor;
+import org.jocean.xharbor.spi.HttpRequestTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -188,7 +189,32 @@ public class HttpRequestData {
 	        future.addListener(ChannelFutureListener.CLOSE);
 	    }
 	}
+
+	public boolean transformAndReplace(final HttpRequestTransformer requestTransformer) {
+        final FullHttpRequest newRequest = transformToFullHttpRequest(requestTransformer);
+        if (null!=newRequest) {
+            try {
+                clear();
+                setHttpRequest(newRequest);
+                return true;
+            } finally {
+                newRequest.release();
+            }
+        }
+        else {
+            return false;
+        }
+	}
     
+    private FullHttpRequest transformToFullHttpRequest(final HttpRequestTransformer requestTransformer) {
+        final ByteBuf content = retainFullContent();
+        try {
+            return requestTransformer.transform(this._httpRequest, content);
+        } finally {
+            content.release();
+        }
+    }
+	
     private void updateRecvHttpRequestState(final HttpObject httpObject) {
         if ( (httpObject instanceof FullHttpRequest) 
             || (httpObject instanceof LastHttpContent)) {
