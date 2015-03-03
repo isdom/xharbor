@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.event.api.AbstractFlow;
 import org.jocean.event.api.BizStep;
-import org.jocean.event.api.EventReceiverSource;
+import org.jocean.event.api.EventEngine;
 import org.jocean.event.api.annotation.OnEvent;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.Function;
@@ -56,14 +56,14 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT> {
         this._implUpdater.updateImpl(routerImpl);
     }
 
-    public CachedRouter(final EventReceiverSource source) {
-        this._source = source;
+    public CachedRouter(final EventEngine engine) {
+        this._engine = engine;
     }
     
     @SuppressWarnings("unchecked")
     public void start() {
         this._implUpdater = new UpdateImplFlow() {{
-            _source.create(this, this.UPDATE);
+            _engine.create(this, this.UPDATE);
         }}.queryInterfaceInstance(ImplUpdater.class);
     }
     
@@ -139,7 +139,7 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT> {
         this._cache.clear();
     }
     
-    private final EventReceiverSource _source;
+    private final EventEngine _engine;
     
     private volatile OnRouted<INPUT, OUTPUT> _onRouted;
     private volatile OnRouterUpdated<INPUT, OUTPUT> _onRouterUpdated;

@@ -15,11 +15,10 @@ import java.net.URISyntaxException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.event.api.BizStep;
+import org.jocean.event.api.EventEngine;
 import org.jocean.event.api.EventReceiver;
-import org.jocean.event.api.EventReceiverSource;
 import org.jocean.event.api.EventUtils;
 import org.jocean.event.api.FlowStateChangedListener;
-import org.jocean.event.api.internal.EventHandler;
 import org.jocean.event.core.FlowContainer;
 import org.jocean.httpclient.api.Guide;
 import org.jocean.httpclient.api.GuideBuilder;
@@ -43,33 +42,8 @@ public class RelayFlowTestCase {
     private static final Logger LOG = LoggerFactory
             .getLogger(RelayFlowTestCase.class);
     
-    final ExectionLoop exectionLoop = new ExectionLoop() {
-
-        @Override
-        public boolean inExectionLoop() {
-            return true;
-        }
-
-        @Override
-        public Detachable submit(final Runnable runnable) {
-            runnable.run();
-            return new Detachable() {
-                @Override
-                public void detach() {
-                }};
-        }
-
-        @Override
-        public Detachable schedule(final Runnable runnable, final long delayMillis) {
-            runnable.run();
-            return new Detachable() {
-                @Override
-                public void detach() {
-                }};
-        }};
-        
-	final EventReceiverSource source = 
-			new FlowContainer("test").genEventReceiverSource(exectionLoop);
+	final EventEngine engine = 
+			new FlowContainer("test").buildEventEngine(ExectionLoop.immediateLoop);
 	
 	Object _guideCtx;
 	Guide.GuideReactor<Object> _reactor;
@@ -232,7 +206,7 @@ public class RelayFlowTestCase {
 	public void testSourceCanceled() throws Exception {
 		final HttpRequest httpRequest = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/test");
 		final RelayFlow relay = new RelayFlow(router, memoBuilder, null);
-		final EventReceiver receiver =  source.createFromInnerState(
+		final EventReceiver receiver =  engine.createFromInnerState(
 				relay.attach(null, httpRequest).INIT);
 		
 		final ServerTask task = EventUtils.buildInterfaceAdapter(ServerTask.class, receiver);
@@ -247,7 +221,7 @@ public class RelayFlowTestCase {
 	public void testRecvResp() throws Exception {
 		final HttpRequest httpRequest = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/test");
 		final RelayFlow relay = new RelayFlow(router, memoBuilder, null);
-		final EventReceiver receiver =  source.createFromInnerState(
+		final EventReceiver receiver =  engine.createFromInnerState(
 				relay.attach(null, httpRequest).INIT);
 		
 		final ServerTask task = EventUtils.buildInterfaceAdapter(ServerTask.class, receiver);
@@ -263,7 +237,7 @@ public class RelayFlowTestCase {
 		
 		// enable return httpclient
 		_isReturnHttpClient = true;
-		final EventReceiver receiver =  source.createFromInnerState(
+		final EventReceiver receiver =  engine.createFromInnerState(
 				relay.attach(null, httpRequest).INIT);
 		
 		final AtomicReference<BizStep> current = new AtomicReference<BizStep>();

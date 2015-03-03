@@ -32,8 +32,7 @@ public class HttpClientWrapper {
             try {
                 this._guide.detach();
             } catch (Throwable e) {
-                LOG.warn(
-                        "exception when detach httpclient {}, detail:{}",
+                LOG.warn("exception when detach httpclient {}, detail:{}",
                         this, ExceptionUtils.exception2detail(e));
             }
             this._guide = null;
@@ -62,11 +61,21 @@ public class HttpClientWrapper {
     }
     
     public boolean validateGuideId(final int guideId) {
-        return this._guideId.isValidId(guideId);
+        final boolean ret = this._guideId.isValidId(guideId);
+        if (!ret) {
+            LOG.warn("special guide id({}) is !MISMATCH! current httpclientWrapper ({}), just ignore.",
+                    guideId, this);
+        }
+        return ret;
     }
     
     public boolean validateHttpClientId(final int clientId) {
-        return this._httpClientId.isValidId(clientId);
+        final boolean ret = this._httpClientId.isValidId(clientId);
+        if (!ret) {
+            LOG.warn("special httpclient id({}) is !MISMATCH! current httpclientWrapper ({}), just ignore.",
+            		clientId, this);
+        }
+        return ret;
     }
     
     @Override

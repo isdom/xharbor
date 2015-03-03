@@ -18,7 +18,7 @@
         <constructor-arg value="${gateway.outbound.httpTransportLogEnabled:true}"/>
     </bean>
     
-    <bean id="source" class="org.jocean.event.extend.Runners"
+    <bean id="eventEngine" class="org.jocean.event.extend.Runners"
         factory-method="build">
         <constructor-arg>
             <bean class="org.jocean.event.extend.Runners.Config">
@@ -46,7 +46,7 @@
     </bean>
  
     <bean id="httpClientPool" class="org.jocean.httpclient.impl.HttpClientPool">
-        <constructor-arg ref="source"/>
+        <constructor-arg ref="eventEngine"/>
         <constructor-arg>
             <bean class="org.jocean.netty.NettyClient">
                 <constructor-arg value="${gateway.connector.processThreadNumber:4}"/>
@@ -100,8 +100,8 @@
             </bean>
         </constructor-arg>
     </bean>
-    
-<!--
+ 
+ <!--    
     <bean id="zkClient" class="org.apache.curator.framework.CuratorFrameworkFactory"
         factory-method="newClient"
         init-method="start">
@@ -119,7 +119,7 @@
     
     <bean id="unitUpdater" class="org.jocean.j2se.zk.ZKUpdater"
         init-method="start" destroy-method="stop">
-        <constructor-arg ref="source"/>
+        <constructor-arg ref="eventEngine"/>
         <constructor-arg ref="zkClient"/>
         <constructor-arg value="${zk.rules.path:/demo}/units"/>
         <constructor-arg>

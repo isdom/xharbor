@@ -6,7 +6,7 @@ package org.jocean.xharbor.relay;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
 
-import org.jocean.event.api.EventReceiverSource;
+import org.jocean.event.api.EventEngine;
 import org.jocean.event.api.EventUtils;
 import org.jocean.httpserver.ServerAgent;
 
@@ -15,8 +15,8 @@ import org.jocean.httpserver.ServerAgent;
  *
  */
 public abstract class RelayAgent implements ServerAgent {
-    public RelayAgent(final EventReceiverSource source) {
-        this._source = source;
+    public RelayAgent(final EventEngine engine) {
+        this._engine = engine;
     }
     
     @Override
@@ -24,11 +24,11 @@ public abstract class RelayAgent implements ServerAgent {
             final ChannelHandlerContext channelCtx, 
             final HttpRequest httpRequest) {
         return EventUtils.buildInterfaceAdapter(ServerTask.class,  
-            this._source.createFromInnerState(
+            this._engine.createFromInnerState(
                 createRelayFlow().attach(channelCtx, httpRequest).INIT));
     }
     
     protected abstract RelayFlow createRelayFlow();
     
-    private final EventReceiverSource _source;
+    private final EventEngine _engine;
 }

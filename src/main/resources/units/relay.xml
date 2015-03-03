@@ -6,7 +6,7 @@
     
     <bean id="cachedRouter" class="org.jocean.xharbor.route.CachedRouter" 
         init-method="start" destroy-method="destroy">
-        <constructor-arg ref="source"/>
+        <constructor-arg ref="eventEngine"/>
     </bean>
     
     <bean class="org.jocean.xharbor.route.CahcedRouterMBeanSetter" >
@@ -37,7 +37,7 @@
     </bean>
     
     <bean id="serverAgent" class="org.jocean.xharbor.relay.RelayAgent">
-        <constructor-arg ref="source" />
+        <constructor-arg ref="eventEngine" />
         <lookup-method name="createRelayFlow" bean="relayFlow"/>
     </bean>
     
@@ -45,7 +45,7 @@
      
     <bean id="routerUpdater" class="org.jocean.j2se.zk.ZKUpdater"
         init-method="start" destroy-method="stop">
-        <constructor-arg ref="source"/>
+        <constructor-arg ref="eventEngine"/>
         <constructor-arg ref="zkClient"/>
         <constructor-arg value="${gateway.rules.path}"/>
         <constructor-arg>
