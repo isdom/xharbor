@@ -26,6 +26,7 @@ import org.jocean.httpclient.api.Guide;
 import org.jocean.httpclient.api.Guide.GuideReactor;
 import org.jocean.httpclient.api.HttpClient;
 import org.jocean.httpclient.api.HttpClient.HttpReactor;
+import org.jocean.httpclient.impl.HttpUtils;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.ProxyBuilder;
 import org.jocean.idiom.Slf4jLoggerSource;
@@ -360,6 +361,17 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     .freeze();
 
     private final BizStep RECVRESP = new BizStep("relay.RECVRESP") {
+    	
+        private boolean isHttpClientError(final HttpResponse response) {
+            return response.getStatus().code() >= 400 
+                && response.getStatus().code() < 500;
+        }
+
+        private boolean isHttpServerError(final HttpResponse response) {
+            return response.getStatus().code() >= 500 
+                && response.getStatus().code() < 600;
+        }
+        
         @OnEvent(event = "onHttpResponseReceived")
         private BizStep responseReceived(final int httpClientId,
                 final HttpResponse response) throws Exception {
@@ -380,23 +392,50 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                 }
             }
             
-            //  http response will never be changed, so record it
-            _httpResponse = ReferenceCountUtil.retain(response);
-            _channelCtx.write(ReferenceCountUtil.retain(response));
-            
-            //  TODO consider 响应为1xx，204，304相应或者head请求，则直接忽视掉消息实体内容。
-            //  当满足上述情况时，是否应该直接结束转发流程。
-            
-            //  ref : http://blog.csdn.net/yankai0219/article/details/8269922
-            // 1、在http1.1及之后版本。如果是keep alive，则content-length和chunk必然是二选一。
-            //   若是非keep alive(Connection: close)，则和http1.0一样, Server侧通过 socket 关闭来表示消息结束
-            // 2、在Http 1.0及之前版本中，content-length字段可有可无。Server侧通过 socket 关闭来表示消息结束
-            return HttpHeaders.isKeepAlive(_requestData.request())
-            		? RECVCONTENT_KEEPALIVE
-                    // Connection: close
-            		: RECVCONTENT_CLOSE
-    				;
+            if (HttpUtils.isHttpResponseHasMoreContent(response)) {
+	            return recvResponseContent(response);
+            }
+            else {
+                return sendbackResponseAndFinishRelay(response);
+            }
         }
+
+		private BizStep sendbackResponseAndFinishRelay(
+				final HttpResponse response) {
+			//  当响应为1xx，204，304相应或者head请求，则直接忽视掉消息实体内容。
+			//  当满足上述情况时，是否应该直接结束转发流程。
+			if (LOG.isDebugEnabled()) {
+			    LOG.debug("channel for {} has no more content, just finish relay.", serviceUri());
+			}
+			
+			_stepmemo.endBizStep();
+			//  release relay's http client
+			_httpClientWrapper.detachHttpClient();
+			
+			final ChannelFuture future = _channelCtx.writeAndFlush(ReferenceCountUtil.retain(response));
+			if ( !HttpHeaders.isKeepAlive(_requestData.request()) ) {
+			    future.addListener(ChannelFutureListener.CLOSE);
+			}
+			memoRelaySuccessResult("RELAY_SUCCESS.NOMORE_CONTENT");
+			setEndReason("relay.RELAY_SUCCESS.NOMORE_CONTENT");
+			return null;
+		}
+
+		private BizStep recvResponseContent(final HttpResponse response) {
+			//  http response will never be changed, so record it
+			_httpResponse = ReferenceCountUtil.retain(response);
+			_channelCtx.write(ReferenceCountUtil.retain(response));
+			
+			//  ref : http://blog.csdn.net/yankai0219/article/details/8269922
+			// 1、在http1.1及之后版本。如果是keep alive，则content-length和chunk必然是二选一。
+			//   若是非keep alive(Connection: close)，则和http1.0一样, Server侧通过 socket 关闭来表示消息结束
+			// 2、在Http 1.0及之前版本中，content-length字段可有可无。Server侧通过 socket 关闭来表示消息结束
+			return HttpHeaders.isKeepAlive(_requestData.request())
+					? RECVCONTENT_KEEPALIVE
+			        // Connection: close
+					: RECVCONTENT_CLOSE
+					;
+		}
 
         private BizStep retryFor(final RESULT result, final HttpResponse response) throws Exception {
             _httpClientWrapper.detachHttpClient();
@@ -516,16 +555,6 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     .handler(handlersOf(RECVCONTENT))
     .handler(handlersOf(ONDETACH))
     .freeze();
-    
-    private static boolean isHttpClientError(final HttpResponse response) {
-        return response.getStatus().code() >= 400 
-            && response.getStatus().code() < 500;
-    }
-
-    private static boolean isHttpServerError(final HttpResponse response) {
-        return response.getStatus().code() >= 500 
-            && response.getStatus().code() < 600;
-    }
     
     @SuppressWarnings("unchecked")
 	private void transferHttpRequest() {
