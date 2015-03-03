@@ -28,10 +28,10 @@ import org.jocean.xharbor.spi.HttpRequestTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class HttpRequestData {
+public class HttpRequestWrapper {
     
     private static final Logger LOG = LoggerFactory
-            .getLogger(HttpRequestData.class);
+            .getLogger(HttpRequestWrapper.class);
     
     @Override
     public String toString() {

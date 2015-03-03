@@ -72,7 +72,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     
     @Override
     public String toString() {
-        return "RelayFlow [httpRequest=" + _requestData + ", httpClient="
+        return "RelayFlow [httpRequest=" + _requestWrapper + ", httpClient="
                 + _httpClientWrapper + "]";
     }
 
@@ -173,7 +173,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     RelayFlow attach(
             final ChannelHandlerContext channelCtx,
             final HttpRequest httpRequest) {
-        this._requestData.setHttpRequest(httpRequest);
+        this._requestWrapper.setHttpRequest(httpRequest);
         this._channelCtx = channelCtx;
         return this;
     }
@@ -230,7 +230,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             
             final RouterCtxImpl routectx = new RouterCtxImpl();
             
-            final Dispatcher dispatcher = _router.calculateRoute(_requestData.request(), routectx);
+            final Dispatcher dispatcher = _router.calculateRoute(_requestWrapper.request(), routectx);
             final RoutingInfo info = routectx.getProperty("routingInfo");
             routectx.clear();
             
@@ -238,7 +238,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             
             if ( null == _target ) {
                 LOG.warn("can't found matched target service for request:[{}]\njust return 200 OK for client http connection ({}).", 
-                        _requestData, _channelCtx.channel());
+                        _requestWrapper, _channelCtx.channel());
                 _noRoutingMemo.incRoutingInfo(info);
                 setEndReason("relay.NOROUTING");
                 return  recvFullRequestAndResponse200OK();
@@ -252,17 +252,17 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             _memo = _memoBuilder.build(_target, info);
             _stepmemo = BizMemo.Util.buildStepMemo(_memo, _watch4Step);
             		
-            if (_target.isNeedAuthorization(_requestData.request())) {
+            if (_target.isNeedAuthorization(_requestWrapper.request())) {
                 setEndReason("relay.HTTP_UNAUTHORIZED");
                 return recvFullRequestAndResponse401Unauthorized();
             }
             
-            _transformer = _target.getHttpRequestTransformerOf(_requestData.request());
+            _transformer = _target.getHttpRequestTransformerOf(_requestWrapper.request());
             
             _stepmemo.beginBizStep(STEP.ROUTING);
             
             if ( LOG.isDebugEnabled() ) {
-                LOG.debug("dispatch to ({}) for request({})", serviceUri(), _requestData);
+                LOG.debug("dispatch to ({}) for request({})", serviceUri(), _requestWrapper);
             }
             
             _stepmemo.beginBizStep(STEP.OBTAINING_HTTPCLIENT);
@@ -289,7 +289,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             _httpClientWrapper.setHttpClient(httpclient);
             if (null==_transformer) {
 	            transferHttpRequestAndContents();
-            	return _requestData.recvFullContentThenGoto(
+            	return _requestWrapper.recvFullContentThenGoto(
             			"relay.TRANSFERCONTENT",
             			new Visitor<HttpContent>() {
 							@Override
@@ -302,13 +302,13 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             			ONDETACH);
             }
             else {
-            	return _requestData.recvFullContentThenGoto(
+            	return _requestWrapper.recvFullContentThenGoto(
             			"relay.RECVCONTENT_TRANSFORMREQ",
             			null,
             			new Runnable() {
             				@Override
             				public void run() {
-            		    		if (_requestData.transformAndReplace(_transformer)) {
+            		    		if (_requestWrapper.transformAndReplace(_transformer)) {
             		                //  add transform request count and record from relay begin 
             		                //  until transform complete 's time cost 
             		                _memo.incBizResult(RESULT.TRANSFORM_REQUEST, 
@@ -325,32 +325,32 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         
         @OnEvent(event = "onHttpContent")
         private BizStep cacheHttpContent(final HttpContent httpContent) {
-            _requestData.addContent(httpContent);
+            _requestWrapper.addContent(httpContent);
             return BizStep.CURRENT_BIZSTEP;
         }
 
         private BizStep recvFullRequestAndResponse401Unauthorized() {
-        	return _requestData.recvFullContentThenGoto(
+        	return _requestWrapper.recvFullContentThenGoto(
         			"relay.RESP_401",
         			null,
         			new Runnable() {
 						@Override
 						public void run() {
 							_memo.incBizResult(RESULT.HTTP_UNAUTHORIZED, _watch4Result.stopAndRestart());
-							_requestData.response401Unauthorized("Basic realm=\"iplusmed\"", _channelCtx);
+							_requestWrapper.response401Unauthorized("Basic realm=\"iplusmed\"", _channelCtx);
 						}},
         			null,
         			ONDETACH);
         }
         
         private BizStep recvFullRequestAndResponse200OK() {
-        	return _requestData.recvFullContentThenGoto(
+        	return _requestWrapper.recvFullContentThenGoto(
         			"relay.RESP_200OK",
         			null,
         			new Runnable() {
 						@Override
 						public void run() {
-							_requestData.response200OK(_channelCtx);
+							_requestWrapper.response200OK(_channelCtx);
 						}},
         			null,
         			ONDETACH);
@@ -392,6 +392,8 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                 }
             }
             
+			//  http response will never be changed, so record it
+			_httpResponse = ReferenceCountUtil.retain(response);
             if (HttpUtils.isHttpResponseHasMoreContent(response)) {
 	            return recvResponseContent(response);
             }
@@ -412,8 +414,9 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
 			//  release relay's http client
 			_httpClientWrapper.detachHttpClient();
 			
-			final ChannelFuture future = _channelCtx.writeAndFlush(ReferenceCountUtil.retain(response));
-			if ( !HttpHeaders.isKeepAlive(_requestData.request()) ) {
+			final ChannelFuture future = 
+					_channelCtx.writeAndFlush(ReferenceCountUtil.retain(response));
+			if ( !HttpHeaders.isKeepAlive(_requestWrapper.request()) ) {
 			    future.addListener(ChannelFutureListener.CLOSE);
 			}
 			memoRelaySuccessResult("RELAY_SUCCESS.NOMORE_CONTENT");
@@ -422,15 +425,13 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
 		}
 
 		private BizStep recvResponseContent(final HttpResponse response) {
-			//  http response will never be changed, so record it
-			_httpResponse = ReferenceCountUtil.retain(response);
 			_channelCtx.write(ReferenceCountUtil.retain(response));
 			
 			//  ref : http://blog.csdn.net/yankai0219/article/details/8269922
 			// 1、在http1.1及之后版本。如果是keep alive，则content-length和chunk必然是二选一。
 			//   若是非keep alive(Connection: close)，则和http1.0一样, Server侧通过 socket 关闭来表示消息结束
 			// 2、在Http 1.0及之前版本中，content-length字段可有可无。Server侧通过 socket 关闭来表示消息结束
-			return HttpHeaders.isKeepAlive(_requestData.request())
+			return HttpHeaders.isKeepAlive(_requestWrapper.request())
 					? RECVCONTENT_KEEPALIVE
 			        // Connection: close
 					: RECVCONTENT_CLOSE
@@ -443,7 +444,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             final long ttl = _watch4Result.stopAndRestart();
             _memo.incBizResult(result, ttl);
             LOG.warn("{},retry\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]\nresponse:[{}]",
-                    result.name(), ttl / (float)1000.0, _requestData, serviceUri(), response);
+                    result.name(), ttl / (float)1000.0, _requestWrapper, serviceUri(), response);
             return launchRetry(ttl);
         }
         
@@ -496,7 +497,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             // 而channelCtx.writeAndFlush完成后，会主动调用 ReferenceCountUtil.release 释放content
             // 因此需要先使用 ReferenceCountUtil.retain 增加一次引用计数
             final ChannelFuture future = _channelCtx.writeAndFlush(ReferenceCountUtil.retain(content));
-            if ( !HttpHeaders.isKeepAlive(_requestData.request()) ) {
+            if ( !HttpHeaders.isKeepAlive(_requestWrapper.request()) ) {
                 future.addListener(ChannelFutureListener.CLOSE);
             }
             memoRelaySuccessResult("RELAY_SUCCESS");
@@ -558,14 +559,14 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     
     @SuppressWarnings("unchecked")
 	private void transferHttpRequest() {
-        this._requestData.request().setUri(
-            this._target.rewritePath(this._requestData.request().getUri()));
+        this._requestWrapper.request().setUri(
+            this._target.rewritePath(this._requestWrapper.request().getUri()));
         try {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("send http request {}", _requestData);
+                LOG.debug("send http request {}", _requestWrapper);
             }
             this._httpClientWrapper.sendHttpRequest(
-                this._requestData.request(), 
+                this._requestWrapper.request(), 
                 this.queryInterfaceInstance(HttpReactor.class));
         }
         catch (Exception e) {
@@ -590,7 +591,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
 
     private void transferHttpRequestAndContents() {
         transferHttpRequest();
-        this._requestData.foreachContent(new Visitor<HttpContent>() {
+        this._requestWrapper.foreachContent(new Visitor<HttpContent>() {
             @Override
             public void visit(final HttpContent content) throws Exception {
                 transferHttpContent(content);
@@ -607,7 +608,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         	_memo.incBizResult(RESULT.SOURCE_CANCELED, ttl);
         }
         LOG.warn("SOURCE_CANCELED\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]",
-                ttl / (float)1000.0, _requestData, serviceUri());
+                ttl / (float)1000.0, _requestWrapper, serviceUri());
         setEndReason("relay.SOURCE_CANCELED");
     }
 
@@ -616,7 +617,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         _memo.incBizResult(result, ttl);
         LOG.warn("{},{}\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]",
                 result.name(), (isRetry ? "retry" : "not retry"), 
-                ttl / (float)1000.0, _requestData, serviceUri());
+                ttl / (float)1000.0, _requestWrapper, serviceUri());
         return ttl;
     }
 
@@ -625,12 +626,12 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         _memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
         if (this._target.isShowInfoLog()) {
             LOG.info("{}\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]\nresponse:[{}]",
-                    successName, ttl / (float)1000.0, _requestData, serviceUri(), _httpResponse);
+                    successName, ttl / (float)1000.0, _requestWrapper, serviceUri(), _httpResponse);
         }
     }
 
     private void destructor() throws Exception {
-        this._requestData.clear();
+        this._requestWrapper.clear();
         ReferenceCountUtil.safeRelease(this._httpResponse);
         //  replace logger to nop logger to disable all log message after this destroy
         this._proxyLogger.setImpl(NOPLogger.NOP_LOGGER);
@@ -641,7 +642,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     private final Router<HttpRequest, Dispatcher> _router;
     private HttpRequestTransformer _transformer = null;
     
-    private final HttpRequestData _requestData = new HttpRequestData();
+    private final HttpRequestWrapper _requestWrapper = new HttpRequestWrapper();
     private final HttpClientWrapper _httpClientWrapper = new HttpClientWrapper();
 
     private ChannelHandlerContext _channelCtx;
