@@ -414,8 +414,19 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
 			//  release relay's http client
 			_httpClientWrapper.detachHttpClient();
 			
+			if (LOG.isDebugEnabled()) {
+				LOG.debug("sendback non-content response via channel {}", _channelCtx.channel());
+			}
+			
+			_channelCtx.write(ReferenceCountUtil.retain(response));
 			final ChannelFuture future = 
-					_channelCtx.writeAndFlush(ReferenceCountUtil.retain(response));
+					_channelCtx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
+			future.addListener(new ChannelFutureListener() {
+				@Override
+				public void operationComplete(ChannelFuture future)
+						throws Exception {
+					LOG.info("sendback non-content response complete for channel {} and future is {}", future.channel(), future);
+				}});
 			if ( !HttpHeaders.isKeepAlive(_requestWrapper.request()) ) {
 			    future.addListener(ChannelFutureListener.CLOSE);
 			}

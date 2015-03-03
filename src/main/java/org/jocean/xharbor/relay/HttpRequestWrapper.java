@@ -35,7 +35,7 @@ public class HttpRequestWrapper {
     
     @Override
     public String toString() {
-        return "HttpRequestData [req=" + _httpRequest + ", contents.count="
+        return "HttpRequestWrapper [req=" + _httpRequest + ", contents.count="
                 + _contents.size() + ", isRequestFully="
                 + _isRequestFully + "]";
     }
