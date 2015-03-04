@@ -182,7 +182,8 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         @OnEvent(event = "detach")
         private BizStep onDetach() throws Exception {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("relay for uri:{} progress canceled", serviceUri());
+                LOG.debug("relay for channel:{}/uri:{} progress canceled", 
+                		_channelCtx.channel(), serviceUri());
             }
             _httpClientWrapper.detachHttpClient();
             try {
