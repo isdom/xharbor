@@ -3,6 +3,7 @@ package org.jocean.xharbor.relay;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpMethod;
@@ -14,6 +15,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.jmock.Expectations;
+import org.jmock.Mockery;
 import org.jocean.event.api.BizStep;
 import org.jocean.event.api.EventEngine;
 import org.jocean.event.api.EventReceiver;
@@ -24,10 +27,14 @@ import org.jocean.http.HttpRequestTransformer;
 import org.jocean.httpclient.api.Guide;
 import org.jocean.httpclient.api.GuideBuilder;
 import org.jocean.httpclient.api.HttpClient;
+import org.jocean.httpclient.api.Guide.GuideReactor;
+import org.jocean.httpclient.api.Guide.Requirement;
 import org.jocean.httpserver.ServerAgent.ServerTask;
 import org.jocean.idiom.ExectionLoop;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.RelayMemo;
+import org.jocean.xharbor.api.RelayMemo.RESULT;
+import org.jocean.xharbor.api.RelayMemo.STEP;
 import org.jocean.xharbor.api.Router;
 import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.api.RoutingInfoMemo;
@@ -41,9 +48,6 @@ public class RelayFlowTestCase {
     private static final Logger LOG = LoggerFactory
             .getLogger(RelayFlowTestCase.class);
     
-	final EventEngine engine = 
-			new FlowContainer("test").buildEventEngine(ExectionLoop.immediateLoop);
-	
 	Object _guideCtx;
 	Guide.GuideReactor<Object> _reactor;
 	boolean _isReturnHttpClient = true;
@@ -201,19 +205,80 @@ public class RelayFlowTestCase {
 			LOG.debug("call incRoutingInfo:{}/{}", info);
 		}};
 	
+	final Mockery jmock = new Mockery();
+	final EventEngine engine = 
+			new FlowContainer("test").buildEventEngine(ExectionLoop.immediateLoop);
+		
 	@Test
 	public void testSourceCanceled() throws Exception {
-		final HttpRequest httpRequest = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/test");
+		final Guide 		guide = jmock.mock(Guide.class);
+		final GuideBuilder 	guideBuilder = jmock.mock(GuideBuilder.class);
+		final Target 		target = jmock.mock(Target.class);
+		final Dispatcher 	dispatcher = jmock.mock(Dispatcher.class);
+		final Router<HttpRequest, Dispatcher> router = 
+				(Router<HttpRequest, Dispatcher>)jmock.mock(Router.class);
+		final RelayMemo 	memo = jmock.mock(RelayMemo.class);
+		final RelayMemo.Builder	memoBuilder = jmock.mock(RelayMemo.Builder.class);
+		
+		final ChannelHandlerContext channelCtx = jmock.mock(ChannelHandlerContext.class);
+		
+		jmock.checking(new Expectations() {   
+	        {   
+	        	allowing(guide).obtainHttpClient(with(anything()), 
+	        			with(any(GuideReactor.class)), with(any(Requirement.class)));
+	        	
+	        	allowing(guide).detach();
+	        	
+	        	allowing(guideBuilder).createHttpClientGuide();
+	            will(returnValue(guide));
+	            
+	        	allowing(target).getGuideBuilder();
+	            will(returnValue(guideBuilder));
+	            
+	        	allowing(target).serviceUri();
+	            will(returnValue(new URI("http://127.0.0.1")));
+	            
+	        	allowing(target).isNeedAuthorization(with(any(HttpRequest.class)));
+	            will(returnValue(false));
+	            
+	        	allowing(target).getHttpRequestTransformerOf(with(any(HttpRequest.class)));
+	            will(returnValue(null));
+	            
+	        	allowing(dispatcher).dispatch();
+	            will(returnValue(target));
+	            
+	        	allowing(router).calculateRoute(with(any(HttpRequest.class)), 
+	        			with(any(org.jocean.xharbor.api.Router.Context.class)));
+	            will(returnValue(dispatcher));
+	            
+	            allowing(memo).beginBizStep(with(any(STEP.class)));
+	            allowing(memo).endBizStep(with(any(STEP.class)), with(any(long.class)));
+	            
+	            oneOf(memo).incBizResult(with(equal(RESULT.SOURCE_CANCELED)), with(any(long.class)));
+	            
+	            allowing(memoBuilder).build(with(any(Target.class)), (RoutingInfo) with(anything()));
+	            will(returnValue(memo));
+	            
+	            allowing(channelCtx).channel();
+	            will(returnValue(null));
+	            
+	            allowing(channelCtx).close();
+	        }   
+	    });
+		
+		// execute
 		final RelayFlow relay = new RelayFlow(router, memoBuilder, null);
 		final EventReceiver receiver =  engine.createFromInnerState(
-				relay.attach(null, httpRequest).INIT);
+				relay.attach(channelCtx, 
+						new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/test")).INIT);
 		
 		final ServerTask task = EventUtils.buildInterfaceAdapter(ServerTask.class, receiver);
 		task.detach();
 		
-		assertEquals(lastResult, RelayMemo.RESULT.SOURCE_CANCELED);
-		assertNull(lastStep);
-		assertEquals(relay.getEndReason(), "relay.SOURCE_CANCELED");
+		// verify
+        jmock.assertIsSatisfied();
+        
+		assertEquals("relay.SOURCE_CANCELED", relay.getEndReason());
 	}
 
 	@Test

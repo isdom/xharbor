@@ -58,4 +58,6 @@ dependencies {
 
     testCompile 'junit:junit:4.11'
     testCompile 'org.apache.curator:curator-examples:2.7.1'
+    /* testCompile 'org.jmockit:jmockit:1.15' */
+    testCompile 'org.jmock:jmock:2.6.0'
 }
