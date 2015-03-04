@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.xharbor.transform;
+package org.jocean.xharbor.util;
 
 import io.netty.handler.codec.http.HttpRequest;
 
@@ -9,8 +9,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import org.jocean.xharbor.spi.HttpRequestTransformer;
-import org.jocean.xharbor.spi.HttpRequestTransformer.Builder;
+import org.jocean.http.HttpRequestTransformer;
+import org.jocean.http.HttpRequestTransformer.Builder;
 
 /**
  * @author isdom

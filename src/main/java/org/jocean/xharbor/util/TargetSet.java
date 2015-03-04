@@ -11,12 +11,12 @@ import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.jocean.http.HttpRequestTransformer;
 import org.jocean.httpclient.api.GuideBuilder;
 import org.jocean.idiom.Function;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.ServiceMemo;
 import org.jocean.xharbor.api.Target;
-import org.jocean.xharbor.spi.HttpRequestTransformer;
 
 /**
  * @author isdom

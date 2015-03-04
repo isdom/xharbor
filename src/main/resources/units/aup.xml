@@ -5,7 +5,7 @@
         http://www.springframework.org/schema/beans/spring-beans.xsd">
     
     
-    <bean class="org.jocean.xharbor.transform.ApplyUrlencode4Post"
+    <bean class="org.jocean.xharbor.util.ApplyUrlencode4Post"
         init-method="start" destroy-method="destroy">
         <constructor-arg value="${path}"/>
         <constructor-arg value="${noapplyFeature}"/>

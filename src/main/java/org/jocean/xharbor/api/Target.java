@@ -7,8 +7,8 @@ import io.netty.handler.codec.http.HttpRequest;
 
 import java.net.URI;
 
+import org.jocean.http.HttpRequestTransformer;
 import org.jocean.httpclient.api.GuideBuilder;
-import org.jocean.xharbor.spi.HttpRequestTransformer;
 
 /**
  * @author isdom

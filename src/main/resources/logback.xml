@@ -74,9 +74,10 @@
  -->
 <!--     <logger name="org.jocean" level="TRACE"/>
  -->
-    <logger name="io.netty" level="INFO"/>
+    <logger name="io.netty" level="TRACE"/>
     <logger name="org.apache.zookeeper" level="WARN"/>
-    <logger name="org.jocean.xharbor" level="DEBUG"/>
+    <logger name="org.jocean.xharbor" level="INFO"/>
+    <logger name="org.jocean.xharbor.relay" level="DEBUG"/>
     
     <logger name="timeoutLogger" level="INFO" additivity="false">
         <appender-ref ref="timeoutLogger"/>

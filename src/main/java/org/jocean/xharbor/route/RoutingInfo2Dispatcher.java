@@ -20,6 +20,7 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.jocean.http.HttpRequestTransformer;
 import org.jocean.httpclient.api.GuideBuilder;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.Function;
@@ -29,7 +30,6 @@ import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.Router;
 import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.api.ServiceMemo;
-import org.jocean.xharbor.spi.HttpRequestTransformer;
 import org.jocean.xharbor.util.RulesMXBean;
 import org.jocean.xharbor.util.TargetSet;
 import org.slf4j.Logger;

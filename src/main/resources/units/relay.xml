@@ -41,7 +41,7 @@
         <lookup-method name="createRelayFlow" bean="relayFlow"/>
     </bean>
     
-    <bean id="compositeBuilder" class="org.jocean.xharbor.transform.CompositeHRTBuilder"/>
+    <bean id="compositeBuilder" class="org.jocean.xharbor.util.CompositeHRTBuilder"/>
      
     <bean id="routerUpdater" class="org.jocean.j2se.zk.ZKUpdater"
         init-method="start" destroy-method="stop">

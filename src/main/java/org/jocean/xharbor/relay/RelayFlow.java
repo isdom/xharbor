@@ -22,6 +22,9 @@ import org.jocean.event.api.EventReceiver;
 import org.jocean.event.api.FlowLifecycleListener;
 import org.jocean.event.api.FlowStateChangedListener;
 import org.jocean.event.api.annotation.OnEvent;
+import org.jocean.http.HttpRequestTransformer;
+import org.jocean.http.HttpRequestWrapper;
+import org.jocean.httpclient.HttpClientWrapper;
 import org.jocean.httpclient.api.Guide;
 import org.jocean.httpclient.api.Guide.GuideReactor;
 import org.jocean.httpclient.api.HttpClient;
@@ -42,7 +45,6 @@ import org.jocean.xharbor.api.Router;
 import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.api.RoutingInfoMemo;
 import org.jocean.xharbor.api.Target;
-import org.jocean.xharbor.spi.HttpRequestTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.helpers.NOPLogger;
@@ -64,11 +66,9 @@ import org.slf4j.helpers.NOPLogger;
  */
 public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSource {
 
-    private static final String MONITOR_CHECKALIVE = "monitor://checkalive";
-
     private static final Logger LOG = LoggerFactory
             .getLogger(RelayFlow.class);
-    
+    private static final String MONITOR_CHECKALIVE = "monitor://checkalive";
     
     @Override
     public String toString() {
@@ -221,7 +221,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     };
     
     public final BizStep INIT = new BizStep("relay.INIT") {
-        @SuppressWarnings("unchecked")
+		@SuppressWarnings("unchecked")
 		@OnEvent(event = "init")
         private BizStep doRouting() {
 
@@ -293,8 +293,8 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             			"relay.TRANSFERCONTENT",
             			new Visitor<HttpContent>() {
 							@Override
-							public void visit(final HttpContent httpContent) throws Exception {
-		            			transferHttpContent(httpContent);
+							public void visit(final HttpContent content) throws Exception {
+				                _httpClientWrapper.sendHttpContent(content);
 							}},
             			null,
             			RECVRESP,
@@ -327,6 +327,15 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         private BizStep cacheHttpContent(final HttpContent httpContent) {
             _requestWrapper.addContent(httpContent);
             return BizStep.CURRENT_BIZSTEP;
+        }
+
+        @SuppressWarnings("unchecked")
+        private void transferHttpRequestAndContents() {
+            _requestWrapper.request().setUri(
+                _target.rewritePath(_requestWrapper.request().getUri()));
+            _requestWrapper.transferRequestAndContents(
+        		_httpClientWrapper, 
+        		queryInterfaceInstance(HttpReactor.class));
         }
 
         private BizStep recvFullRequestAndResponse401Unauthorized() {
@@ -362,16 +371,6 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
 
     private final BizStep RECVRESP = new BizStep("relay.RECVRESP") {
     	
-        private boolean isHttpClientError(final HttpResponse response) {
-            return response.getStatus().code() >= 400 
-                && response.getStatus().code() < 500;
-        }
-
-        private boolean isHttpServerError(final HttpResponse response) {
-            return response.getStatus().code() >= 500 
-                && response.getStatus().code() < 600;
-        }
-        
         @OnEvent(event = "onHttpResponseReceived")
         private BizStep responseReceived(final int httpClientId,
                 final HttpResponse response) throws Exception {
@@ -383,11 +382,11 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             }
             
             if ( _target.isCheckResponseStatus() ) {
-                if (isHttpClientError(response)) {
+                if (HttpUtils.isHttpClientError(response)) {
                     return retryFor(RESULT.HTTP_CLIENT_ERROR,response);
                 }
                 
-                if (isHttpServerError(response)) {
+                if (HttpUtils.isHttpServerError(response)) {
                     return retryFor(RESULT.HTTP_SERVER_ERROR,response);
                 }
             }
@@ -407,7 +406,8 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
 			//  当响应为1xx，204，304相应或者head请求，则直接忽视掉消息实体内容。
 			//  当满足上述情况时，是否应该直接结束转发流程。
 			if (LOG.isDebugEnabled()) {
-			    LOG.debug("channel for {} has no more content, just finish relay.", serviceUri());
+			    LOG.debug("channel {} for {} has no more content, just finish relay.", 
+			    		_channelCtx.channel(), serviceUri());
 			}
 			
 			_stepmemo.endBizStep();
@@ -568,47 +568,6 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     .handler(handlersOf(ONDETACH))
     .freeze();
     
-    @SuppressWarnings("unchecked")
-	private void transferHttpRequest() {
-        this._requestWrapper.request().setUri(
-            this._target.rewritePath(this._requestWrapper.request().getUri()));
-        try {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("send http request {}", _requestWrapper);
-            }
-            this._httpClientWrapper.sendHttpRequest(
-                this._requestWrapper.request(), 
-                this.queryInterfaceInstance(HttpReactor.class));
-        }
-        catch (Exception e) {
-            LOG.error(
-                    "state({})/{}: exception when sendHttpRequest, detail:{}",
-                    currentEventHandler().getName(), currentEvent(),
-                    ExceptionUtils.exception2detail(e));
-        }
-    }
-
-    private void transferHttpContent(final HttpContent content) {
-        try {
-            this._httpClientWrapper.sendHttpContent(content);
-        }
-        catch (Exception e) {
-            LOG.error(
-                    "state({})/{}: exception when sendHttpContent, detail:{}",
-                    currentEventHandler().getName(), currentEvent(),
-                    ExceptionUtils.exception2detail(e));
-        }
-    }
-
-    private void transferHttpRequestAndContents() {
-        transferHttpRequest();
-        this._requestWrapper.foreachContent(new Visitor<HttpContent>() {
-            @Override
-            public void visit(final HttpContent content) throws Exception {
-                transferHttpContent(content);
-            }});
-    }
-
     private String serviceUri() {
         return null != this._target ? this._target.serviceUri().toString() : "non-uri";
     }

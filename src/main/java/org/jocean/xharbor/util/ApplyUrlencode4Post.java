@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.xharbor.transform;
+package org.jocean.xharbor.util;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
@@ -17,9 +17,9 @@ import java.io.InputStream;
 import java.net.URLEncoder;
 
 import org.apache.commons.io.IOUtils;
+import org.jocean.http.HttpRequestTransformer;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.Triple;
-import org.jocean.xharbor.spi.HttpRequestTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
