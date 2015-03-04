@@ -25,7 +25,6 @@ import org.jocean.httpclient.api.Guide;
 import org.jocean.httpclient.api.GuideBuilder;
 import org.jocean.httpclient.api.HttpClient;
 import org.jocean.httpserver.ServerAgent.ServerTask;
-import org.jocean.idiom.Detachable;
 import org.jocean.idiom.ExectionLoop;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.RelayMemo;

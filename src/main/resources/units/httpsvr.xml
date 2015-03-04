@@ -12,6 +12,7 @@
         <property name="logByteStream" value="${http.isLogByteStream:true}"/>
         <property name="idleTimeSeconds" value="${http.idleTimeSeconds:200}"/>
         <property name="compressContent" value="${http.isCompressContent:true}"/>
+        <property name="enableSSL" value="${http.isEnableSSL:false}"/>
     </bean>
     
 </beans>
