@@ -132,9 +132,9 @@ TODO:
   
   43、结合42 简化方式实现需求 28
   
-  44、梳理 RelayFlow 单个Java文件: 将 HttpRequest / request's HttpContent 以及相关方法 组织在一起，etc
+  44、梳理 RelayFlow 单个Java文件: 将 HttpRequest / request's HttpContent 以及相关方法 组织在一起，etc (done)
   
-  45、使用 Mock or Hamcrest to build Unit TestCase.
+  45、使用 Mock or Hamcrest to build Unit TestCase. (done)
   
   46、在BizStep中实现延迟初始化特性，当调用到接口时，才对其完整实例进行初始化，减少Flow初始化所占用的时间及内存消耗，
   	在某些场景下，一个状态转换图中的某些状态在单次流程中不会被跳转到，延迟初始化特性可有效减少整个流程的总时间耗用和内存耗用。

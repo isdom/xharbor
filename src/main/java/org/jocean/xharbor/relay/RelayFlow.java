@@ -108,54 +108,6 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         }
     }
 
-    private static final FlowLifecycleListener<RelayFlow> LIFECYCLE_LISTENER = 
-            new FlowLifecycleListener<RelayFlow>() {
-        @Override
-        public void afterEventReceiverCreated(
-                final RelayFlow flow, final EventReceiver receiver)
-                throws Exception {
-            receiver.acceptEvent("init");
-        }
-        @Override
-        public void afterFlowDestroy(final RelayFlow flow)
-                throws Exception {
-            flow.destructor();
-        }
-    };
-    
-    private void whenStateChanged(
-    		final BizStep prev,
-			final BizStep next, 
-			final String causeEvent, 
-			final Object[] causeArgs)
-			throws Exception {
-		LOG.debug("onStateChanged: prev:{} next:{} event:{}", prev, next, causeEvent);
-		if ( RECVRESP == next) {
-			_stepmemo.beginBizStep(STEP.RECV_RESP);
-		}
-		if (null==next && "detach".equals(causeEvent)) {
-			// means flow end by detach event
-			if (null!=_stepmemo) {
-				_stepmemo.endBizStep(-1);
-			}
-			memoDetachResult();
-		}
-	}
-    
-    private static final FlowStateChangedListener<RelayFlow, BizStep> STATECHANGED_LISTENER = 
-		new FlowStateChangedListener<RelayFlow, BizStep>() {
-		@Override
-		public void onStateChanged(
-				final RelayFlow flow, 
-				final BizStep prev,
-				final BizStep next, 
-				final String causeEvent, 
-				final Object[] causeArgs)
-				throws Exception {
-			flow.whenStateChanged(prev, next, causeEvent, causeArgs);
-		}
-	};
-    
     public RelayFlow(
             final Router<HttpRequest, Dispatcher> router, 
             final RelayMemo.Builder memoBuilder,
@@ -166,8 +118,41 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         this._memoBuilder = memoBuilder;
         this._noRoutingMemo = noRoutingMemo;
         
-        addFlowLifecycleListener(LIFECYCLE_LISTENER);
-        addFlowStateChangedListener(STATECHANGED_LISTENER);
+        this.addFlowLifecycleListener(new FlowLifecycleListener() {
+            @Override
+            public void afterEventReceiverCreated(final EventReceiver receiver)
+                    throws Exception {
+                receiver.acceptEvent("init");
+            }
+            @Override
+            public void afterFlowDestroy()
+                    throws Exception {
+                destructor();
+            }
+        });
+        this.addFlowStateChangedListener(new FlowStateChangedListener<BizStep>() {
+    		@Override
+    		public void onStateChanged(
+    				final BizStep prev,
+    				final BizStep next, 
+    				final String causeEvent, 
+    				final Object[] causeArgs)
+    				throws Exception {
+    			if (LOG.isDebugEnabled()) {
+    				LOG.debug("onStateChanged: prev:{} next:{} event:{}", prev, next, causeEvent);
+    			}
+    			if ( RECVRESP == next) {
+    				_stepmemo.beginBizStep(STEP.RECV_RESP);
+    			}
+    			if (null==next && "detach".equals(causeEvent)) {
+    				// means flow end by detach event
+    				if (null!=_stepmemo) {
+    					_stepmemo.endBizStep(-1);
+    				}
+    				memoDetachResult();
+    			}
+    		}
+    	});
     }
     
     RelayFlow attach(

@@ -63,7 +63,7 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT> {
     @SuppressWarnings("unchecked")
     public void start() {
         this._implUpdater = new UpdateImplFlow() {{
-            _engine.create(this, this.UPDATE);
+            _engine.create(CachedRouter.this.toString() + "'s UpdateImpl", this.UPDATE, this);
         }}.queryInterfaceInstance(ImplUpdater.class);
     }
     

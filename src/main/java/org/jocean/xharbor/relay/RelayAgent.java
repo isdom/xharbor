@@ -23,9 +23,9 @@ public abstract class RelayAgent implements ServerAgent {
     public ServerTask createServerTask(
             final ChannelHandlerContext channelCtx, 
             final HttpRequest httpRequest) {
+    	final RelayFlow flow = createRelayFlow().attach(channelCtx, httpRequest);
         return EventUtils.buildInterfaceAdapter(ServerTask.class,  
-            this._engine.createFromInnerState(
-                createRelayFlow().attach(channelCtx, httpRequest).INIT));
+            this._engine.create(flow.toString(), flow.INIT, flow));
     }
     
     protected abstract RelayFlow createRelayFlow();

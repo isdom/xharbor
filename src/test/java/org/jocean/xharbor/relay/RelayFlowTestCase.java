@@ -224,8 +224,10 @@ public class RelayFlowTestCase {
 		
 		jmock.checking(new Expectations() {   
 	        {   
-	        	allowing(guide).obtainHttpClient(with(anything()), 
-	        			with(any(GuideReactor.class)), with(any(Requirement.class)));
+	        	allowing(guide).obtainHttpClient(
+	        			with(anything()), 
+	        			with(any(GuideReactor.class)), 
+	        			with(any(Requirement.class)));
 	        	
 	        	allowing(guide).detach();
 	        	
@@ -256,7 +258,7 @@ public class RelayFlowTestCase {
 	            
 	            oneOf(memo).incBizResult(with(equal(RESULT.SOURCE_CANCELED)), with(any(long.class)));
 	            
-	            allowing(memoBuilder).build(with(any(Target.class)), (RoutingInfo) with(anything()));
+	            allowing(memoBuilder).build(with(any(Target.class)), (RoutingInfo)with(anything()));
 	            will(returnValue(memo));
 	            
 	            allowing(channelCtx).channel();
@@ -267,26 +269,24 @@ public class RelayFlowTestCase {
 	    });
 		
 		// execute
-		final RelayFlow relay = new RelayFlow(router, memoBuilder, null);
-		final EventReceiver receiver =  engine.createFromInnerState(
-				relay.attach(channelCtx, 
-						new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/test")).INIT);
+		final RelayFlow relay = new RelayFlow(router, memoBuilder, null)
+			.attach(channelCtx, new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/test"));
+		final EventReceiver receiver =  engine.create("testcase", relay.INIT, relay);
 		
 		final ServerTask task = EventUtils.buildInterfaceAdapter(ServerTask.class, receiver);
 		task.detach();
 		
 		// verify
         jmock.assertIsSatisfied();
-        
-		assertEquals("relay.SOURCE_CANCELED", relay.getEndReason());
 	}
 
 	@Test
 	public void testRecvResp() throws Exception {
-		final HttpRequest httpRequest = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/test");
-		final RelayFlow relay = new RelayFlow(router, memoBuilder, null);
-		final EventReceiver receiver =  engine.createFromInnerState(
-				relay.attach(null, httpRequest).INIT);
+		final HttpRequest httpRequest = 
+				new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/test");
+		final RelayFlow relay = new RelayFlow(router, memoBuilder, null)
+			.attach(null, httpRequest);
+		final EventReceiver receiver =  engine.create("testcase", relay.INIT, relay);
 		
 		final ServerTask task = EventUtils.buildInterfaceAdapter(ServerTask.class, receiver);
 		task.onHttpContent(LastHttpContent.EMPTY_LAST_CONTENT);
@@ -297,18 +297,18 @@ public class RelayFlowTestCase {
 	@Test
 	public void testRelayRetry() throws Exception {
 		final HttpRequest httpRequest = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/test");
-		final RelayFlow relay = new RelayFlow(router, memoBuilder, null);
+		final RelayFlow relay = new RelayFlow(router, memoBuilder, null)
+			.attach(null, httpRequest);
 		
 		// enable return httpclient
 		_isReturnHttpClient = true;
-		final EventReceiver receiver =  engine.createFromInnerState(
-				relay.attach(null, httpRequest).INIT);
+		final EventReceiver receiver =  engine.create("testcase", relay.INIT, relay);
 		
 		final AtomicReference<BizStep> current = new AtomicReference<BizStep>();
-		relay.addFlowStateChangedListener(new FlowStateChangedListener<RelayFlow, BizStep>() {
+		relay.addFlowStateChangedListener(new FlowStateChangedListener<BizStep>() {
 
 			@Override
-			public void onStateChanged(RelayFlow flow, BizStep prev,
+			public void onStateChanged(BizStep prev,
 					BizStep next, String causeEvent, Object[] causeArgs)
 					throws Exception {
 				current.set((BizStep)next);
