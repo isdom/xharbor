@@ -581,8 +581,13 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         final long ttl = _watch4Result.stopAndRestart();
         _memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
         if (this._target.isShowInfoLog()) {
-            LOG.info("{}\ncost:[{}]s\nrequest:[{}]\ndispatch to:[{}]\nresponse:[{}]",
-                    successName, ttl / (float)1000.0, _requestWrapper, serviceUri(), _httpResponse);
+            LOG.info("{}\ncost:[{}]s for client http connection ({})\nrequest:[{}]\ndispatch to:[{}]\nresponse:[{}]",
+                    successName, 
+                    ttl / (float)1000.0, 
+                    this._channelCtx.channel(), 
+                    this._requestWrapper, 
+                    this.serviceUri(), 
+                    this._httpResponse);
         }
     }
 
