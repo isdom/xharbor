@@ -245,7 +245,10 @@ public class RelayFlowTestCase {
 		
 		final States guidefsm = jmock.states("guide").startsAs("init");
 		
-		final class Guide4Test implements Guide {
+		final AtomicReference<Object> ctxRef = new AtomicReference<Object>();
+		final AtomicReference<GuideReactor<Object>> reactorRef = new AtomicReference<GuideReactor<Object>>();
+		
+		final Guide guide = new Guide() {
 			@Override
 			public void detach() throws Exception {
 			}
@@ -255,8 +258,8 @@ public class RelayFlowTestCase {
 					final GuideReactor<CTX> reactor, 
 					final Requirement requirement) {
 				try {
-					_currentGuideCtx = ctx;
-					_currentReactor = (Guide.GuideReactor<Object>)reactor;
+					ctxRef.set(ctx);
+					reactorRef.set((GuideReactor<Object>)reactor);
 					reactor.onHttpClientObtained(ctx, httpclient);
 				} catch (Exception e) {
 				}
@@ -264,8 +267,6 @@ public class RelayFlowTestCase {
 			Object _currentGuideCtx;
 			Guide.GuideReactor<Object> _currentReactor;
 		};
-		
-		final Guide4Test guide = new Guide4Test();
 			
 		jmock.checking(new Expectations() {   
 	        {   
@@ -353,7 +354,7 @@ public class RelayFlowTestCase {
 		task.onHttpContent(LastHttpContent.EMPTY_LAST_CONTENT);
 
 		// for httpclient lost
-		guide._currentReactor.onHttpClientLost(guide._currentGuideCtx);
+		reactorRef.get().onHttpClientLost(ctxRef.get());
 		
 		assertEquals(relay.INIT, current.get());
 	}
