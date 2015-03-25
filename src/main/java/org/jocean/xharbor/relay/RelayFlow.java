@@ -8,12 +8,15 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.ReferenceCountUtil;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.jocean.event.api.AbstractFlow;
@@ -48,6 +51,10 @@ import org.jocean.xharbor.api.Target;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.helpers.NOPLogger;
+
+import rx.Observable;
+import rx.Observable.OnSubscribe;
+import rx.Subscriber;
 
 /**
  * @author isdom
@@ -111,12 +118,14 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     public RelayFlow(
             final Router<HttpRequest, Dispatcher> router, 
             final RelayMemo.Builder memoBuilder,
-            final RoutingInfoMemo   noRoutingMemo
+            final RoutingInfoMemo   noRoutingMemo,
+            final org.jocean.http.client.HttpClient   httpClient
             ) {
         this._proxyLogger.setImpl(LOG);
         this._router = router;
         this._memoBuilder = memoBuilder;
         this._noRoutingMemo = noRoutingMemo;
+        this._httpClient = httpClient;
         
         this.addFlowLifecycleListener(new FlowLifecycleListener() {
             @Override
@@ -159,6 +168,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             final ChannelHandlerContext channelCtx,
             final HttpRequest httpRequest) {
         this._requestWrapper.setHttpRequest(httpRequest);
+//        this._httpRequest = ReferenceCountUtil.retain(httpRequest);
         this._channelCtx = channelCtx;
         return this;
     }
@@ -252,6 +262,22 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             }
             
             _stepmemo.beginBizStep(STEP.OBTAINING_HTTPCLIENT);
+            
+            _httpClient.sendRequest(null, _request).subscribe(new Subscriber<HttpObject>() {
+                @Override
+                public void onCompleted() {
+                    
+                }
+
+                @Override
+                public void onError(final Throwable e) {
+                    
+                }
+
+                @Override
+                public void onNext(final HttpObject httpObj) {
+                    
+                }});
             
             _httpClientWrapper.startObtainHttpClient(
                     _target.getGuideBuilder(),
@@ -598,6 +624,30 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
         this._proxyLogger.setImpl(NOPLogger.NOP_LOGGER);
     }
 
+    private class OnSubscribeRequest implements OnSubscribe<HttpObject> {
+        @Override
+        public void call(final Subscriber<? super HttpObject> subscriber) {
+            if (!subscriber.isUnsubscribed()) {
+                // transfer request & all contents
+//                subscriber.onNext(t);
+                _subscribers.add(subscriber);
+                subscriber.onNext(_requestWrapper.request());
+                _requestWrapper.foreachContent(new Visitor<HttpContent>() {
+
+                    @Override
+                    public void visit(HttpContent content) throws Exception {
+                        subscriber.onNext(content);
+                    }});
+            }
+        }
+    }
+    
+    private final org.jocean.http.client.HttpClient _httpClient;
+    private final Observable<HttpObject> _request = Observable.create(new OnSubscribeRequest());
+    
+//    private HttpRequest _httpRequest;
+    private final List<Subscriber<? super HttpObject>> _subscribers = new ArrayList<>();
+            
     private final RelayMemo.Builder _memoBuilder;
     private final RoutingInfoMemo _noRoutingMemo;
     private final Router<HttpRequest, Dispatcher> _router;
