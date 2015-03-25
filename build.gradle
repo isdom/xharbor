@@ -21,6 +21,7 @@ dependencies {
     compile('org.jocean:jocean-restful-server:0.0.4-SNAPSHOT') { transitive = false }
     compile('org.jocean:jocean-j2se:0.0.3-SNAPSHOT') { transitive = false }
     compile('org.jocean:jocean-rosa:0.1.1-SNAPSHOT') { transitive = false }
+    compile('org.jocean:jocean-http:0.0.1-SNAPSHOT') { transitive = false }
     compile('org.jocean:jocean-jdmk:0.0.1-SNAPSHOT') { transitive = false }
 
     compile 'commons-beanutils:commons-beanutils:1.9.1'
