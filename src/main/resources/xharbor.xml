@@ -55,6 +55,8 @@
         <constructor-arg value="${gateway.connector.maxConnection:1000}"/>
     </bean>
     
+    <bean id="httpClient" class="org.jocean.http.client.impl.DefaultHttpClient" />
+    
     <bean id="timer" class="io.netty.util.HashedWheelTimer" />
 
     <bean id="statsRegister" class="org.jocean.xharbor.util.StatsImpl" />
@@ -77,6 +79,7 @@
     
     <bean id="noRoutingMemo" class="org.jocean.xharbor.util.RoutingInfoMemoImpl"/>
    
+ <!--    
     <bean id="zkClient" class="org.jocean.j2se.zk.ZKUtils"
         factory-method="buildWithExhibitorEnsembleProvider"
         init-method="start"
@@ -100,8 +103,8 @@
             </bean>
         </constructor-arg>
     </bean>
+ -->
  
- <!--    
     <bean id="zkClient" class="org.apache.curator.framework.CuratorFrameworkFactory"
         factory-method="newClient"
         init-method="start">
@@ -113,7 +116,6 @@
             </bean>
         </constructor-arg>
     </bean>
- -->
      
     <bean id="unitAgent" class="org.jocean.j2se.unit.UnitAgent"/>
     

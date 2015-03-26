@@ -14,6 +14,7 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.ReferenceCountUtil;
 
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -136,9 +137,10 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             @Override
             public void afterFlowDestroy()
                     throws Exception {
-                destructor();
+//                destructor();
             }
         });
+        /*
         this.addFlowStateChangedListener(new FlowStateChangedListener<BizStep>() {
     		@Override
     		public void onStateChanged(
@@ -162,6 +164,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     			}
     		}
     	});
+            */
     }
     
     RelayFlow attach(
@@ -263,83 +266,104 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             
             _stepmemo.beginBizStep(STEP.OBTAINING_HTTPCLIENT);
             
-            _httpClient.sendRequest(null, _request).subscribe(new Subscriber<HttpObject>() {
+            //  add temp for enable rewrite 2015.03.26
+            _requestWrapper.request().setUri(
+                    _target.rewritePath(_requestWrapper.request().getUri()));                                                                                                                 
+            
+            _httpClient.sendRequest(new InetSocketAddress(
+                        _target.serviceUri().getHost(), 
+                        _target.serviceUri().getPort()), 
+                    _request).subscribe(new Subscriber<HttpObject>() {
                 @Override
                 public void onCompleted() {
-                    
+                    _channelCtx.flush();
                 }
 
                 @Override
                 public void onError(final Throwable e) {
-                    
+                    LOG.warn("exception when response.subscribe, detail:{}", 
+                            ExceptionUtils.exception2detail(e));
+                    _channelCtx.close();
                 }
 
                 @Override
                 public void onNext(final HttpObject httpObj) {
-                    
+                    _channelCtx.write(ReferenceCountUtil.retain(httpObj));
                 }});
             
-            _httpClientWrapper.startObtainHttpClient(
-                    _target.getGuideBuilder(),
-                    queryInterfaceInstance(GuideReactor.class),
-                    new Guide.DefaultRequirement()
-                        .uri(_target.serviceUri())
-                        .priority(0)
-                );
-            return BizStep.CURRENT_BIZSTEP;
+//            if (null==_transformer) 
+            {
+//                transferHttpRequestAndContents();
+                return _requestWrapper.recvFullContentThenGoto(
+                        "relay.TRANSFERCONTENT",
+                        new Visitor<HttpContent>() {
+                            @Override
+                            public void visit(final HttpContent content) throws Exception {
+//                                _httpClientWrapper.sendHttpContent(content);
+                                for (Subscriber<? super HttpObject> subscriber : _subscribers) {
+                                    subscriber.onNext(content);
+                                }
+                            }},
+                        new Runnable() {
+                            @Override
+                            public void run() {
+                                for (Subscriber<? super HttpObject> subscriber : _subscribers) {
+                                    subscriber.onCompleted();
+                                }
+                            }},
+                        //RECVRESP,
+                        null,
+                        new RETRY_WHENHTTPLOST(RESULT.RELAY_FAILURE),
+                        ONDETACH);
+            }
+//            else {
+//                return _requestWrapper.recvFullContentThenGoto(
+//                        "relay.RECVCONTENT_TRANSFORMREQ",
+//                        null,
+//                        new Runnable() {
+//                            @Override
+//                            public void run() {
+//                                if (_requestWrapper.transformAndReplace(_transformer)) {
+//                                    //  add transform request count and record from relay begin 
+//                                    //  until transform complete 's time cost 
+//                                    _memo.incBizResult(RESULT.TRANSFORM_REQUEST, 
+//                                            _watch4Result.pauseAndContinue());
+//                                }
+//                                _transformer = null;
+//                                transferHttpRequestAndContents();
+//                            }},
+//                        RECVRESP,
+//                        new RETRY_WHENHTTPLOST(RESULT.RELAY_FAILURE),
+//                        ONDETACH);
+//            }
+            
+//            _httpClientWrapper.startObtainHttpClient(
+//                    _target.getGuideBuilder(),
+//                    queryInterfaceInstance(GuideReactor.class),
+//                    new Guide.DefaultRequirement()
+//                        .uri(_target.serviceUri())
+//                        .priority(0)
+//                );
+//            return BizStep.CURRENT_BIZSTEP;
         }
         
-        @OnEvent(event = "onHttpClientObtained")
-        private BizStep obtainHttpClient(
-                final int guideId,
-                final HttpClient httpclient) {
-            if (!_httpClientWrapper.validateGuideId(guideId)) {
-                return BizStep.CURRENT_BIZSTEP;
-            }
-
-            _stepmemo.beginBizStep(STEP.TRANSFER_CONTENT);
-            _httpClientWrapper.setHttpClient(httpclient);
-            if (null==_transformer) {
-	            transferHttpRequestAndContents();
-            	return _requestWrapper.recvFullContentThenGoto(
-            			"relay.TRANSFERCONTENT",
-            			new Visitor<HttpContent>() {
-							@Override
-							public void visit(final HttpContent content) throws Exception {
-				                _httpClientWrapper.sendHttpContent(content);
-							}},
-            			null,
-            			RECVRESP,
-            			new RETRY_WHENHTTPLOST(RESULT.RELAY_FAILURE),
-            			ONDETACH);
-            }
-            else {
-            	return _requestWrapper.recvFullContentThenGoto(
-            			"relay.RECVCONTENT_TRANSFORMREQ",
-            			null,
-            			new Runnable() {
-            				@Override
-            				public void run() {
-            		    		if (_requestWrapper.transformAndReplace(_transformer)) {
-            		                //  add transform request count and record from relay begin 
-            		                //  until transform complete 's time cost 
-            		                _memo.incBizResult(RESULT.TRANSFORM_REQUEST, 
-            		                        _watch4Result.pauseAndContinue());
-            		    		}
-            		    		_transformer = null;
-            		    		transferHttpRequestAndContents();
-            				}},
-            			RECVRESP,
-            			new RETRY_WHENHTTPLOST(RESULT.RELAY_FAILURE),
-            			ONDETACH);
-            }
-        }
+//        @OnEvent(event = "onHttpClientObtained")
+//        private BizStep obtainHttpClient(
+//                final int guideId,
+//                final HttpClient httpclient) {
+//            if (!_httpClientWrapper.validateGuideId(guideId)) {
+//                return BizStep.CURRENT_BIZSTEP;
+//            }
+//
+//            _stepmemo.beginBizStep(STEP.TRANSFER_CONTENT);
+//            _httpClientWrapper.setHttpClient(httpclient);
+//        }
         
-        @OnEvent(event = "onHttpContent")
-        private BizStep cacheHttpContent(final HttpContent httpContent) {
-            _requestWrapper.addContent(httpContent);
-            return BizStep.CURRENT_BIZSTEP;
-        }
+//        @OnEvent(event = "onHttpContent")
+//        private BizStep cacheHttpContent(final HttpContent httpContent) {
+//            _requestWrapper.addContent(httpContent);
+//            return BizStep.CURRENT_BIZSTEP;
+//        }
 
         @SuppressWarnings("unchecked")
         private void transferHttpRequestAndContents() {
@@ -633,11 +657,13 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                 _subscribers.add(subscriber);
                 subscriber.onNext(_requestWrapper.request());
                 _requestWrapper.foreachContent(new Visitor<HttpContent>() {
-
                     @Override
                     public void visit(HttpContent content) throws Exception {
                         subscriber.onNext(content);
                     }});
+                if (_requestWrapper.isRequestFully()) {
+                    subscriber.onCompleted();
+                }
             }
         }
     }
@@ -645,7 +671,6 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
     private final org.jocean.http.client.HttpClient _httpClient;
     private final Observable<HttpObject> _request = Observable.create(new OnSubscribeRequest());
     
-//    private HttpRequest _httpRequest;
     private final List<Subscriber<? super HttpObject>> _subscribers = new ArrayList<>();
             
     private final RelayMemo.Builder _memoBuilder;
