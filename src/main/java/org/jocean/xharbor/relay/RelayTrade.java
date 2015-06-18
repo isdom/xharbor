@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 import rx.Observable;
 import rx.Observable.OnSubscribe;
 import rx.Subscriber;
+import rx.functions.Action0;
 import rx.functions.Func1;
 import rx.observers.SerializedSubscriber;
 
@@ -225,22 +226,28 @@ public class RelayTrade extends Subscriber<HttpTrade> {
                     this._request.setUri(
                         target.rewritePath(this._request.getUri()));
                     
-                    _httpClient.defineInteraction(new InetSocketAddress(
-                                target.serviceUri().getHost(), 
-                                target.serviceUri().getPort()), 
-                                cachedRequest(),
-                                Feature.ENABLE_LOGGING)
-                                .filter(new Func1<Object, Boolean>() {
-                                    @Override
-                                    public Boolean call(Object in) {
-                                        return in instanceof HttpObject;
-                                    }})
-                                 .map(new Func1<Object, HttpObject>() {
-                                    @Override
-                                    public HttpObject call(Object in) {
-                                        return (HttpObject)in;
-                                    }})
-                                .subscribe(trade.responseObserver());
+                    _httpClient.defineInteraction(
+                        new InetSocketAddress(
+                            target.serviceUri().getHost(), 
+                            target.serviceUri().getPort()), 
+                        cachedRequest(),
+                        Feature.ENABLE_LOGGING)
+                        .filter(new Func1<Object, Boolean>() {
+                            @Override
+                            public Boolean call(Object in) {
+                                return in instanceof HttpObject;
+                            }})
+                         .map(new Func1<Object, HttpObject>() {
+                            @Override
+                            public HttpObject call(Object in) {
+                                return (HttpObject)in;
+                            }})
+                        .doOnTerminate(new Action0() {
+                            @Override
+                            public void call() {
+                                destructor();
+                            }})
+                        .subscribe(trade.responseObserver());
                 }
                 for (Subscriber<? super HttpObject> subscriber : this._subscribers ) {
                     subscriber.onNext(msg);
