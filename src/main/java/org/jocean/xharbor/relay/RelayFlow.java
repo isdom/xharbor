@@ -270,10 +270,10 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
             _requestWrapper.request().setUri(
                     _target.rewritePath(_requestWrapper.request().getUri()));                                                                                                                 
             
-            _httpClient.sendRequest(new InetSocketAddress(
+            _httpClient.defineInteraction(new InetSocketAddress(
                         _target.serviceUri().getHost(), 
                         _target.serviceUri().getPort()), 
-                    _request).subscribe(new Subscriber<HttpObject>() {
+                    _request).subscribe(new Subscriber<Object>() {
                 @Override
                 public void onCompleted() {
                     _channelCtx.flush();
@@ -287,7 +287,7 @@ public class RelayFlow extends AbstractFlow<RelayFlow> implements Slf4jLoggerSou
                 }
 
                 @Override
-                public void onNext(final HttpObject httpObj) {
+                public void onNext(final Object httpObj) {
                     _channelCtx.write(ReferenceCountUtil.retain(httpObj));
                 }});
             

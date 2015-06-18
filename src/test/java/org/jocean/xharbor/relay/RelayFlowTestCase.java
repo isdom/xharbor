@@ -116,7 +116,7 @@ public class RelayFlowTestCase {
 	    });
 		
 		// execute
-		final RelayFlow relay = new RelayFlow(router, memoBuilder, null)
+		final RelayFlow relay = new RelayFlow(router, memoBuilder, null, null)
 			.attach(channelCtx, new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/test"));
 		final EventReceiver receiver =  engine.create("testcase", relay.INIT, relay);
 		
@@ -215,7 +215,7 @@ public class RelayFlowTestCase {
 	    });
 		
 		// execute
-		final RelayFlow relay = new RelayFlow(router, memoBuilder, null)
+		final RelayFlow relay = new RelayFlow(router, memoBuilder, null, null)
 			.attach(channelCtx, new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/test"));
 		final EventReceiver receiver =  engine.create("testcase", relay.INIT, relay);
 		
@@ -334,7 +334,7 @@ public class RelayFlowTestCase {
 	        }   
 	    });
 		
-		final RelayFlow relay = new RelayFlow(router, memoBuilder, null)
+		final RelayFlow relay = new RelayFlow(router, memoBuilder, null, null)
 			.attach(null, new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/test"));
 		
 		final EventReceiver receiver =  engine.create("testcase", relay.INIT, relay);

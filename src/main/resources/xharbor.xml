@@ -57,6 +57,8 @@
     
     <bean id="httpClient" class="org.jocean.http.client.impl.DefaultHttpClient" />
     
+    <bean id="httpServer" class="org.jocean.http.server.impl.DefaultHttpServer"/>
+    
     <bean id="timer" class="io.netty.util.HashedWheelTimer" />
 
     <bean id="statsRegister" class="org.jocean.xharbor.util.StatsImpl" />
