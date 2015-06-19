@@ -3,25 +3,17 @@
  */
 package org.jocean.xharbor.relay;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.handler.codec.http.DefaultFullHttpRequest;
-import io.netty.handler.codec.http.FullHttpRequest;
-import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.util.ReferenceCountUtil;
 
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.jocean.http.Feature;
 import org.jocean.http.client.HttpClient;
+import org.jocean.http.server.CachedRequest;
 import org.jocean.http.server.HttpServer.HttpTrade;
-import org.jocean.idiom.rx.OneshotSubscription;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.Router;
@@ -31,8 +23,6 @@ import org.jocean.xharbor.api.Target;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import rx.Observable;
-import rx.Observable.OnSubscribe;
 import rx.Subscriber;
 import rx.functions.Action0;
 import rx.functions.Func1;
@@ -102,85 +92,19 @@ public class RelayTrade extends Subscriber<HttpTrade> {
         final Subscriber<HttpObject> subscriber = 
                 new Subscriber<HttpObject>() {
             private HttpRequest _request;
-            private final List<HttpObject> _reqHttpObjects = new ArrayList<>();
-            private final List<Subscriber<? super HttpObject>> _subscribers = new ArrayList<>();
-            private boolean _isCompleted = false;
+            private CachedRequest _cached = new CachedRequest(trade);
           
-            private Observable<? extends HttpObject> cachedRequest() {
-                return Observable.create(new OnSubscribe<HttpObject>() {
-                    @Override
-                    public void call(final Subscriber<? super HttpObject> subscriber) {
-                        trade.requestExecutor().execute(new Runnable() {
-                            @Override
-                            public void run() {
-                                if (!subscriber.isUnsubscribed()) {
-                                    for (HttpObject httpObj : _reqHttpObjects ) {
-                                        subscriber.onNext(httpObj);
-                                    }
-                                    if (_isCompleted) {
-                                        subscriber.onCompleted();
-                                    }
-                                    _subscribers.add(subscriber);
-                                    subscriber.add(new OneshotSubscription() {
-                                        @Override
-                                        protected void doUnsubscribe() {
-                                            trade.requestExecutor().execute(new Runnable() {
-                                                @Override
-                                                public void run() {
-                                                    _subscribers.remove(subscriber);
-                                                }});
-                                        }});
-                                }
-                            }});
-                    }});
-            }
-            
-            private void destructor() {
-                // release all HttpObjects of request
-                for (HttpObject obj : this._reqHttpObjects) {
-                    ReferenceCountUtil.release(obj);
-                }
-                this._reqHttpObjects.clear();
-            }
-            
-            private FullHttpRequest retainFullHttpRequest() {
-                if (this._reqHttpObjects.size()>0) {
-                    if (this._reqHttpObjects.get(0) instanceof FullHttpRequest) {
-                        return ((FullHttpRequest)this._reqHttpObjects.get(0)).retain();
-                    }
-                    
-                    final HttpRequest req = (HttpRequest)this._reqHttpObjects.get(0);
-                    final ByteBuf[] bufs = new ByteBuf[this._reqHttpObjects.size()-1];
-                    for (int idx = 1; idx<this._reqHttpObjects.size(); idx++) {
-                        bufs[idx-1] = ((HttpContent)this._reqHttpObjects.get(idx)).content().retain();
-                    }
-                    return new DefaultFullHttpRequest(
-                            req.getProtocolVersion(), 
-                            req.getMethod(), 
-                            req.getUri(), 
-                            Unpooled.wrappedBuffer(bufs));
-                } else {
-                    return null;
-                }
-            }
-            
             @Override
             public void onCompleted() {
-                this._isCompleted = true;
-                for (Subscriber<? super HttpObject> subscriber : this._subscribers ) {
-                    subscriber.onCompleted();
-                }
-                //destructor();
             }
 
             @Override
             public void onError(final Throwable e) {
-                destructor();
+                _cached.destroy();
             }
             
             @Override
             public void onNext(final HttpObject msg) {
-                this._reqHttpObjects.add(ReferenceCountUtil.retain(msg));
                 if (msg instanceof HttpRequest) {
                     this._request = (HttpRequest)msg;
                     final RouterCtxImpl routectx = new RouterCtxImpl();
@@ -230,7 +154,7 @@ public class RelayTrade extends Subscriber<HttpTrade> {
                         new InetSocketAddress(
                             target.serviceUri().getHost(), 
                             target.serviceUri().getPort()), 
-                        cachedRequest(),
+                            _cached.request(),
                         Feature.ENABLE_LOGGING)
                         .filter(new Func1<Object, Boolean>() {
                             @Override
@@ -245,12 +169,9 @@ public class RelayTrade extends Subscriber<HttpTrade> {
                         .doOnTerminate(new Action0() {
                             @Override
                             public void call() {
-                                destructor();
+                                _cached.destroy();
                             }})
                         .subscribe(trade.responseObserver());
-                }
-                for (Subscriber<? super HttpObject> subscriber : this._subscribers ) {
-                    subscriber.onNext(msg);
                 }
             }
         };
