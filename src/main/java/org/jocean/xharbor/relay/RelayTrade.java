@@ -5,6 +5,7 @@ package org.jocean.xharbor.relay;
 
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpVersion;
 
 import java.net.InetSocketAddress;
 import java.util.HashMap;
@@ -14,6 +15,7 @@ import org.jocean.http.Feature;
 import org.jocean.http.client.HttpClient;
 import org.jocean.http.server.CachedRequest;
 import org.jocean.http.server.HttpServer.HttpTrade;
+import org.jocean.http.util.RxNettys;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.Router;
@@ -24,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import rx.Subscriber;
+import rx.Observer;
 import rx.functions.Action0;
 import rx.functions.Func1;
 import rx.observers.SerializedSubscriber;
@@ -130,11 +133,23 @@ public class RelayTrade extends Subscriber<HttpTrade> {
 //                    }
                     final RelayMemo memo = _memoBuilder.build(target, info);
 //                    final StepMemo<STEP> stepmemo = BizMemo.Util.buildStepMemo(memo, _watch4Step);
-                            
-//                    if (_target.isNeedAuthorization(_requestWrapper.request())) {
+
+                    if (target.isNeedAuthorization(this._request)) {
 //                        setEndReason("relay.HTTP_UNAUTHORIZED");
 //                        return recvFullRequestAndResponse401Unauthorized();
-//                    }
+                        final HttpVersion version = _request.getProtocolVersion();
+                        _cached.request()
+                            .doOnCompleted(new Action0() {
+                                @Override
+                                public void call() {
+                                    RxNettys.response401Unauthorized(
+                                            version,
+                                            "Basic realm=\"iplusmed\"")
+                                        .subscribe(trade.responseObserver());
+                                }})
+                            .subscribe();
+                        return;
+                    }
                     
 //                    _transformer = _target.getHttpRequestTransformerOf(_requestWrapper.request());
 //                    
