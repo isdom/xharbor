@@ -16,6 +16,7 @@ import org.jocean.http.client.HttpClient;
 import org.jocean.http.server.CachedRequest;
 import org.jocean.http.server.HttpServer.HttpTrade;
 import org.jocean.http.util.RxNettys;
+import org.jocean.idiom.ExceptionUtils;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.Router;
@@ -26,7 +27,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import rx.Subscriber;
-import rx.Observer;
 import rx.functions.Action0;
 import rx.functions.Func1;
 import rx.observers.SerializedSubscriber;
@@ -62,7 +62,6 @@ public class RelayTrade extends Subscriber<HttpTrade> {
         }
     }
     
-    @SuppressWarnings("unused")
     private static final Logger LOG =
             LoggerFactory.getLogger(RelayTrade.class);
 
@@ -103,6 +102,10 @@ public class RelayTrade extends Subscriber<HttpTrade> {
 
             @Override
             public void onError(final Throwable e) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("trade({}).request().onError ({}).", 
+                        trade, ExceptionUtils.exception2detail(e));
+                }
                 _cached.destroy();
             }
             
@@ -136,7 +139,6 @@ public class RelayTrade extends Subscriber<HttpTrade> {
 
                     if (target.isNeedAuthorization(this._request)) {
 //                        setEndReason("relay.HTTP_UNAUTHORIZED");
-//                        return recvFullRequestAndResponse401Unauthorized();
                         final HttpVersion version = _request.getProtocolVersion();
                         _cached.request()
                             .doOnCompleted(new Action0() {
