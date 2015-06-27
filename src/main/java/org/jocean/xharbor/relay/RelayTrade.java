@@ -37,6 +37,8 @@ import rx.observers.SerializedSubscriber;
  */
 public class RelayTrade extends Subscriber<HttpTrade> {
 
+    private static final String MONITOR_CHECKALIVE = "monitor://checkalive";
+    
     private static class RouterCtxImpl implements Router.Context {
         private final HashMap<String, Object> _map = new HashMap<String, Object>();
         
@@ -126,14 +128,31 @@ public class RelayTrade extends Subscriber<HttpTrade> {
 //                                _requestWrapper, _channelCtx.channel());
                         _noRoutingMemo.incRoutingInfo(info);
 //                        setEndReason("relay.NOROUTING");
+                        final HttpVersion version = _request.getProtocolVersion();
+                        _cached.request()
+                            .doOnCompleted(new Action0() {
+                                @Override
+                                public void call() {
+                                    RxNettys.response200OK(version)
+                                        .subscribe(trade.responseObserver());
+                                }})
+                            .subscribe();
                         return;
-//                        return  recvFullRequestAndResponse200OK();
                     }
                     
-//                    if (MONITOR_CHECKALIVE.equalsIgnoreCase(_target.serviceUri().toString())) {
+                    if (MONITOR_CHECKALIVE.equalsIgnoreCase(target.serviceUri().toString())) {
 //                        setEndReason("relay.CHECKALIVE."+_target.serviceUri().toString().replace(':', '-'));
-//                        return  recvFullRequestAndResponse200OK();
-//                    }
+                        final HttpVersion version = _request.getProtocolVersion();
+                        _cached.request()
+                            .doOnCompleted(new Action0() {
+                                @Override
+                                public void call() {
+                                    RxNettys.response200OK(version)
+                                        .subscribe(trade.responseObserver());
+                                }})
+                            .subscribe();
+                        return;
+                    }
                     final RelayMemo memo = _memoBuilder.build(target, info);
 //                    final StepMemo<STEP> stepmemo = BizMemo.Util.buildStepMemo(memo, _watch4Step);
 
