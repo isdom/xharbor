@@ -17,8 +17,12 @@ import org.jocean.http.server.CachedRequest;
 import org.jocean.http.server.HttpServer.HttpTrade;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.ExceptionUtils;
+import org.jocean.idiom.StopWatch;
+import org.jocean.idiom.stats.BizMemo;
+import org.jocean.idiom.stats.BizMemo.StepMemo;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.RelayMemo;
+import org.jocean.xharbor.api.RelayMemo.STEP;
 import org.jocean.xharbor.api.Router;
 import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.api.RoutingInfoMemo;
@@ -97,6 +101,8 @@ public class RelayTrade extends Subscriber<HttpTrade> {
                 new Subscriber<HttpObject>() {
             private HttpRequest _request;
             private CachedRequest _cached = new CachedRequest(trade);
+            private final StopWatch _watch4Step = new StopWatch();
+            private final StopWatch _watch4Result = new StopWatch();
           
             @Override
             public void onCompleted() {
@@ -124,8 +130,8 @@ public class RelayTrade extends Subscriber<HttpTrade> {
                     final Target target = null != dispatcher ? dispatcher.dispatch() : null;
                     
                     if ( null == target ) {
-//                        LOG.warn("can't found matched target service for request:[{}]\njust return 200 OK for client http connection ({}).", 
-//                                _requestWrapper, _channelCtx.channel());
+                        LOG.warn("can't found matched target service for request:[{}]\njust return 200 OK for trade ({}).", 
+                                msg, trade);
                         _noRoutingMemo.incRoutingInfo(info);
 //                        setEndReason("relay.NOROUTING");
                         final HttpVersion version = _request.getProtocolVersion();
@@ -154,7 +160,7 @@ public class RelayTrade extends Subscriber<HttpTrade> {
                         return;
                     }
                     final RelayMemo memo = _memoBuilder.build(target, info);
-//                    final StepMemo<STEP> stepmemo = BizMemo.Util.buildStepMemo(memo, _watch4Step);
+                    final StepMemo<STEP> stepmemo = BizMemo.Util.buildStepMemo(memo, this._watch4Step);
 
                     if (target.isNeedAuthorization(this._request)) {
 //                        setEndReason("relay.HTTP_UNAUTHORIZED");
@@ -174,13 +180,13 @@ public class RelayTrade extends Subscriber<HttpTrade> {
                     
 //                    _transformer = _target.getHttpRequestTransformerOf(_requestWrapper.request());
 //                    
-//                    _stepmemo.beginBizStep(STEP.ROUTING);
+                    stepmemo.beginBizStep(STEP.ROUTING);
 //                    
-//                    if ( LOG.isDebugEnabled() ) {
-//                        LOG.debug("dispatch to ({}) for request({})", serviceUri(), _requestWrapper);
-//                    }
-//                    
-//                    _stepmemo.beginBizStep(STEP.OBTAINING_HTTPCLIENT);
+                    if ( LOG.isDebugEnabled() ) {
+                        LOG.debug("dispatch to ({}) for request({})", target.serviceUri(), msg);
+                    }
+                    
+                    stepmemo.beginBizStep(STEP.OBTAINING_HTTPCLIENT);
 //                    
                     //  add temp for enable rewrite 2015.03.26
                     this._request.setUri(
