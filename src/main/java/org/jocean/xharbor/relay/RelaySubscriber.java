@@ -39,7 +39,7 @@ import rx.observers.SerializedSubscriber;
  * @author isdom
  *
  */
-public class RelayTrade extends Subscriber<HttpTrade> {
+public class RelaySubscriber extends Subscriber<HttpTrade> {
 
     private static final String MONITOR_CHECKALIVE = "monitor://checkalive";
     
@@ -69,9 +69,9 @@ public class RelayTrade extends Subscriber<HttpTrade> {
     }
     
     private static final Logger LOG =
-            LoggerFactory.getLogger(RelayTrade.class);
+            LoggerFactory.getLogger(RelaySubscriber.class);
 
-    public RelayTrade(
+    public RelaySubscriber(
             final Router<HttpRequest, Dispatcher> router, 
             final RelayMemo.Builder memoBuilder,
             final RoutingInfoMemo   noRoutingMemo,

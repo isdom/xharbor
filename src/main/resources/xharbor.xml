@@ -13,10 +13,12 @@
         <property name="fileEncoding" value="UTF-8"/>
     </bean>
     
+    <!-- 
     <bean id="httpTransportLogStatus" class="org.jocean.httpclient.impl.HttpUtils"
         factory-method="enableHttpTransportLog">
         <constructor-arg value="${gateway.outbound.httpTransportLogEnabled:true}"/>
     </bean>
+     -->
     
     <bean id="eventEngine" class="org.jocean.event.extend.Runners"
         factory-method="build">

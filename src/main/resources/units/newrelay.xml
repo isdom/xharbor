@@ -29,12 +29,12 @@
         </constructor-arg>
     </bean>     
     
-    <bean id="trade" 
+    <bean id="tradeSubscription" 
         factory-bean="agentServer" 
         factory-method="subscribe"
         destroy-method="unsubscribe">
         <constructor-arg>
-            <bean class="org.jocean.xharbor.relay.RelayTrade">
+            <bean class="org.jocean.xharbor.relay.RelaySubscriber">
 		        <constructor-arg ref="router" />
 		        <constructor-arg ref="memoBuilder" />
 		        <constructor-arg ref="noRoutingMemo" />
