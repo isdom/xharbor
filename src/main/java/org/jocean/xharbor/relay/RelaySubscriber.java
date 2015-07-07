@@ -97,130 +97,136 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
 
     @Override
     public void onNext(final HttpTrade trade) {
-        final Subscriber<HttpObject> subscriber = 
-                new Subscriber<HttpObject>() {
-            private HttpRequest _request;
-            private CachedRequest _cached = new CachedRequest(trade);
-            private final StopWatch _watch4Step = new StopWatch();
-            private final StopWatch _watch4Result = new StopWatch();
-          
-            @Override
-            public void onCompleted() {
-            }
+        trade.request().subscribe(
+            new SerializedSubscriber<HttpObject>(
+                new RequestSubscriber(trade)));
+    }
+    
+    class RequestSubscriber extends Subscriber<HttpObject> {
+        private final HttpTrade _trade;
+        private HttpRequest _request;
+        private final CachedRequest _cached;
+        private final StopWatch _watch4Step = new StopWatch();
+        private final StopWatch _watch4Result = new StopWatch();
+      
+        RequestSubscriber(HttpTrade trade) {
+            this._trade = trade;
+            this._cached = new CachedRequest(trade);
+        }
+        
+        @Override
+        public void onCompleted() {
+        }
 
-            @Override
-            public void onError(final Throwable e) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("trade({}).request().onError ({}).", 
-                        trade, ExceptionUtils.exception2detail(e));
-                }
-                _cached.destroy();
+        @Override
+        public void onError(final Throwable e) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("trade({}).request().onError ({}).", 
+                    this._trade, ExceptionUtils.exception2detail(e));
             }
-            
-            @Override
-            public void onNext(final HttpObject msg) {
-                if (msg instanceof HttpRequest) {
-                    this._request = (HttpRequest)msg;
-                    final RouterCtxImpl routectx = new RouterCtxImpl();
-                    
-                    final Dispatcher dispatcher = _router.calculateRoute(this._request, routectx);
-                    final RoutingInfo info = routectx.getProperty("routingInfo");
-                    routectx.clear();
-                    
-                    final Target target = null != dispatcher ? dispatcher.dispatch() : null;
-                    
-                    if ( null == target ) {
-                        LOG.warn("can't found matched target service for request:[{}]\njust return 200 OK for trade ({}).", 
-                                msg, trade);
-                        _noRoutingMemo.incRoutingInfo(info);
-//                        setEndReason("relay.NOROUTING");
-                        final HttpVersion version = _request.getProtocolVersion();
-                        _cached.request()
-                            .doOnCompleted(new Action0() {
-                                @Override
-                                public void call() {
-                                    RxNettys.response200OK(version)
-                                        .subscribe(trade.responseObserver());
-                                }})
-                            .subscribe();
-                        return;
-                    }
-                    
-                    if (MONITOR_CHECKALIVE.equalsIgnoreCase(target.serviceUri().toString())) {
-//                        setEndReason("relay.CHECKALIVE."+_target.serviceUri().toString().replace(':', '-'));
-                        final HttpVersion version = _request.getProtocolVersion();
-                        _cached.request()
-                            .doOnCompleted(new Action0() {
-                                @Override
-                                public void call() {
-                                    RxNettys.response200OK(version)
-                                        .subscribe(trade.responseObserver());
-                                }})
-                            .subscribe();
-                        return;
-                    }
-                    final RelayMemo memo = _memoBuilder.build(target, info);
-                    final StepMemo<STEP> stepmemo = BizMemo.Util.buildStepMemo(memo, this._watch4Step);
-
-                    if (target.isNeedAuthorization(this._request)) {
-//                        setEndReason("relay.HTTP_UNAUTHORIZED");
-                        final HttpVersion version = _request.getProtocolVersion();
-                        _cached.request()
-                            .doOnCompleted(new Action0() {
-                                @Override
-                                public void call() {
-                                    RxNettys.response401Unauthorized(
-                                            version,
-                                            "Basic realm=\"iplusmed\"")
-                                        .subscribe(trade.responseObserver());
-                                }})
-                            .subscribe();
-                        return;
-                    }
-                    
-//                    _transformer = _target.getHttpRequestTransformerOf(_requestWrapper.request());
-//                    
-                    stepmemo.beginBizStep(STEP.ROUTING);
-//                    
-                    if ( LOG.isDebugEnabled() ) {
-                        LOG.debug("dispatch to ({}) for request({})", target.serviceUri(), msg);
-                    }
-                    
-                    stepmemo.beginBizStep(STEP.OBTAINING_HTTPCLIENT);
-//                    
-                    //  add temp for enable rewrite 2015.03.26
-                    this._request.setUri(
-                        target.rewritePath(this._request.getUri()));
-                    
-                    _httpClient.defineInteraction(
-                        new InetSocketAddress(
-                            target.serviceUri().getHost(), 
-                            target.serviceUri().getPort()), 
-                            _cached.request(),
-                        Feature.ENABLE_LOGGING)
-                        .filter(new Func1<Object, Boolean>() {
-                            @Override
-                            public Boolean call(Object in) {
-                                return in instanceof HttpObject;
-                            }})
-                         .map(new Func1<Object, HttpObject>() {
-                            @Override
-                            public HttpObject call(Object in) {
-                                return (HttpObject)in;
-                            }})
-                        .doOnTerminate(new Action0() {
+            this._cached.destroy();
+        }
+        
+        @Override
+        public void onNext(final HttpObject msg) {
+            if (msg instanceof HttpRequest) {
+                this._request = (HttpRequest)msg;
+                final RouterCtxImpl routectx = new RouterCtxImpl();
+                
+                final Dispatcher dispatcher = _router.calculateRoute(this._request, routectx);
+                final RoutingInfo info = routectx.getProperty("routingInfo");
+                routectx.clear();
+                
+                final Target target = null != dispatcher ? dispatcher.dispatch() : null;
+                
+                if ( null == target ) {
+                    LOG.warn("can't found matched target service for request:[{}]\njust return 200 OK for trade ({}).", 
+                            msg, this._trade);
+                    _noRoutingMemo.incRoutingInfo(info);
+//                    setEndReason("relay.NOROUTING");
+                    final HttpVersion version = _request.getProtocolVersion();
+                    _cached.request()
+                        .doOnCompleted(new Action0() {
                             @Override
                             public void call() {
-                                _cached.destroy();
+                                RxNettys.response200OK(version)
+                                    .subscribe(_trade.responseObserver());
                             }})
-                        .subscribe(trade.responseObserver());
+                        .subscribe();
+                    return;
                 }
+                
+                if (MONITOR_CHECKALIVE.equalsIgnoreCase(target.serviceUri().toString())) {
+//                    setEndReason("relay.CHECKALIVE."+_target.serviceUri().toString().replace(':', '-'));
+                    final HttpVersion version = _request.getProtocolVersion();
+                    _cached.request()
+                        .doOnCompleted(new Action0() {
+                            @Override
+                            public void call() {
+                                RxNettys.response200OK(version)
+                                    .subscribe(_trade.responseObserver());
+                            }})
+                        .subscribe();
+                    return;
+                }
+                final RelayMemo memo = _memoBuilder.build(target, info);
+                final StepMemo<STEP> stepmemo = BizMemo.Util.buildStepMemo(memo, this._watch4Step);
+
+                if (target.isNeedAuthorization(this._request)) {
+//                    setEndReason("relay.HTTP_UNAUTHORIZED");
+                    final HttpVersion version = _request.getProtocolVersion();
+                    _cached.request()
+                        .doOnCompleted(new Action0() {
+                            @Override
+                            public void call() {
+                                RxNettys.response401Unauthorized(
+                                        version,
+                                        "Basic realm=\"iplusmed\"")
+                                    .subscribe(_trade.responseObserver());
+                            }})
+                        .subscribe();
+                    return;
+                }
+                
+//                _transformer = _target.getHttpRequestTransformerOf(_requestWrapper.request());
+//                
+                stepmemo.beginBizStep(STEP.ROUTING);
+//                
+                if ( LOG.isDebugEnabled() ) {
+                    LOG.debug("dispatch to ({}) for request({})", target.serviceUri(), msg);
+                }
+                
+                stepmemo.beginBizStep(STEP.OBTAINING_HTTPCLIENT);
+//                
+                //  add temp for enable rewrite 2015.03.26
+                this._request.setUri(
+                    target.rewritePath(this._request.getUri()));
+                
+                _httpClient.defineInteraction(
+                    new InetSocketAddress(
+                        target.serviceUri().getHost(), 
+                        target.serviceUri().getPort()), 
+                        _cached.request(),
+                    Feature.ENABLE_LOGGING)
+                    .filter(new Func1<Object, Boolean>() {
+                        @Override
+                        public Boolean call(Object in) {
+                            return in instanceof HttpObject;
+                        }})
+                     .map(new Func1<Object, HttpObject>() {
+                        @Override
+                        public HttpObject call(Object in) {
+                            return (HttpObject)in;
+                        }})
+                    .doOnTerminate(new Action0() {
+                        @Override
+                        public void call() {
+                            _cached.destroy();
+                        }})
+                    .subscribe(_trade.responseObserver());
             }
-        };
-        
-        trade.request().subscribe(
-            new SerializedSubscriber<HttpObject>(subscriber));
-    }
+        }
+    };
     
     private final HttpClient _httpClient;
     private final RelayMemo.Builder _memoBuilder;
