@@ -42,11 +42,6 @@
         </constructor-arg>
     </bean>
     
-    <bean id="bytesPool" class="org.jocean.idiom.pool.Pools" 
-        factory-method="createCachedBytesPool">
-        <constructor-arg value="${pool.bytes.blockSize:10240}"/>
-    </bean>
- 
     <bean id="httpClientPool" class="org.jocean.httpclient.impl.HttpClientPool">
         <constructor-arg ref="eventEngine"/>
         <constructor-arg>
@@ -142,7 +137,6 @@
         <property name="beans">
             <map>
                 <entry key="org.jocean:name=directMemory"   value-ref="directMemory"/>
-                <entry key="org.jocean:name=bytesPool"      value-ref="bytesPool"/>
                 <entry key="org.jocean:name=httpClientPool" value-ref="httpClientPool"/>
                 <entry key="org.jocean:name=serviceMemo"    value-ref="serviceMemo"/>
                 <entry key="org.jocean:name=noRouting"      value-ref="noRoutingMemo"/>
