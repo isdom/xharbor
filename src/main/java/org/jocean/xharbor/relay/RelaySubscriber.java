@@ -5,6 +5,7 @@ package org.jocean.xharbor.relay;
 
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpVersion;
 
 import java.net.InetSocketAddress;
@@ -22,6 +23,7 @@ import org.jocean.idiom.stats.BizMemo;
 import org.jocean.idiom.stats.BizMemo.StepMemo;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.RelayMemo;
+import org.jocean.xharbor.api.RelayMemo.RESULT;
 import org.jocean.xharbor.api.RelayMemo.STEP;
 import org.jocean.xharbor.api.Router;
 import org.jocean.xharbor.api.RoutingInfo;
@@ -30,8 +32,10 @@ import org.jocean.xharbor.api.Target;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import rx.Observable;
 import rx.Subscriber;
 import rx.functions.Action0;
+import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.observers.SerializedSubscriber;
 
@@ -106,10 +110,8 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
         private final HttpTrade _trade;
         private HttpRequest _request;
         private final CachedRequest _cached;
-        private final StopWatch _watch4Step = new StopWatch();
-        private final StopWatch _watch4Result = new StopWatch();
       
-        RequestSubscriber(HttpTrade trade) {
+        RequestSubscriber(final HttpTrade trade) {
             this._trade = trade;
             this._cached = new CachedRequest(trade);
         }
@@ -169,9 +171,12 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                         .subscribe();
                     return;
                 }
+                
                 final RelayMemo memo = _memoBuilder.build(target, info);
-                final StepMemo<STEP> stepmemo = BizMemo.Util.buildStepMemo(memo, this._watch4Step);
-
+                final StopWatch watch4Result = new StopWatch();
+                final StepMemo<STEP> stepmemo = 
+                        BizMemo.Util.buildStepMemo(memo, new StopWatch());
+                
                 if (target.isNeedAuthorization(this._request)) {
 //                    setEndReason("relay.HTTP_UNAUTHORIZED");
                     final HttpVersion version = _request.getProtocolVersion();
@@ -179,6 +184,7 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                         .doOnCompleted(new Action0() {
                             @Override
                             public void call() {
+                                memo.incBizResult(RESULT.HTTP_UNAUTHORIZED, watch4Result.stopAndRestart());
                                 RxNettys.response401Unauthorized(
                                         version,
                                         "Basic realm=\"iplusmed\"")
@@ -190,37 +196,48 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                 
 //                _transformer = _target.getHttpRequestTransformerOf(_requestWrapper.request());
 //                
+                //  ?
                 stepmemo.beginBizStep(STEP.ROUTING);
 //                
                 if ( LOG.isDebugEnabled() ) {
                     LOG.debug("dispatch to ({}) for request({})", target.serviceUri(), msg);
                 }
                 
-                stepmemo.beginBizStep(STEP.OBTAINING_HTTPCLIENT);
-//                
+                stepmemo.beginBizStep(STEP.TRANSFER_CONTENT);
+                
                 //  add temp for enable rewrite 2015.03.26
                 this._request.setUri(
                     target.rewritePath(this._request.getUri()));
                 
-                _httpClient.defineInteraction(
-                    new InetSocketAddress(
-                        target.serviceUri().getHost(), 
-                        target.serviceUri().getPort()), 
-                        _cached.request(),
-                    Feature.ENABLE_LOGGING)
-                    .filter(new Func1<Object, Boolean>() {
+                final Observable<HttpObject> response = 
+                    _httpClient.defineInteraction(
+                        new InetSocketAddress(
+                            target.serviceUri().getHost(), 
+                            target.serviceUri().getPort()), 
+                            _cached.request(),
+                            Feature.ENABLE_LOGGING)
+                        .filter(new Func1<Object, Boolean>() {
+                            @Override
+                            public Boolean call(Object in) {
+                                return in instanceof HttpObject;
+                            }})
+                         .map(new Func1<Object, HttpObject>() {
+                            @Override
+                            public HttpObject call(Object in) {
+                                return (HttpObject)in;
+                            }});
+                response.doOnNext(new Action1<HttpObject>() {
                         @Override
-                        public Boolean call(Object in) {
-                            return in instanceof HttpObject;
-                        }})
-                     .map(new Func1<Object, HttpObject>() {
-                        @Override
-                        public HttpObject call(Object in) {
-                            return (HttpObject)in;
+                        public void call(final HttpObject obj) {
+                            if (obj instanceof HttpResponse) {
+                                stepmemo.beginBizStep(STEP.RECV_RESP);
+                            }
                         }})
                     .doOnTerminate(new Action0() {
                         @Override
                         public void call() {
+                            stepmemo.endBizStep();
+                            memo.incBizResult(RESULT.RELAY_SUCCESS, watch4Result.stopAndRestart());
                             _cached.destroy();
                         }})
                     .subscribe(_trade.responseObserver());
