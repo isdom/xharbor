@@ -29,19 +29,20 @@
         </constructor-arg>
     </bean>     
     
-    <bean id="relayFlow" class="org.jocean.xharbor.relay.RelayFlow" 
-        scope="prototype">
-        <constructor-arg ref="router" />
-        <constructor-arg ref="memoBuilder" />
-        <constructor-arg ref="noRoutingMemo" />
-        <constructor-arg ref="httpClient" />
+    <bean id="tradeSubscription" 
+        factory-bean="agentServer" 
+        factory-method="subscribe"
+        destroy-method="unsubscribe">
+        <constructor-arg>
+            <bean class="org.jocean.xharbor.relay.RelaySubscriber">
+		        <constructor-arg ref="router" />
+		        <constructor-arg ref="memoBuilder" />
+		        <constructor-arg ref="noRoutingMemo" />
+		        <constructor-arg ref="httpClient" />
+            </bean>
+        </constructor-arg>
     </bean>
-    
-    <bean id="serverAgent" class="org.jocean.xharbor.relay.RelayAgent">
-        <constructor-arg ref="eventEngine" />
-        <lookup-method name="createRelayFlow" bean="relayFlow"/>
-    </bean>
-    
+     
     <bean id="compositeBuilder" class="org.jocean.xharbor.util.CompositeHRTBuilder"/>
      
     <bean id="routerUpdater" class="org.jocean.j2se.zk.ZKUpdater"

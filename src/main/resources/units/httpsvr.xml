@@ -4,15 +4,21 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
     
-    <bean id="httpServer" class="org.jocean.httpserver.HttpServer"
-        init-method="start" destroy-method="stop">
-        <property name="serverAgent" ref="serverAgent"/>
-        <property name="acceptPort" value="${http.port:8080}" />
-        <property name="acceptIp" value="${http.ip:0.0.0.0}" />
-        <property name="logByteStream" value="${http.isLogByteStream:true}"/>
-        <property name="idleTimeSeconds" value="${http.idleTimeSeconds:200}"/>
-        <property name="compressContent" value="${http.isCompressContent:true}"/>
-        <property name="enableSSL" value="${http.isEnableSSL:false}"/>
+    <bean id="agentServer" 
+        factory-bean="httpServer" 
+        factory-method="defineServer">
+        <constructor-arg>
+            <bean class="java.net.InetSocketAddress">
+                <constructor-arg value="${http.ip:0.0.0.0}"/>
+                <constructor-arg value="${http.port:8080}"/>
+            </bean>
+        </constructor-arg>
+        <constructor-arg>
+            <array>
+                <bean id="org.jocean.http.Feature.ENABLE_LOGGING" 
+                    class="org.springframework.beans.factory.config.FieldRetrievingFactoryBean"/>
+            </array>
+        </constructor-arg>
     </bean>
     
 </beans>
