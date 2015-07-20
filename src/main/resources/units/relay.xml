@@ -4,9 +4,17 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
     
+    <bean id="compositeBuilder" class="org.jocean.xharbor.util.CompositeHRTBuilder"/>
+    
+    <bean id="defaultRouter" class="org.jocean.xharbor.route.DefaultRouter">
+	    <constructor-arg ref="serviceMemo"/>
+	    <constructor-arg ref="compositeBuilder"/>
+    </bean>
+    
     <bean id="cachedRouter" class="org.jocean.xharbor.route.CachedRouter" 
-        init-method="start" destroy-method="destroy">
+        destroy-method="destroy">
         <constructor-arg ref="eventEngine"/>
+        <property name="impl" ref="defaultRouter"/>
     </bean>
     
     <bean class="org.jocean.xharbor.route.CahcedRouterMBeanSetter" >
@@ -43,25 +51,4 @@
         </constructor-arg>
     </bean>
      
-    <bean id="compositeBuilder" class="org.jocean.xharbor.util.CompositeHRTBuilder"/>
-     
-    <bean id="routerUpdater" class="org.jocean.j2se.zk.ZKUpdater"
-        init-method="start" destroy-method="stop">
-        <constructor-arg ref="eventEngine"/>
-        <constructor-arg ref="zkClient"/>
-        <constructor-arg value="${gateway.rules.path}"/>
-        <constructor-arg>
-            <bean class="org.jocean.xharbor.util.RouteRulesOperator">
-                <constructor-arg>
-                    <bean class="org.jocean.xharbor.route.CachedRouterUpdater">
-                        <constructor-arg ref="cachedRouter"/>
-                    </bean>
-                </constructor-arg>
-                <constructor-arg ref="httpClientPool"/>
-                <constructor-arg ref="serviceMemo"/>
-                <constructor-arg ref="compositeBuilder"/>
-            </bean>
-        </constructor-arg>
-    </bean>
-    
 </beans>

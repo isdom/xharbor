@@ -8,16 +8,13 @@ import io.netty.handler.codec.http.HttpRequest;
 import java.net.URI;
 
 import org.jocean.http.HttpRequestTransformer;
-import org.jocean.httpclient.api.GuideBuilder;
 
 /**
  * @author isdom
  *
  */
 public interface Target {
-    
-    public GuideBuilder getGuideBuilder();
-    
+        
     public URI serviceUri();
     
     public String rewritePath(final String path);

@@ -52,16 +52,13 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT> {
         }
     }
 
-    public void updateRouter(final Router<INPUT, OUTPUT> routerImpl) {
+    public void setImpl(final Router<INPUT, OUTPUT> routerImpl) {
         this._implUpdater.updateImpl(routerImpl);
     }
 
+    @SuppressWarnings("unchecked")
     public CachedRouter(final EventEngine engine) {
         this._engine = engine;
-    }
-    
-    @SuppressWarnings("unchecked")
-    public void start() {
         this._implUpdater = new UpdateImplFlow() {{
             _engine.create(CachedRouter.this.toString() + "'s UpdateImpl", this.UPDATE, this);
         }}.queryInterfaceInstance(ImplUpdater.class);

@@ -17,7 +17,7 @@ public class CachedRouterUpdater<I, O> implements Visitor<Router<I, O>> {
     
     @Override
     public void visit(final Router<I, O> rules) throws Exception {
-        this._cachedRouter.updateRouter(rules);
+        this._cachedRouter.setImpl(rules);
     }
     
     private final CachedRouter<I, O> _cachedRouter;

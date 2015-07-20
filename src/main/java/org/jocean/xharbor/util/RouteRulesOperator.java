@@ -11,7 +11,6 @@ import java.util.regex.Pattern;
 import org.apache.curator.framework.recipes.cache.ChildData;
 import org.apache.curator.framework.recipes.cache.TreeCacheEvent;
 import org.jocean.http.HttpRequestTransformer;
-import org.jocean.httpclient.api.GuideBuilder;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.Pair;
 import org.jocean.idiom.Triple;
@@ -39,19 +38,17 @@ public class RouteRulesOperator implements Operator<Router<RoutingInfo, Dispatch
     
     public RouteRulesOperator(
             final Visitor<Router<RoutingInfo, Dispatcher>> updateRules,
-            final GuideBuilder guideBuilder,
             final ServiceMemo serviceMemo,
             final HttpRequestTransformer.Builder transformerBuilder
             ) {
         this._updateRules = updateRules;
-        this._guideBuilder = guideBuilder;
         this._serviceMemo = serviceMemo;
         this._transformerBuilder = transformerBuilder;
     }
     
     @Override
     public Router<RoutingInfo, Dispatcher> createContext() {
-        return new RoutingInfo2Dispatcher(this._guideBuilder, this._serviceMemo, this._transformerBuilder);
+        return new RoutingInfo2Dispatcher(this._serviceMemo, this._transformerBuilder);
     }
 
     @Override
@@ -309,7 +306,6 @@ public class RouteRulesOperator implements Operator<Router<RoutingInfo, Dispatch
     }
     
     private final Visitor<Router<RoutingInfo, Dispatcher>> _updateRules;
-    private final GuideBuilder _guideBuilder; 
     private final ServiceMemo _serviceMemo; 
     private final HttpRequestTransformer.Builder _transformerBuilder;
 }

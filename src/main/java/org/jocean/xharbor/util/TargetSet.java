@@ -12,7 +12,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.jocean.http.HttpRequestTransformer;
-import org.jocean.httpclient.api.GuideBuilder;
 import org.jocean.idiom.Function;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.ServiceMemo;
@@ -27,7 +26,6 @@ public class TargetSet implements Dispatcher {
     private static final int MAX_EFFECTIVEWEIGHT = 1000;
     
     public TargetSet(
-            final GuideBuilder guideBuilder,
             final URI[] uris, 
             final boolean isCheckResponseStatus, 
             final boolean isShowInfoLog, 
@@ -36,7 +34,6 @@ public class TargetSet implements Dispatcher {
             final ServiceMemo serviceMemo,
             final HttpRequestTransformer.Builder transformerBuilder
             ) {
-        this._guideBuilder = guideBuilder;
         this._serviceMemo = serviceMemo;
         this._transformerBuilder = transformerBuilder;
         this._isCheckResponseStatus = isCheckResponseStatus;
@@ -115,11 +112,6 @@ public class TargetSet implements Dispatcher {
     private class TargetImpl implements Target {
         
         @Override
-        public GuideBuilder getGuideBuilder() {
-            return _guideBuilder;
-        }
-        
-        @Override
         public URI serviceUri() {
             return this._uri;
         }
@@ -179,7 +171,6 @@ public class TargetSet implements Dispatcher {
         private final AtomicBoolean _down = new AtomicBoolean(false);
     }
     
-    private final GuideBuilder _guideBuilder;
     private final ServiceMemo _serviceMemo;
     private final HttpRequestTransformer.Builder _transformerBuilder;
     private final boolean _isCheckResponseStatus;

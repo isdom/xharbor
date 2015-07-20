@@ -35,16 +35,6 @@
         </constructor-arg>
     </bean>
     
-    <bean id="httpClientPool" class="org.jocean.httpclient.impl.HttpClientPool">
-        <constructor-arg ref="eventEngine"/>
-        <constructor-arg>
-            <bean class="org.jocean.netty.NettyClient">
-                <constructor-arg value="${gateway.connector.processThreadNumber:4}"/>
-            </bean>
-        </constructor-arg>
-        <constructor-arg value="${gateway.connector.maxConnection:1000}"/>
-    </bean>
-    
     <bean id="httpClient" class="org.jocean.http.client.impl.DefaultHttpClient" />
     
     <bean id="httpServer" class="org.jocean.http.server.impl.DefaultHttpServer"/>
@@ -130,7 +120,6 @@
         <property name="beans">
             <map>
                 <entry key="org.jocean:name=directMemory"   value-ref="directMemory"/>
-                <entry key="org.jocean:name=httpClientPool" value-ref="httpClientPool"/>
                 <entry key="org.jocean:name=serviceMemo"    value-ref="serviceMemo"/>
                 <entry key="org.jocean:name=noRouting"      value-ref="noRoutingMemo"/>
                 <entry key="org.jocean:type=router,name=stats" value-ref="statsRegister"/>

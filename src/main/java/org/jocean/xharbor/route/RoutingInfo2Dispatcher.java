@@ -21,7 +21,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.jocean.http.HttpRequestTransformer;
-import org.jocean.httpclient.api.GuideBuilder;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.Function;
 import org.jocean.idiom.Pair;
@@ -66,7 +65,7 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
             return "NOP";
         }};
     private static final TargetSet EMPTY_TARGETSET = 
-            new TargetSet(null, EMPTY_URIS, false, false, NOP_REWRITEPATH, NOP_NEEDAUTHORIZATION, null, null);
+            new TargetSet(EMPTY_URIS, false, false, NOP_REWRITEPATH, NOP_NEEDAUTHORIZATION, null, null);
 
     private static class MatchResult {
         final URI[] _uris;
@@ -114,11 +113,9 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
     }
 
     public RoutingInfo2Dispatcher(
-            final GuideBuilder guideBuilder,
             final ServiceMemo serviceMemo,
             final HttpRequestTransformer.Builder transformerBuilder
             ) {
-        this._guideBuilder = guideBuilder;
         this._serviceMemo = serviceMemo;
         this._transformerBuilder = transformerBuilder;
     }
@@ -126,7 +123,7 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
     @Override
     protected RoutingInfo2Dispatcher clone() throws CloneNotSupportedException {
         final RoutingInfo2Dispatcher cloned = 
-                new RoutingInfo2Dispatcher(this._guideBuilder, this._serviceMemo, this._transformerBuilder);
+                new RoutingInfo2Dispatcher(this._serviceMemo, this._transformerBuilder);
         for ( Level level : this._levels ) {
             cloned._levels.add(level.clone());
         }
@@ -153,7 +150,6 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
             final MatchResult result = level.match(info);
             if (null != result) {
                 return new TargetSet(
-                        this._guideBuilder,
                         result._uris, 
                         result._isCheckResponseStatus, 
                         result._isShowInfoLog, 
@@ -474,7 +470,6 @@ public class RoutingInfo2Dispatcher implements Cloneable, Router<RoutingInfo, Di
                 new ArrayList<Triple<Pattern,String,String>>();
     }
 
-    private final GuideBuilder _guideBuilder;
     private final ServiceMemo _serviceMemo;
     private final HttpRequestTransformer.Builder _transformerBuilder;
     private final SortedSet<Level> _levels = new TreeSet<Level>();
