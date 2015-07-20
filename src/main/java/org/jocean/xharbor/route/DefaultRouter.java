@@ -8,7 +8,6 @@ import java.util.Iterator;
 import java.util.SortedSet;
 import java.util.concurrent.ConcurrentSkipListSet;
 
-import org.jocean.http.HttpRequestTransformer;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.Router;
 import org.jocean.xharbor.api.RoutingInfo;
@@ -31,14 +30,10 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
 
     private static final TargetSet EMPTY_TARGETSET = 
             new TargetSet(Level.EMPTY_URIS, false, false, 
-                    Level.NOP_REWRITEPATH, Level.NOP_NEEDAUTHORIZATION, null, null);
+                    Level.NOP_REWRITEPATH, Level.NOP_NEEDAUTHORIZATION, null);
 
-    public DefaultRouter(
-            final ServiceMemo serviceMemo,
-            final HttpRequestTransformer.Builder transformerBuilder
-            ) {
+    public DefaultRouter(final ServiceMemo serviceMemo) {
         this._serviceMemo = serviceMemo;
-        this._transformerBuilder = transformerBuilder;
     }
     
     @Override
@@ -66,8 +61,7 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
                         result._isShowInfoLog, 
                         result._rewritePath, 
                         result._needAuthorization, 
-                        this._serviceMemo,
-                        this._transformerBuilder);
+                        this._serviceMemo);
             }
         }
         return EMPTY_TARGETSET;
@@ -82,6 +76,5 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
     }
     
     private final ServiceMemo _serviceMemo;
-    private final HttpRequestTransformer.Builder _transformerBuilder;
     private final SortedSet<Level> _levels = new ConcurrentSkipListSet<Level>();
 }

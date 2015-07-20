@@ -7,8 +7,6 @@ import io.netty.handler.codec.http.HttpRequest;
 
 import java.net.URI;
 
-import org.jocean.http.HttpRequestTransformer;
-
 /**
  * @author isdom
  *
@@ -30,6 +28,4 @@ public interface Target {
     public boolean isCheckResponseStatus();
     
     public boolean isShowInfoLog();
-    
-    public HttpRequestTransformer getHttpRequestTransformerOf(final HttpRequest httpRequest);
 }

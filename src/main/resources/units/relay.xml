@@ -4,11 +4,8 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
     
-    <bean id="compositeBuilder" class="org.jocean.xharbor.util.CompositeHRTBuilder"/>
-    
     <bean id="defaultRouter" class="org.jocean.xharbor.route.DefaultRouter">
 	    <constructor-arg ref="serviceMemo"/>
-	    <constructor-arg ref="compositeBuilder"/>
     </bean>
     
     <bean id="cachedRouter" class="org.jocean.xharbor.route.CachedRouter" 

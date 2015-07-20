@@ -11,7 +11,6 @@ import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.jocean.http.HttpRequestTransformer;
 import org.jocean.idiom.Function;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.ServiceMemo;
@@ -31,11 +30,8 @@ public class TargetSet implements Dispatcher {
             final boolean isShowInfoLog, 
             final Function<String, String> rewritePath, 
             final Function<HttpRequest, Boolean> needAuthorization, 
-            final ServiceMemo serviceMemo,
-            final HttpRequestTransformer.Builder transformerBuilder
-            ) {
+            final ServiceMemo serviceMemo            ) {
         this._serviceMemo = serviceMemo;
-        this._transformerBuilder = transformerBuilder;
         this._isCheckResponseStatus = isCheckResponseStatus;
         this._isShowInfoLog = isShowInfoLog;
         this._rewritePath = rewritePath;
@@ -155,11 +151,11 @@ public class TargetSet implements Dispatcher {
             _serviceMemo.markServiceDownStatus(this._uri, isDown);
         }
         
-        @Override
-        public HttpRequestTransformer getHttpRequestTransformerOf(
-                final HttpRequest httpRequest) {
-            return _transformerBuilder.build(httpRequest);
-        }
+//        @Override
+//        public HttpRequestTransformer getHttpRequestTransformerOf(
+//                final HttpRequest httpRequest) {
+//            return _transformerBuilder.build(httpRequest);
+//        }
         
         TargetImpl(final URI uri) {
             this._uri = uri;
@@ -172,7 +168,7 @@ public class TargetSet implements Dispatcher {
     }
     
     private final ServiceMemo _serviceMemo;
-    private final HttpRequestTransformer.Builder _transformerBuilder;
+//    private final HttpRequestTransformer.Builder _transformerBuilder;
     private final boolean _isCheckResponseStatus;
     private final boolean _isShowInfoLog;
     private final Function<String, String> _rewritePath;
