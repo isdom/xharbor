@@ -4,10 +4,12 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
     
-    <bean id="level" class="org.jocean.xharbor.route.Level" 
+    <bean class="org.jocean.xharbor.route.PathAuthorizer" 
         destroy-method="stop">
-        <constructor-arg value="${level}"/>
-        <constructor-arg ref="defaultRouter"/>
+        <constructor-arg ref="level"/>
+        <constructor-arg value="${auth.path}"/>
+        <constructor-arg value="${auth.user}"/>
+        <constructor-arg value="${auth.password}"/>
     </bean>
     
 </beans>
