@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.xharbor.route;
+package org.jocean.xharbor.router;
 
 import org.jocean.xharbor.api.Router;
 

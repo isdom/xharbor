@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.xharbor.route;
+package org.jocean.xharbor.router;
 
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.QueryStringDecoder;

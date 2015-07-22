@@ -1,4 +1,4 @@
-package org.jocean.xharbor.route;
+package org.jocean.xharbor.routing.impl;
 
 import io.netty.handler.codec.http.HttpRequest;
 
@@ -10,57 +10,21 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.jocean.idiom.Function;
 import org.jocean.xharbor.api.RoutingInfo;
+import org.jocean.xharbor.router.DefaultRouter;
+import org.jocean.xharbor.routing.PathAuthorizer;
+import org.jocean.xharbor.routing.PathRewriter;
+import org.jocean.xharbor.routing.RouteLevel;
+import org.jocean.xharbor.routing.RouteRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class Level implements Comparable<Level> {
+public class DefaultLevel implements RouteLevel {
     
     @SuppressWarnings("unused")
     private static final Logger LOG = LoggerFactory
-            .getLogger(Level.class);
+            .getLogger(DefaultLevel.class);
     
-    static final URI[] EMPTY_URIS = new URI[0];
-    
-    static final Function<String, String> NOP_REWRITEPATH = new Function<String, String>() {
-        @Override
-        public String apply(final String input) {
-            return input;
-        }
-        @Override
-        public String toString() {
-            return "NOP";
-        }};
-    static final Function<HttpRequest, Boolean> NOP_NEEDAUTHORIZATION = new Function<HttpRequest, Boolean>() {
-        @Override
-        public Boolean apply(final HttpRequest request) {
-            return false;
-        }
-        @Override
-        public String toString() {
-            return "NOP";
-        }};
-    
-    static class MatchResult {
-        final URI[] _uris;
-        final boolean _isCheckResponseStatus;
-        final boolean _isShowInfoLog;
-        final Function<String, String> _rewritePath;
-        final Function<HttpRequest, Boolean> _needAuthorization;
-        
-        MatchResult(final URI[] uris, 
-                final boolean isCheckResponseStatus,
-                final boolean isShowInfoLog,
-                final Function<String, String> rewritePath,
-                final Function<HttpRequest, Boolean> needAuthorization) {
-            this._uris = uris;
-            this._isCheckResponseStatus = isCheckResponseStatus;
-            this._isShowInfoLog = isShowInfoLog;
-            this._rewritePath = rewritePath;
-            this._needAuthorization = needAuthorization;
-        }
-    }
-    
-    public Level(final int priority, final DefaultRouter router) {
+    public DefaultLevel(final int priority, final DefaultRouter router) {
         this._priority = priority;
         this._router = router;
         this._router.addLevel(this);
@@ -71,28 +35,28 @@ public class Level implements Comparable<Level> {
     }
     
     @Override
-    public int compareTo(final Level o) {
-        return o._priority - this._priority;
+    public int compareTo(final RouteLevel o) {
+        return o.getPriority() - this._priority;
     }
     
     public int getPriority() {
         return this._priority;
     }
 
-    public void addRule(final Rule rule) {
+    public void addRule(final RouteRule rule) {
         this._rules.add(rule);
     }
     
-    public void removeRule(final Rule rule) {
+    public void removeRule(final RouteRule rule) {
         this._rules.remove(rule);
     }
     
-    public Level setIsCheckResponseStatus(final boolean isCheckResponseStatus) {
+    public DefaultLevel setIsCheckResponseStatus(final boolean isCheckResponseStatus) {
         this._isCheckResponseStatus = isCheckResponseStatus;
         return this;
     }
 
-    public Level setIsShowInfoLog(final boolean isShowInfoLog) {
+    public DefaultLevel setIsShowInfoLog(final boolean isShowInfoLog) {
         this._isShowInfoLog = isShowInfoLog;
         return this;
     }
@@ -113,10 +77,11 @@ public class Level implements Comparable<Level> {
         this._authorizations.remove(authorizer);
     }
     
-    MatchResult match(final RoutingInfo info) {
+    @Override
+    public MatchResult match(final RoutingInfo info) {
         final List<URI> ret = new ArrayList<URI>();
         
-        for (Rule rule : this._rules) {
+        for (RouteRule rule : this._rules) {
             final URI uri = rule.match(info);
             if (null!=uri) {
                 ret.add(uri);
@@ -133,7 +98,7 @@ public class Level implements Comparable<Level> {
 
     private Function<String, String> genRewritePath(final String path) {
         for (PathRewriter rewriter : this._rewritePaths) {
-            final Function<String, String> func = rewriter.genRewriter(path);
+            final Function<String, String> func = rewriter.genRewriting(path);
             if (null!=func) {
                 return func;
             }
@@ -151,11 +116,12 @@ public class Level implements Comparable<Level> {
         return NOP_NEEDAUTHORIZATION;
     }
 
-    Collection<String> getRules() {
+    @Override
+    public Collection<String> getRules() {
         return new ArrayList<String>() {
             private static final long serialVersionUID = 1L;
         {
-            for (Rule rule : _rules) {
+            for (RouteRule rule : _rules) {
                 this.add(Integer.toString(_priority) + ":" + rule.toString());
             }
         }};
@@ -169,8 +135,8 @@ public class Level implements Comparable<Level> {
     
     private volatile boolean _isShowInfoLog;
     
-    private final List<Rule> _rules = 
-            new CopyOnWriteArrayList<Rule>();
+    private final List<RouteRule> _rules = 
+            new CopyOnWriteArrayList<RouteRule>();
     
     private final List<PathRewriter> _rewritePaths = 
             new CopyOnWriteArrayList<PathRewriter>();

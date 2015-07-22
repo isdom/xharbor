@@ -1,13 +1,15 @@
-package org.jocean.xharbor.route;
+package org.jocean.xharbor.routing.impl;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.jocean.idiom.Function;
+import org.jocean.xharbor.routing.PathRewriter;
+import org.jocean.xharbor.routing.RouteLevel;
 
-public class PathRewriter {
-    public PathRewriter(
-            final Level level,
+public class DefaultRewriter implements PathRewriter {
+    public DefaultRewriter(
+            final RouteLevel level,
             final String pathPattern, 
             final String replaceTo) {
         this._level = level;
@@ -20,7 +22,8 @@ public class PathRewriter {
         this._level.removePathRewriter(this);
     }
     
-    public Function<String, String> genRewriter(final String path) {
+    @Override
+    public Function<String, String> genRewriting(final String path) {
         final Matcher matcher = this._pathPattern.matcher(path);
         if ( matcher.find() ) {
             return new Function<String, String>() {
@@ -42,7 +45,7 @@ public class PathRewriter {
         return null != regex && !"".equals(regex) ? Pattern.compile(regex) : null;
     }
     
-    private final Level _level;
+    private final RouteLevel _level;
     private final Pattern _pathPattern;
     private final String _replaceTo;
 }

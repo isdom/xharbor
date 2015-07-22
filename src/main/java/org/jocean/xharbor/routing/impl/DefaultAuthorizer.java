@@ -1,4 +1,4 @@
-package org.jocean.xharbor.route;
+package org.jocean.xharbor.routing.impl;
 
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
@@ -10,18 +10,20 @@ import java.util.regex.Pattern;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.Function;
 import org.jocean.idiom.Pair;
+import org.jocean.xharbor.routing.PathAuthorizer;
+import org.jocean.xharbor.routing.RouteLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.io.BaseEncoding;
 
-public class PathAuthorizer {
+public class DefaultAuthorizer implements PathAuthorizer {
     
     private static final Logger LOG = LoggerFactory
-            .getLogger(PathAuthorizer.class);
+            .getLogger(DefaultAuthorizer.class);
     
-    public PathAuthorizer(
-            final Level level,
+    public DefaultAuthorizer(
+            final RouteLevel level,
             final String pathPattern, 
             final String user, 
             final String password) {
@@ -37,6 +39,7 @@ public class PathAuthorizer {
         this._level.removePathAuthorizer(this);
     }
     
+    @Override
     public Function<HttpRequest, Boolean> genNeedAuthorization(final String path) {
         final Matcher matcher = _pathPattern.matcher(path);
         if ( matcher.find() ) {
@@ -108,7 +111,7 @@ public class PathAuthorizer {
         return null != regex && !"".equals(regex) ? Pattern.compile(regex) : null;
     }
     
-    private final Level _level;
+    private final RouteLevel _level;
     private final Pattern _pathPattern;
     private final String _user;
     private final String _password;

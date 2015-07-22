@@ -1,12 +1,14 @@
-package org.jocean.xharbor.route;
+package org.jocean.xharbor.routing.impl;
 
 import java.net.URI;
 import java.util.regex.Pattern;
 
 import org.jocean.xharbor.api.RoutingInfo;
+import org.jocean.xharbor.routing.RouteLevel;
+import org.jocean.xharbor.routing.RouteRule;
 
-public class Rule {
-    public Rule(final Level level, 
+public class DefaultRule implements RouteRule {
+    public DefaultRule(final RouteLevel level, 
             final String uri,
             final String methodPattern, 
             final String pathPattern) throws Exception {
@@ -44,7 +46,7 @@ public class Rule {
                 + ",path=" + _pathPattern + "]";
     }
 
-    private final Level _level;
+    private final RouteLevel _level;
     private final URI _uri;
     private final Pattern _methodPattern;
     private final Pattern _pathPattern;
