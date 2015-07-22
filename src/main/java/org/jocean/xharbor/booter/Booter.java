@@ -1,4 +1,4 @@
-package org.jocean.xharbor;
+package org.jocean.xharbor.booter;
 
 public class Booter {
 
@@ -12,7 +12,7 @@ public class Booter {
         }
 
         try {
-            Main.main(args);
+            ZKMain.main(args);
         } catch (Exception e) {
             e.printStackTrace();
         }

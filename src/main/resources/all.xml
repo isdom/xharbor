@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd">
+        
+    <bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+        <property name="locations">
+            <list>
+                <value>classpath:jmxsrv.properties</value>
+                <value>classpath:httpsvr.properties</value>
+                <value>classpath:level.properties</value>
+                <value>classpath:rule.properties</value>
+                <value>classpath:rewrite.properties</value>
+                <value>classpath:authorizer.properties</value>
+                
+            </list>
+        </property>
+        <property name="fileEncoding" value="UTF-8"/>
+    </bean>
+    
+    <bean id="eventEngine" class="org.jocean.event.extend.Runners"
+        factory-method="build">
+        <constructor-arg>
+            <bean class="org.jocean.event.extend.Runners.Config">
+                <constructor-arg value="org.jocean:type=xharbor"/>
+                <constructor-arg value="xharbor"/>
+                <constructor-arg>
+                    <bean class="org.jocean.event.extend.Services" 
+                        factory-method="lookupOrCreateTimerService">
+                        <constructor-arg value="xharbor"/>
+                    </bean>
+                </constructor-arg>
+                <constructor-arg>
+                    <bean class="org.jocean.event.extend.Services" 
+                        factory-method="lookupOrCreateFlowBasedExecutorSource">
+                        <constructor-arg value="xharbor"/>
+                    </bean>
+                </constructor-arg>
+            </bean>
+        </constructor-arg>
+    </bean>
+    
+    <bean id="httpClient" class="org.jocean.http.client.impl.DefaultHttpClient" />
+    
+    <bean id="httpServer" class="org.jocean.http.server.impl.DefaultHttpServer"/>
+    
+    <bean id="timer" class="io.netty.util.HashedWheelTimer" />
+
+    <bean id="statsRegister" class="org.jocean.xharbor.util.StatsImpl" />
+    
+    <bean id="memoBuilder" class="org.jocean.xharbor.api.RelayMemo.Utils" 
+        factory-method="compositeBuilder">
+        <constructor-arg>
+            <array>
+                <bean class="org.jocean.xharbor.util.RelayMemoBuilderForStats">
+                    <constructor-arg ref="statsRegister"/>
+                </bean>
+                <bean class="org.jocean.xharbor.util.RelayMemoBuilderForDispatchFeedback">
+                    <constructor-arg ref="timer"/>
+                </bean>
+            </array>
+        </constructor-arg>
+    </bean>
+    
+    <bean id="serviceMemo" class="org.jocean.xharbor.util.ServiceMemoImpl"/>
+    
+    <bean id="noRoutingMemo" class="org.jocean.xharbor.util.RoutingInfoMemoImpl"/>
+   
+    <bean id="directMemory" class="org.jocean.xharbor.util.DirectMemoryIndicator"/>
+    
+    <bean id="exporter" class="org.springframework.jmx.export.MBeanExporter"
+          lazy-init="false">
+        <property name="beans">
+            <map>
+                <entry key="org.jocean:name=directMemory"   value-ref="directMemory"/>
+                <entry key="org.jocean:name=serviceMemo"    value-ref="serviceMemo"/>
+                <entry key="org.jocean:name=noRouting"      value-ref="noRoutingMemo"/>
+                <entry key="org.jocean:type=router,name=stats" value-ref="statsRegister"/>
+            </map>
+        </property>
+    </bean>
+
+    <import resource="classpath:xharbor/httpsvr.xml"/>
+    <import resource="classpath:xharbor/level.xml"/>
+    <import resource="classpath:xharbor/rule.xml"/>
+    <import resource="classpath:xharbor/rewrite.xml"/>
+    <import resource="classpath:xharbor/authorizer.xml"/>
+    <import resource="classpath:unit/jmxsrv.xml"/>
+    
+</beans>
