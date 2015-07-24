@@ -233,7 +233,14 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                                 stepmemo.beginBizStep(STEP.RECV_RESP);
                             }
                         }})
-                    .doOnTerminate(new Action0() {
+                    .doOnError(new Action1<Throwable>() {
+                        @Override
+                        public void call(final Throwable e) {
+                            stepmemo.endBizStep();
+                            memo.incBizResult(RESULT.RELAY_FAILURE, watch4Result.stopAndRestart());
+                            _cached.destroy();
+                        }})
+                    .doOnCompleted(new Action0() {
                         @Override
                         public void call() {
                             stepmemo.endBizStep();

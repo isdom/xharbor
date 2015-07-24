@@ -105,7 +105,7 @@
         init-method="start" destroy-method="stop">
         <constructor-arg ref="eventEngine"/>
         <constructor-arg ref="zkClient"/>
-        <constructor-arg value="${zk.rules.path:/demo}/xharbor"/>
+        <constructor-arg value="${zk.rules.path:/demo}/units"/>
         <constructor-arg>
             <bean class="org.jocean.j2se.unit.UnitOperator">
                 <constructor-arg ref="unitAgent"/>
@@ -115,7 +115,7 @@
  
     <bean id="directMemory" class="org.jocean.xharbor.util.DirectMemoryIndicator"/>
     
-    <bean id="exporter" class="org.springframework.jmx.export.MBeanExporter"
+    <bean id="zkExporter" class="org.springframework.jmx.export.MBeanExporter"
           lazy-init="false">
         <property name="beans">
             <map>

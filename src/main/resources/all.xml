@@ -13,7 +13,6 @@
                 <value>classpath:rule.properties</value>
                 <value>classpath:rewrite.properties</value>
                 <value>classpath:authorizer.properties</value>
-                
             </list>
         </property>
         <property name="fileEncoding" value="UTF-8"/>
