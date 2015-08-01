@@ -6,7 +6,6 @@ import io.netty.handler.codec.http.HttpRequest;
 import java.net.URI;
 import java.util.Collection;
 
-import org.jocean.idiom.Function;
 import org.jocean.xharbor.api.RoutingInfo;
 
 import rx.functions.Func1;
@@ -15,18 +14,18 @@ public interface RouteLevel extends Comparable<RouteLevel> {
     
     static final URI[] EMPTY_URIS = new URI[0];
     
-    static final Function<String, String> NOP_REWRITEPATH = new Function<String, String>() {
+    static final Func1<String, String> NOP_REWRITEPATH = new Func1<String, String>() {
         @Override
-        public String apply(final String input) {
+        public String call(final String input) {
             return input;
         }
         @Override
         public String toString() {
             return "NOP";
         }};
-    static final Function<HttpRequest, Boolean> NOP_NEEDAUTHORIZATION = new Function<HttpRequest, Boolean>() {
+    static final Func1<HttpRequest, Boolean> NOP_NEEDAUTHORIZATION = new Func1<HttpRequest, Boolean>() {
         @Override
-        public Boolean apply(final HttpRequest request) {
+        public Boolean call(final HttpRequest request) {
             return false;
         }
         @Override
@@ -38,15 +37,15 @@ public interface RouteLevel extends Comparable<RouteLevel> {
         public final URI[] _uris;
         public final boolean _isCheckResponseStatus;
         public final boolean _isShowInfoLog;
-        public final Function<String, String> _rewritePath;
-        public final Function<HttpRequest, Boolean> _needAuthorization;
+        public final Func1<String, String> _rewritePath;
+        public final Func1<HttpRequest, Boolean> _needAuthorization;
         public final Func1<HttpRequest,FullHttpResponse> _responser;
         
         public MatchResult(final URI[] uris, 
                 final boolean isCheckResponseStatus,
                 final boolean isShowInfoLog,
-                final Function<String, String> rewritePath,
-                final Function<HttpRequest, Boolean> needAuthorization, 
+                final Func1<String, String> rewritePath,
+                final Func1<HttpRequest, Boolean> needAuthorization, 
                 final Func1<HttpRequest,FullHttpResponse> responser) {
             this._uris = uris;
             this._isCheckResponseStatus = isCheckResponseStatus;

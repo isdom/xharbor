@@ -1,7 +1,7 @@
 package org.jocean.xharbor.routing;
 
-import org.jocean.idiom.Function;
+import rx.functions.Func1;
 
 public interface PathRewriter {
-    public Function<String, String> genRewriting(final String path);
+    public Func1<String, String> genRewriting(final String path);
 }

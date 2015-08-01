@@ -12,7 +12,6 @@ import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.jocean.idiom.Function;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.ServiceMemo;
 import org.jocean.xharbor.api.Target;
@@ -30,8 +29,8 @@ public class TargetSet implements Dispatcher {
     public TargetSet(
             final URI[] uris, 
             final boolean isCheckResponseStatus, 
-            final Function<String, String> rewritePath, 
-            final Function<HttpRequest, Boolean> needAuthorization, 
+            final Func1<String, String> rewritePath, 
+            final Func1<HttpRequest, Boolean> needAuthorization, 
             final Func1<HttpRequest, FullHttpResponse> responser,
             final ServiceMemo serviceMemo            ) {
         this._serviceMemo = serviceMemo;
@@ -117,12 +116,12 @@ public class TargetSet implements Dispatcher {
         
         @Override
         public String rewritePath(final String path) {
-            return _rewritePath.apply(path);
+            return _rewritePath.call(path);
         }
         
         @Override
         public boolean isNeedAuthorization(final HttpRequest httpRequest) {
-            return _needAuthorization.apply(httpRequest);
+            return _needAuthorization.call(httpRequest);
         }
         
         @Override
@@ -173,8 +172,8 @@ public class TargetSet implements Dispatcher {
     private final ServiceMemo _serviceMemo;
 //    private final HttpRequestTransformer.Builder _transformerBuilder;
     private final boolean _isCheckResponseStatus;
-    private final Function<String, String> _rewritePath;
-    private final Function<HttpRequest, Boolean> _needAuthorization;
+    private final Func1<String, String> _rewritePath;
+    private final Func1<HttpRequest, Boolean> _needAuthorization;
     private final Func1<HttpRequest, FullHttpResponse> _responser;
     private final TargetImpl[] _targets;
 }

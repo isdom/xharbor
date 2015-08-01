@@ -1,10 +1,9 @@
 package org.jocean.xharbor.routing;
 
 import io.netty.handler.codec.http.HttpRequest;
-
-import org.jocean.idiom.Function;
+import rx.functions.Func1;
 
 public interface PathAuthorizer {
     
-    public Function<HttpRequest, Boolean> genNeedAuthorization(final String path);
+    public Func1<HttpRequest, Boolean> genNeedAuthorization(final String path);
 }

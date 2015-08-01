@@ -8,12 +8,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.jocean.idiom.ExceptionUtils;
-import org.jocean.idiom.Function;
 import org.jocean.idiom.Pair;
 import org.jocean.xharbor.routing.PathAuthorizer;
 import org.jocean.xharbor.routing.RouteLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import rx.functions.Func1;
 
 import com.google.common.io.BaseEncoding;
 
@@ -40,12 +41,12 @@ public class DefaultAuthorizer implements PathAuthorizer {
     }
     
     @Override
-    public Function<HttpRequest, Boolean> genNeedAuthorization(final String path) {
+    public Func1<HttpRequest, Boolean> genNeedAuthorization(final String path) {
         final Matcher matcher = _pathPattern.matcher(path);
         if ( matcher.find() ) {
-            return new Function<HttpRequest, Boolean>() {
+            return new Func1<HttpRequest, Boolean>() {
                 @Override
-                public Boolean apply(final HttpRequest request) {
+                public Boolean call(final HttpRequest request) {
                     return !isAuthorizeSuccess(request, _user, _password);
                 }
                 

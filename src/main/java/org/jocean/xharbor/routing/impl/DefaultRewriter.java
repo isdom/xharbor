@@ -3,9 +3,10 @@ package org.jocean.xharbor.routing.impl;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.jocean.idiom.Function;
 import org.jocean.xharbor.routing.PathRewriter;
 import org.jocean.xharbor.routing.RouteLevel;
+
+import rx.functions.Func1;
 
 public class DefaultRewriter implements PathRewriter {
     public DefaultRewriter(
@@ -23,12 +24,12 @@ public class DefaultRewriter implements PathRewriter {
     }
     
     @Override
-    public Function<String, String> genRewriting(final String path) {
+    public Func1<String, String> genRewriting(final String path) {
         final Matcher matcher = this._pathPattern.matcher(path);
         if ( matcher.find() ) {
-            return new Function<String, String>() {
+            return new Func1<String, String>() {
                 @Override
-                public String apply(final String input) {
+                public String call(final String input) {
                     return _pathPattern.matcher(input).replaceFirst(_replaceTo);
                 }
                 

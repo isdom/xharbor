@@ -9,7 +9,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import org.jocean.idiom.Function;
 import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.router.DefaultRouter;
 import org.jocean.xharbor.routing.PathAuthorizer;
@@ -121,9 +120,9 @@ public class DefaultLevel implements RouteLevel {
         return null;
     }
 
-    private Function<String, String> genRewritePath(final String path) {
+    private Func1<String, String> genRewritePath(final String path) {
         for (PathRewriter rewriter : this._rewritePaths) {
-            final Function<String, String> func = rewriter.genRewriting(path);
+            final Func1<String, String> func = rewriter.genRewriting(path);
             if (null!=func) {
                 return func;
             }
@@ -131,9 +130,9 @@ public class DefaultLevel implements RouteLevel {
         return NOP_REWRITEPATH;
     }
     
-    private Function<HttpRequest, Boolean> genNeedAuthorization(final String path) {
+    private Func1<HttpRequest, Boolean> genNeedAuthorization(final String path) {
         for (PathAuthorizer authorizer : this._authorizations) {
-            final Function<HttpRequest, Boolean> func = authorizer.genNeedAuthorization(path);
+            final Func1<HttpRequest, Boolean> func = authorizer.genNeedAuthorization(path);
             if (null!=func) {
                 return func;
             }
