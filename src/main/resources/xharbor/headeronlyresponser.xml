@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd">
+    
+    <bean id="extraHeaders" class="java.util.concurrent.ConcurrentHashMap"/>
+    
+    <bean class="org.jocean.xharbor.routing.impl.HeaderonlyResponser" 
+        destroy-method="stop">
+        <constructor-arg ref="level"/>
+        <constructor-arg value="${request.method}"/>
+        <constructor-arg value="${request.path}"/>
+        <constructor-arg value="${response.status}"/>
+        <constructor-arg ref="extraHeaders"/>
+    </bean>
+    
+</beans>

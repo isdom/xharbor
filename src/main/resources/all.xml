@@ -13,6 +13,8 @@
                 <value>classpath:rule.properties</value>
                 <value>classpath:rewrite.properties</value>
                 <value>classpath:authorizer.properties</value>
+                <value>classpath:headeronlyresponser.properties</value>
+                <value>classpath:respheader.properties</value>
             </list>
         </property>
         <property name="fileEncoding" value="UTF-8"/>
@@ -85,6 +87,8 @@
     <import resource="classpath:xharbor/rule.xml"/>
     <import resource="classpath:xharbor/rewrite.xml"/>
     <import resource="classpath:xharbor/authorizer.xml"/>
+    <import resource="classpath:xharbor/headeronlyresponser.xml"/>
+    <import resource="classpath:unit/respheader.xml"/>
     <import resource="classpath:unit/jmxsrv.xml"/>
     
 </beans>

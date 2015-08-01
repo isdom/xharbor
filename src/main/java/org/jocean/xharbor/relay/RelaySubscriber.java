@@ -3,6 +3,7 @@
  */
 package org.jocean.xharbor.relay;
 
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -170,6 +171,21 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                             }})
                         .subscribe();
                     return;
+                }
+                {
+                    // response direct
+                    final FullHttpResponse response = 
+                            target.needResponseDirect(this._request);
+                    if (null != response) {
+                        _cached.request().doOnCompleted(new Action0() {
+                            @Override
+                            public void call() {
+                                Observable.just(response).subscribe(
+                                        _trade.responseObserver());
+                            }
+                        }).subscribe();
+                        return;
+                    }
                 }
                 
                 final RelayMemo memo = _memoBuilder.build(target, info);

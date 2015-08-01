@@ -30,8 +30,12 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
             .getLogger(DefaultRouter.class);
 
     private static final TargetSet EMPTY_TARGETSET = 
-            new TargetSet(RouteLevel.EMPTY_URIS, false, false, 
-                    RouteLevel.NOP_REWRITEPATH, RouteLevel.NOP_NEEDAUTHORIZATION, null);
+            new TargetSet(RouteLevel.EMPTY_URIS, 
+                    false, 
+                    RouteLevel.NOP_REWRITEPATH, 
+                    RouteLevel.NOP_NEEDAUTHORIZATION, 
+                    null,
+                    null);
 
     public DefaultRouter(final ServiceMemo serviceMemo) {
         this._serviceMemo = serviceMemo;
@@ -59,9 +63,9 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
                 return new TargetSet(
                         result._uris, 
                         result._isCheckResponseStatus, 
-                        result._isShowInfoLog, 
                         result._rewritePath, 
                         result._needAuthorization, 
+                        result._responser,
                         this._serviceMemo);
             }
         }

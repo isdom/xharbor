@@ -1,5 +1,6 @@
 package org.jocean.xharbor.routing;
 
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpRequest;
 
 import java.net.URI;
@@ -7,6 +8,8 @@ import java.util.Collection;
 
 import org.jocean.idiom.Function;
 import org.jocean.xharbor.api.RoutingInfo;
+
+import rx.functions.Func1;
 
 public interface RouteLevel extends Comparable<RouteLevel> {
     
@@ -37,17 +40,20 @@ public interface RouteLevel extends Comparable<RouteLevel> {
         public final boolean _isShowInfoLog;
         public final Function<String, String> _rewritePath;
         public final Function<HttpRequest, Boolean> _needAuthorization;
+        public final Func1<HttpRequest,FullHttpResponse> _responser;
         
         public MatchResult(final URI[] uris, 
                 final boolean isCheckResponseStatus,
                 final boolean isShowInfoLog,
                 final Function<String, String> rewritePath,
-                final Function<HttpRequest, Boolean> needAuthorization) {
+                final Function<HttpRequest, Boolean> needAuthorization, 
+                final Func1<HttpRequest,FullHttpResponse> responser) {
             this._uris = uris;
             this._isCheckResponseStatus = isCheckResponseStatus;
             this._isShowInfoLog = isShowInfoLog;
             this._rewritePath = rewritePath;
             this._needAuthorization = needAuthorization;
+            this._responser = responser;
         }
     }
     
@@ -64,6 +70,10 @@ public interface RouteLevel extends Comparable<RouteLevel> {
     public void addPathAuthorizer(final PathAuthorizer authorizer);
     
     public void removePathAuthorizer(final PathAuthorizer authorizer);
+    
+    public void addResponser(final Responser responser);
+    
+    public void removeResponser(final Responser responser);
     
     public MatchResult match(final RoutingInfo info);
 

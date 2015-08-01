@@ -1,5 +1,6 @@
 package org.jocean.xharbor.routing.impl;
 
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpRequest;
 
 import java.net.URI;
@@ -13,10 +14,13 @@ import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.router.DefaultRouter;
 import org.jocean.xharbor.routing.PathAuthorizer;
 import org.jocean.xharbor.routing.PathRewriter;
+import org.jocean.xharbor.routing.Responser;
 import org.jocean.xharbor.routing.RouteLevel;
 import org.jocean.xharbor.routing.RouteRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import rx.functions.Func1;
 
 public class DefaultLevel implements RouteLevel {
     
@@ -78,6 +82,16 @@ public class DefaultLevel implements RouteLevel {
     }
     
     @Override
+    public void addResponser(final Responser responser) {
+        this._responsers.add(responser);
+    }
+
+    @Override
+    public void removeResponser(final Responser responser) {
+        this._responsers.remove(responser);
+    }
+    
+    @Override
     public MatchResult match(final RoutingInfo info) {
         final List<URI> ret = new ArrayList<URI>();
         
@@ -92,8 +106,19 @@ public class DefaultLevel implements RouteLevel {
                     this._isCheckResponseStatus,
                     this._isShowInfoLog,
                     genRewritePath(info.getPath()), 
-                    genNeedAuthorization(info.getPath()))
+                    genNeedAuthorization(info.getPath()),
+                    genResponser(info))
             : null;
+    }
+
+    private Func1<HttpRequest, FullHttpResponse> genResponser(final RoutingInfo info) {
+        for (Responser responser : this._responsers) {
+            final Func1<HttpRequest, FullHttpResponse> func = responser.genResponseBuilder(info);
+            if (null!=func) {
+                return func;
+            }
+        }
+        return null;
     }
 
     private Function<String, String> genRewritePath(final String path) {
@@ -144,4 +169,6 @@ public class DefaultLevel implements RouteLevel {
     private final List<PathAuthorizer> _authorizations = 
             new CopyOnWriteArrayList<PathAuthorizer>();
 
+    private final List<Responser> _responsers = 
+            new CopyOnWriteArrayList<Responser>();
 }
