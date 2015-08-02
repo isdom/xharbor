@@ -27,6 +27,15 @@ public class DefaultLevel implements RouteLevel {
     private static final Logger LOG = LoggerFactory
             .getLogger(DefaultLevel.class);
     
+    static final URI[] FAKE_URIS = new URI[1];
+    
+    static {
+        try {
+            FAKE_URIS[0] = new URI("http://255.255.255.255");
+        } catch (Exception e) {
+        }
+    }
+    
     public DefaultLevel(final int priority, final DefaultRouter router) {
         this._priority = priority;
         this._router = router;
@@ -59,11 +68,6 @@ public class DefaultLevel implements RouteLevel {
         return this;
     }
 
-    public DefaultLevel setIsShowInfoLog(final boolean isShowInfoLog) {
-        this._isShowInfoLog = isShowInfoLog;
-        return this;
-    }
-
     public void addPathRewriter(final PathRewriter rewriter) {
         this._rewritePaths.add(rewriter);
     }
@@ -92,6 +96,15 @@ public class DefaultLevel implements RouteLevel {
     
     @Override
     public MatchResult match(final RoutingInfo info) {
+        final Func1<HttpRequest, FullHttpResponse> shortResponse = genShortResponse(info);
+        if (null!=shortResponse) {
+            return new MatchResult(FAKE_URIS, 
+                    false,
+                    NOP_REWRITEPATH, 
+                    NOP_NEEDAUTHORIZATION,
+                    shortResponse);
+        }
+        
         final List<URI> ret = new ArrayList<URI>();
         
         for (RouteRule rule : this._rules) {
@@ -103,16 +116,15 @@ public class DefaultLevel implements RouteLevel {
         return !ret.isEmpty() 
             ? new MatchResult(ret.toArray(EMPTY_URIS), 
                     this._isCheckResponseStatus,
-                    this._isShowInfoLog,
                     genRewritePath(info.getPath()), 
                     genNeedAuthorization(info.getPath()),
-                    genResponser(info))
+                    null)
             : null;
     }
 
-    private Func1<HttpRequest, FullHttpResponse> genResponser(final RoutingInfo info) {
+    private Func1<HttpRequest, FullHttpResponse> genShortResponse(final RoutingInfo info) {
         for (Responser responser : this._responsers) {
-            final Func1<HttpRequest, FullHttpResponse> func = responser.genResponseBuilder(info);
+            final Func1<HttpRequest, FullHttpResponse> func = responser.genShortResponse(info);
             if (null!=func) {
                 return func;
             }
@@ -156,8 +168,6 @@ public class DefaultLevel implements RouteLevel {
     private final int _priority;
     
     private volatile boolean _isCheckResponseStatus;
-    
-    private volatile boolean _isShowInfoLog;
     
     private final List<RouteRule> _rules = 
             new CopyOnWriteArrayList<RouteRule>();

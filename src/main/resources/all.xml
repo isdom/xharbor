@@ -13,7 +13,7 @@
                 <value>classpath:rule.properties</value>
                 <value>classpath:rewrite.properties</value>
                 <value>classpath:authorizer.properties</value>
-                <value>classpath:headeronlyresponser.properties</value>
+                <value>classpath:smpresponser.properties</value>
                 <value>classpath:respheader.properties</value>
             </list>
         </property>
@@ -87,7 +87,7 @@
     <import resource="classpath:xharbor/rule.xml"/>
     <import resource="classpath:xharbor/rewrite.xml"/>
     <import resource="classpath:xharbor/authorizer.xml"/>
-    <import resource="classpath:xharbor/headeronlyresponser.xml"/>
+    <import resource="classpath:xharbor/smpresponser.xml"/>
     <import resource="classpath:unit/respheader.xml"/>
     <import resource="classpath:unit/jmxsrv.xml"/>
     

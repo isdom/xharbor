@@ -36,20 +36,17 @@ public interface RouteLevel extends Comparable<RouteLevel> {
     public class MatchResult {
         public final URI[] _uris;
         public final boolean _isCheckResponseStatus;
-        public final boolean _isShowInfoLog;
         public final Func1<String, String> _rewritePath;
         public final Func1<HttpRequest, Boolean> _needAuthorization;
         public final Func1<HttpRequest,FullHttpResponse> _responser;
         
         public MatchResult(final URI[] uris, 
                 final boolean isCheckResponseStatus,
-                final boolean isShowInfoLog,
                 final Func1<String, String> rewritePath,
                 final Func1<HttpRequest, Boolean> needAuthorization, 
                 final Func1<HttpRequest,FullHttpResponse> responser) {
             this._uris = uris;
             this._isCheckResponseStatus = isCheckResponseStatus;
-            this._isShowInfoLog = isShowInfoLog;
             this._rewritePath = rewritePath;
             this._needAuthorization = needAuthorization;
             this._responser = responser;

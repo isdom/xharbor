@@ -36,7 +36,7 @@ public class HeaderonlyResponser implements Responser {
     }
     
     @Override
-    public Func1<HttpRequest, FullHttpResponse> genResponseBuilder(final RoutingInfo info) {
+    public Func1<HttpRequest, FullHttpResponse> genShortResponse(final RoutingInfo info) {
         if (isMatch(this._pathPattern, info.getPath())
            && isMatch(this._methodPattern, info.getMethod())) {
             return _func1;
