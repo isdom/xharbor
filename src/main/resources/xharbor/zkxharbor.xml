@@ -105,7 +105,7 @@
         init-method="start" destroy-method="stop">
         <constructor-arg ref="eventEngine"/>
         <constructor-arg ref="zkClient"/>
-        <constructor-arg value="${zk.rules.path:/demo}/units"/>
+        <constructor-arg value="${zk.units.path}"/>
         <constructor-arg>
             <bean class="org.jocean.j2se.unit.UnitOperator">
                 <constructor-arg ref="unitAgent"/>
