@@ -42,7 +42,7 @@ public class DefaultAuthorizer implements PathAuthorizer {
     
     @Override
     public Func1<HttpRequest, Boolean> genNeedAuthorization(final String path) {
-        final Matcher matcher = _pathPattern.matcher(path);
+        final Matcher matcher = this._pathPattern.matcher(path);
         if ( matcher.find() ) {
             return new Func1<HttpRequest, Boolean>() {
                 @Override

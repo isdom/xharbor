@@ -14,6 +14,8 @@ import org.jocean.idiom.Function;
 import org.jocean.idiom.SimpleCache;
 import org.jocean.idiom.Visitor;
 import org.jocean.idiom.Visitor2;
+import org.jocean.j2se.jmx.MBeanRegister;
+import org.jocean.j2se.jmx.MBeanRegisterAware;
 import org.jocean.xharbor.api.Router;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,8 +24,12 @@ import org.slf4j.LoggerFactory;
  * @author isdom
  *
  */
-public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT> {
-
+public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT>, MBeanRegisterAware {
+    
+    public interface CachedMXBean {
+        public void reset();
+    }
+    
     private static final Logger LOG = LoggerFactory
             .getLogger(CachedRouter.class);
     
@@ -130,6 +136,15 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT> {
         public String toString() {
             return "UpdateImplFlow";
         }
+    }
+    
+    @Override
+    public void setMBeanRegister(final MBeanRegister register) {
+        register.registerMBean("name=cachedRouter", new CachedMXBean() {
+            @Override
+            public void reset() {
+                _cache.clear();
+            }});
     }
     
     public void destroy() {
