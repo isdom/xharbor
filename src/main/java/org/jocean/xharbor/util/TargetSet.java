@@ -31,13 +31,13 @@ public class TargetSet implements Dispatcher {
             final boolean isCheckResponseStatus, 
             final Func1<String, String> rewritePath, 
             final Func1<HttpRequest, Boolean> needAuthorization, 
-            final Func1<HttpRequest, FullHttpResponse> responser,
+            final Func1<HttpRequest, FullHttpResponse> shortResponse,
             final ServiceMemo serviceMemo            ) {
         this._serviceMemo = serviceMemo;
         this._isCheckResponseStatus = isCheckResponseStatus;
         this._rewritePath = rewritePath;
         this._needAuthorization = needAuthorization;
-        this._responser = responser;
+        this._shortResponse = shortResponse;
         this._targets = new ArrayList<TargetImpl>() {
             private static final long serialVersionUID = 1L;
         {
@@ -148,15 +148,9 @@ public class TargetSet implements Dispatcher {
             _serviceMemo.markServiceDownStatus(this._uri, isDown);
         }
         
-//        @Override
-//        public HttpRequestTransformer getHttpRequestTransformerOf(
-//                final HttpRequest httpRequest) {
-//            return _transformerBuilder.build(httpRequest);
-//        }
-        
         @Override
-        public FullHttpResponse needResponseDirect(final HttpRequest httpRequest) {
-            return null!=_responser ? _responser.call(httpRequest) : null;
+        public FullHttpResponse needShortResponse(final HttpRequest httpRequest) {
+            return null!=_shortResponse ? _shortResponse.call(httpRequest) : null;
         }
         
         TargetImpl(final URI uri) {
@@ -170,10 +164,9 @@ public class TargetSet implements Dispatcher {
     }
     
     private final ServiceMemo _serviceMemo;
-//    private final HttpRequestTransformer.Builder _transformerBuilder;
     private final boolean _isCheckResponseStatus;
     private final Func1<String, String> _rewritePath;
     private final Func1<HttpRequest, Boolean> _needAuthorization;
-    private final Func1<HttpRequest, FullHttpResponse> _responser;
+    private final Func1<HttpRequest, FullHttpResponse> _shortResponse;
     private final TargetImpl[] _targets;
 }

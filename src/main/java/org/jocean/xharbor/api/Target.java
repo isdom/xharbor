@@ -26,7 +26,7 @@ public interface Target {
 
     public boolean isNeedAuthorization(final HttpRequest httpRequest);
     
-    public FullHttpResponse needResponseDirect(final HttpRequest httpRequest);
+    public FullHttpResponse needShortResponse(final HttpRequest httpRequest);
     
     public boolean isCheckResponseStatus();
 }

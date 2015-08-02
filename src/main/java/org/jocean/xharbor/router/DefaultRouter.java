@@ -65,7 +65,7 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
                         result._isCheckResponseStatus, 
                         result._rewritePath, 
                         result._needAuthorization, 
-                        result._responser,
+                        result._shortResponse,
                         this._serviceMemo);
             }
         }

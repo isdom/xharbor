@@ -175,7 +175,7 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                 {
                     // response direct
                     final FullHttpResponse response = 
-                            target.needResponseDirect(this._request);
+                            target.needShortResponse(this._request);
                     if (null != response) {
                         _cached.request().doOnCompleted(new Action0() {
                             @Override
