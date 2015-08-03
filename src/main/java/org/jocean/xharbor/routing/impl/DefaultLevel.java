@@ -19,6 +19,7 @@ import org.jocean.xharbor.routing.RouteRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import rx.functions.Action0;
 import rx.functions.Func1;
 
 public class DefaultLevel implements RouteLevel {
@@ -57,10 +58,12 @@ public class DefaultLevel implements RouteLevel {
 
     public void addRule(final RouteRule rule) {
         this._rules.add(rule);
+        doReset();
     }
     
     public void removeRule(final RouteRule rule) {
         this._rules.remove(rule);
+        doReset();
     }
     
     public DefaultLevel setIsCheckResponseStatus(final boolean isCheckResponseStatus) {
@@ -70,28 +73,34 @@ public class DefaultLevel implements RouteLevel {
 
     public void addPathRewriter(final PathRewriter rewriter) {
         this._rewritePaths.add(rewriter);
+        doReset();
     }
     
     public void removePathRewriter(final PathRewriter rewriter) {
         this._rewritePaths.remove(rewriter);
+        doReset();
     }
     
     public void addPathAuthorizer(final PathAuthorizer authorizer) {
         this._authorizations.add(authorizer);
+        doReset();
     }
     
     public void removePathAuthorizer(final PathAuthorizer authorizer) {
         this._authorizations.remove(authorizer);
+        doReset();
     }
     
     @Override
     public void addResponser(final Responser responser) {
         this._responsers.add(responser);
+        doReset();
     }
 
     @Override
     public void removeResponser(final Responser responser) {
         this._responsers.remove(responser);
+        doReset();
     }
     
     @Override
@@ -163,11 +172,23 @@ public class DefaultLevel implements RouteLevel {
         }};
     }
     
+    public void setResetAction(final Action0 resetAction) {
+        this._resetAction = resetAction;
+    }
+    
+    private void doReset() {
+        if (null!=this._resetAction) {
+            this._resetAction.call();
+        }
+    }
+
     private final DefaultRouter _router;
     
     private final int _priority;
     
     private volatile boolean _isCheckResponseStatus;
+    
+    private Action0 _resetAction;
     
     private final List<RouteRule> _rules = 
             new CopyOnWriteArrayList<RouteRule>();

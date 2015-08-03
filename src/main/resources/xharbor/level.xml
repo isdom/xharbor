@@ -8,6 +8,7 @@
         destroy-method="stop">
         <constructor-arg value="${level}"/>
         <constructor-arg ref="defaultRouter"/>
+        <property name="resetAction" ref="resetAction"/>
     </bean>
     
 </beans>

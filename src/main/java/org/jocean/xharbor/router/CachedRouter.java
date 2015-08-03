@@ -20,6 +20,8 @@ import org.jocean.xharbor.api.Router;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import rx.functions.Action0;
+
 /**
  * @author isdom
  *
@@ -149,6 +151,17 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT>, MBean
     
     public void destroy() {
         this._cache.clear();
+    }
+    
+    public Action0 resetAction() {
+        return new Action0() {
+            @Override
+            public void call() {
+                _cache.clear();
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("reset cache({})'s content.", _cache);
+                }
+            }};
     }
     
     private final EventEngine _engine;

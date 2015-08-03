@@ -31,6 +31,9 @@
         <property name="impl" ref="defaultRouter"/>
     </bean>
     
+    <bean id="resetAction" factory-bean="cachedRouter"
+        factory-method="resetAction" />
+    
     <bean class="org.jocean.xharbor.router.CahcedRouterMBeanSetter" >
         <constructor-arg ref="cachedRouter"/>
         <constructor-arg>

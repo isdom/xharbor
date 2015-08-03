@@ -76,9 +76,9 @@
  -->
     <logger name="io.netty" level="DEBUG"/>
     <logger name="org.apache.zookeeper" level="WARN"/>
-    <logger name="org.jocean.xharbor" level="INFO"/>
-    <logger name="org.jocean.xharbor.relay" level="DEBUG"/>
-    
+    <logger name="org.jocean.xharbor" level="DEBUG"/>
+    <logger name="org.springframework" level="INFO"/>
+        
     <logger name="timeoutLogger" level="INFO" additivity="false">
         <appender-ref ref="timeoutLogger"/>
     </logger>
