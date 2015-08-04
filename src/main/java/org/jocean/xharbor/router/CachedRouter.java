@@ -3,12 +3,6 @@
  */
 package org.jocean.xharbor.router;
 
-import java.util.concurrent.atomic.AtomicReference;
-
-import org.jocean.event.api.AbstractFlow;
-import org.jocean.event.api.BizStep;
-import org.jocean.event.api.EventEngine;
-import org.jocean.event.api.annotation.OnEvent;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.Function;
 import org.jocean.idiom.SimpleCache;
@@ -21,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import rx.functions.Action0;
+import rx.functions.Action1;
 
 /**
  * @author isdom
@@ -41,10 +36,6 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT>, MBean
         Visitor<SimpleCache<I, O>> {
     }
     
-    public interface OnRouterUpdated<I, O> extends 
-        Visitor2<Router<I, O>,Router<I, O>> {
-    }
-    
     public interface OnRouted<I, O> extends 
         Visitor2<I, O> {
     }
@@ -60,16 +51,12 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT>, MBean
         }
     }
 
-    public void setImpl(final Router<INPUT, OUTPUT> routerImpl) {
-        this._implUpdater.updateImpl(routerImpl);
+    public CachedRouter(final Router<INPUT, OUTPUT> impl) {
+        this._impl = impl;
     }
-
-    @SuppressWarnings("unchecked")
-    public CachedRouter(final EventEngine engine) {
-        this._engine = engine;
-        this._implUpdater = new UpdateImplFlow() {{
-            _engine.create(CachedRouter.this.toString() + "'s UpdateImpl", this.UPDATE, this);
-        }}.queryInterfaceInstance(ImplUpdater.class);
+    
+    public void start() {
+        callRouterUpdated(this._onRouterUpdated);
     }
     
     public void setCacheVisitor(final CacheVisitor<INPUT, OUTPUT> cacheVisitor) {
@@ -83,7 +70,7 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT>, MBean
         }
     }
     
-    public void setOnRouterUpdated(final OnRouterUpdated<INPUT, OUTPUT> onRouterUpdated) {
+    public void setOnRouterUpdated(final Action1<Router<INPUT, OUTPUT>> onRouterUpdated) {
         this._onRouterUpdated = onRouterUpdated;
     }
     
@@ -91,61 +78,12 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT>, MBean
         this._onRouted = onRouted;
     }
     
-    private interface ImplUpdater<I, O> {
-        public void updateImpl(final Router<I, O> impl);
-        public void onRouted(final I input);
-    }
-    
-    private class UpdateImplFlow extends AbstractFlow<UpdateImplFlow> {
-        final BizStep UPDATE = new BizStep("routing.UPDATE") {
-
-            @OnEvent(event = "updateImpl")
-            private BizStep updateImpl(final Router<INPUT, OUTPUT> newImpl) {
-                final Router<INPUT, OUTPUT> prevImpl = _implRef.getAndSet(newImpl);
-                // clear all cached routing
-                _cache.clear();
-                final OnRouterUpdated<INPUT, OUTPUT> onRouterUpdated = _onRouterUpdated;
-                try {
-                    if ( null != onRouterUpdated ) {
-                        onRouterUpdated.visit(prevImpl, newImpl);
-                    }
-                } catch (Exception e) {
-                    LOG.warn("exception when call onCacheCleared({}), detail: {}",
-                            onRouterUpdated, ExceptionUtils.exception2detail(e));
-                }
-                
-                return currentEventHandler();
-            }
-            
-            @OnEvent(event = "onRouted")
-            private BizStep onRouted(final INPUT input) {
-                final OnRouted<INPUT, OUTPUT> onRouted = _onRouted;
-                try {
-                    if ( null != onRouted ) {
-                        onRouted.visit(input, _cache.get(input));
-                    }
-                } catch (Exception e) {
-                    LOG.warn("exception when call onRouted({}) with ctx({}), detail: {}",
-                            onRouted, input, ExceptionUtils.exception2detail(e));
-                }
-
-                return currentEventHandler();
-            }
-        }
-        .freeze();
-
-        @Override
-        public String toString() {
-            return "UpdateImplFlow";
-        }
-    }
-    
     @Override
     public void setMBeanRegister(final MBeanRegister register) {
         register.registerMBean("name=cachedRouter", new CachedMXBean() {
             @Override
             public void reset() {
-                _cache.clear();
+                resetAction().call();
             }});
     }
     
@@ -161,30 +99,47 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT>, MBean
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("reset cache({})'s content.", _cache);
                 }
+                callRouterUpdated(_onRouterUpdated);
             }};
     }
     
-    private final EventEngine _engine;
+    private void callRouterUpdated(
+            final Action1<Router<INPUT, OUTPUT>> onRouterUpdated) {
+        try {
+            if ( null != onRouterUpdated ) {
+                onRouterUpdated.call(_impl);
+            }
+        } catch (Exception e) {
+            LOG.warn("exception when call onRouterUpdated({}), detail: {}",
+                    onRouterUpdated, ExceptionUtils.exception2detail(e));
+        }
+    }
     
     private volatile OnRouted<INPUT, OUTPUT> _onRouted;
-    private volatile OnRouterUpdated<INPUT, OUTPUT> _onRouterUpdated;
+    private volatile Action1<Router<INPUT, OUTPUT>> _onRouterUpdated;
     
-    private final AtomicReference<Router<INPUT, OUTPUT>> _implRef = 
-            new AtomicReference<Router<INPUT, OUTPUT>>(null);
+    private final Router<INPUT, OUTPUT> _impl;
     
-    private ImplUpdater<INPUT, OUTPUT> _implUpdater;
     private final SimpleCache<INPUT, OUTPUT> _cache = new SimpleCache<INPUT, OUTPUT>(
             //  ifAbsent
             new Function<INPUT, OUTPUT>() {
                 @Override
                 public OUTPUT apply(final INPUT input) {
-                    return _implRef.get().calculateRoute(input, _CTX.get());
+                    return _impl.calculateRoute(input, _CTX.get());
                 }
             },
             //  ifAssociated
             new Visitor2<INPUT, OUTPUT>() {
                 @Override
                 public void visit(final INPUT input, final OUTPUT output) throws Exception {
-                    _implUpdater.onRouted(input);
+                    final OnRouted<INPUT, OUTPUT> onRouted = _onRouted;
+                    try {
+                        if ( null != onRouted ) {
+                            onRouted.visit(input, output);
+                        }
+                    } catch (Exception e) {
+                        LOG.warn("exception when call onRouted({}) with ctx({}), detail: {}",
+                                onRouted, input, ExceptionUtils.exception2detail(e));
+                    }
                 }});
 }

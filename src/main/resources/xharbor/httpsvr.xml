@@ -26,9 +26,9 @@
     </bean>
     
     <bean id="cachedRouter" class="org.jocean.xharbor.router.CachedRouter" 
+        init-method="start"
         destroy-method="destroy">
-        <constructor-arg ref="eventEngine"/>
-        <property name="impl" ref="defaultRouter"/>
+        <constructor-arg ref="defaultRouter"/>
     </bean>
     
     <bean id="resetAction" factory-bean="cachedRouter"

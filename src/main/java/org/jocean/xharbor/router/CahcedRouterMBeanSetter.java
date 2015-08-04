@@ -6,6 +6,8 @@ package org.jocean.xharbor.router;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.jocean.idiom.Function;
 import org.jocean.idiom.Pair;
@@ -13,6 +15,8 @@ import org.jocean.idiom.SimpleCache;
 import org.jocean.j2se.jmx.MBeanRegister;
 import org.jocean.j2se.jmx.MBeanRegisterAware;
 import org.jocean.xharbor.api.Router;
+
+import rx.functions.Action1;
 
 /**
  * @author isdom
@@ -40,6 +44,7 @@ public class CahcedRouterMBeanSetter<I, O> implements MBeanRegisterAware {
                     public void visit(final I input, final O output) throws Exception {
                         final String objname = _objectNameMaker.apply(Pair.of(input, output));
                         if (null != objname && !_register.isRegistered(objname)) {
+                            _suffixs.add(objname);
                             _register.registerMBean(objname,
                                 new RouteMXBean() {
                                     @Override
@@ -51,16 +56,24 @@ public class CahcedRouterMBeanSetter<I, O> implements MBeanRegisterAware {
                     }});
             
         this._cachedRouter.setOnRouterUpdated(
-            new CachedRouter.OnRouterUpdated<I, O>() {
+            new Action1<Router<I, O>>() {
                 @Override
-                public void visit(final Router<I, O> prevImpl, final Router<I, O> newImpl)
-                        throws Exception {
-                  _register.unregisterAllMBeans();
+                public void call(final Router<I, O> impl) {
+                  unregisterAllMBean();
                   registerRoutesMBean();
-                  _register.registerMBean("name=rules", newImpl);
+                  _register.registerMBean("name=rules", impl);
                 }}); 
     }
     
+    private void unregisterAllMBean() {
+        _register.unregisterMBean("name=routes");
+        _register.unregisterMBean("name=rules");
+        for (String suffix : _suffixs) {
+            _register.unregisterMBean(suffix);
+        }
+        _suffixs.clear();
+    }
+
     @Override
     public void setMBeanRegister(final MBeanRegister register) {
         this._register = register;
@@ -92,4 +105,5 @@ public class CahcedRouterMBeanSetter<I, O> implements MBeanRegisterAware {
     private final CachedRouter<I, O> _cachedRouter;
     private final Function<Pair<I, O>, String> _objectNameMaker;
     private MBeanRegister _register;
+    private final Queue<String> _suffixs = new ConcurrentLinkedQueue<>();
 }
