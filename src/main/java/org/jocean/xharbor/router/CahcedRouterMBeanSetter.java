@@ -42,16 +42,18 @@ public class CahcedRouterMBeanSetter<I, O> implements MBeanRegisterAware {
                 new CachedRouter.OnRouted<I, O>() {
                     @Override
                     public void visit(final I input, final O output) throws Exception {
-                        final String objname = _objectNameMaker.apply(Pair.of(input, output));
-                        if (null != objname && !_register.isRegistered(objname)) {
-                            _suffixs.add(objname);
-                            _register.registerMBean(objname,
-                                new RouteMXBean() {
-                                    @Override
-                                    public String getRoutes() {
-                                        return output.toString();
-                                    }
-                                });
+                        if (null!=_register) {
+                            final String objname = _objectNameMaker.apply(Pair.of(input, output));
+                            if (null != objname && !_register.isRegistered(objname)) {
+                                _suffixs.add(objname);
+                                _register.registerMBean(objname,
+                                    new RouteMXBean() {
+                                        @Override
+                                        public String getRoutes() {
+                                            return output.toString();
+                                        }
+                                    });
+                            }
                         }
                     }});
             
@@ -59,17 +61,19 @@ public class CahcedRouterMBeanSetter<I, O> implements MBeanRegisterAware {
             new Action1<Router<I, O>>() {
                 @Override
                 public void call(final Router<I, O> impl) {
-                  unregisterAllMBean();
-                  registerRoutesMBean();
-                  _register.registerMBean("name=rules", impl);
+                  if (null!=_register) {
+                      unregisterAllMBean();
+                      registerRoutesMBean();
+                      _register.registerMBean("name=rules", impl);
+                  }
                 }}); 
     }
     
     private void unregisterAllMBean() {
-        _register.unregisterMBean("name=routes");
-        _register.unregisterMBean("name=rules");
+        this._register.unregisterMBean("name=routes");
+        this._register.unregisterMBean("name=rules");
         for (String suffix : _suffixs) {
-            _register.unregisterMBean(suffix);
+            this._register.unregisterMBean(suffix);
         }
         _suffixs.clear();
     }

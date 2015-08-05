@@ -20,28 +20,6 @@
         <property name="fileEncoding" value="UTF-8"/>
     </bean>
     
-    <bean id="eventEngine" class="org.jocean.event.extend.Runners"
-        factory-method="build">
-        <constructor-arg>
-            <bean class="org.jocean.event.extend.Runners.Config">
-                <constructor-arg value="org.jocean:type=xharbor"/>
-                <constructor-arg value="xharbor"/>
-                <constructor-arg>
-                    <bean class="org.jocean.event.extend.Services" 
-                        factory-method="lookupOrCreateTimerService">
-                        <constructor-arg value="xharbor"/>
-                    </bean>
-                </constructor-arg>
-                <constructor-arg>
-                    <bean class="org.jocean.event.extend.Services" 
-                        factory-method="lookupOrCreateFlowBasedExecutorSource">
-                        <constructor-arg value="xharbor"/>
-                    </bean>
-                </constructor-arg>
-            </bean>
-        </constructor-arg>
-    </bean>
-    
     <bean id="httpClient" class="org.jocean.http.client.impl.DefaultHttpClient" />
     
     <bean id="httpServer" class="org.jocean.http.server.impl.DefaultHttpServer"/>
@@ -85,7 +63,7 @@
     <import resource="classpath:xharbor/httpsvr.xml"/>
     <import resource="classpath:xharbor/level.xml"/>
     <import resource="classpath:xharbor/rule.xml"/>
-    <import resource="classpath:xharbor/rewrite.xml"/>
+    <import resource="classpath:xharbor/rewritepath.xml"/>
     <import resource="classpath:xharbor/authorizer.xml"/>
     <import resource="classpath:xharbor/smpresponser.xml"/>
     <import resource="classpath:unit/respheader.xml"/>
