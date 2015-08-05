@@ -4,7 +4,7 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
     
-    <bean class="org.jocean.xharbor.routing.impl.PathRewriter" 
+    <bean class="org.jocean.xharbor.routing.impl.RequestPathRewriter" 
         destroy-method="stop">
         <constructor-arg ref="level"/>
         <constructor-arg value="${rewrite.path}"/>

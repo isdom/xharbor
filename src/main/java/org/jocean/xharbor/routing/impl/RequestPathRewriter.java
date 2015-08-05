@@ -10,8 +10,8 @@ import org.jocean.xharbor.routing.RouteLevel;
 
 import rx.functions.Action1;
 
-public class PathRewriter implements RequestRewriter {
-    public PathRewriter(
+public class RequestPathRewriter implements RequestRewriter {
+    public RequestPathRewriter(
             final RouteLevel level,
             final String pathPattern, 
             final String replaceTo) {

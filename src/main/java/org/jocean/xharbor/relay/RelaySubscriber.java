@@ -247,6 +247,7 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                         public void call(final HttpObject obj) {
                             if (obj instanceof HttpResponse) {
                                 stepmemo.beginBizStep(STEP.RECV_RESP);
+                                target.rewriteResponse((HttpResponse)obj);
                             }
                         }})
                     .doOnError(new Action1<Throwable>() {

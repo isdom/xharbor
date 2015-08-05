@@ -32,12 +32,14 @@ public class TargetSet implements Dispatcher {
             final URI[] uris, 
             final boolean isCheckResponseStatus, 
             final Action1<HttpRequest> rewriteRequest, 
+            final Action1<HttpResponse> rewriteResponse, 
             final Func1<HttpRequest, Boolean> needAuthorization, 
             final Func1<HttpRequest, FullHttpResponse> shortResponse,
             final ServiceMemo serviceMemo            ) {
         this._serviceMemo = serviceMemo;
         this._isCheckResponseStatus = isCheckResponseStatus;
         this._rewriteRequest = rewriteRequest;
+        this._rewriteResponse = rewriteResponse;
         this._needAuthorization = needAuthorization;
         this._shortResponse = shortResponse;
         this._targets = new ArrayList<TargetImpl>() {
@@ -122,6 +124,11 @@ public class TargetSet implements Dispatcher {
         }
         
         @Override
+        public void rewriteResponse(final HttpResponse response) {
+            _rewriteResponse.call(response);
+        }
+        
+        @Override
         public boolean isNeedAuthorization(final HttpRequest httpRequest) {
             return _needAuthorization.call(httpRequest);
         }
@@ -155,12 +162,6 @@ public class TargetSet implements Dispatcher {
             return null!=_shortResponse ? _shortResponse.call(httpRequest) : null;
         }
         
-        @Override
-        public void rewriteResponse(final HttpResponse response) {
-            // TODO Auto-generated method stub
-            
-        }
-        
         TargetImpl(final URI uri) {
             this._uri = uri;
         }
@@ -174,6 +175,7 @@ public class TargetSet implements Dispatcher {
     private final ServiceMemo _serviceMemo;
     private final boolean _isCheckResponseStatus;
     private final Action1<HttpRequest> _rewriteRequest;
+    private final Action1<HttpResponse> _rewriteResponse;
     private final Func1<HttpRequest, Boolean> _needAuthorization;
     private final Func1<HttpRequest, FullHttpResponse> _shortResponse;
     private final TargetImpl[] _targets;

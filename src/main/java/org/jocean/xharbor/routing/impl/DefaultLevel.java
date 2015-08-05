@@ -2,6 +2,7 @@ package org.jocean.xharbor.routing.impl;
 
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponse;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -13,6 +14,7 @@ import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.router.DefaultRouter;
 import org.jocean.xharbor.routing.PathAuthorizer;
 import org.jocean.xharbor.routing.RequestRewriter;
+import org.jocean.xharbor.routing.ResponseRewriter;
 import org.jocean.xharbor.routing.Responser;
 import org.jocean.xharbor.routing.RouteLevel;
 import org.jocean.xharbor.routing.RouteRule;
@@ -82,6 +84,18 @@ public class DefaultLevel implements RouteLevel {
         doReset();
     }
     
+    @Override
+    public void addResponseRewriter(final ResponseRewriter rewriter) {
+        this._responseRewriters.add(rewriter);
+        doReset();
+    }
+
+    @Override
+    public void removeResponseRewriter(final ResponseRewriter rewriter) {
+        this._responseRewriters.remove(rewriter);
+        doReset();
+    }
+    
     public void addPathAuthorizer(final PathAuthorizer authorizer) {
         this._authorizations.add(authorizer);
         doReset();
@@ -111,6 +125,7 @@ public class DefaultLevel implements RouteLevel {
             return new MatchResult(FAKE_URIS, 
                     false,
                     NOP_REQ_REWRITER, 
+                    NOP_RESP_REWRITER, 
                     NOP_NEEDAUTHORIZATION,
                     shortResponse);
         }
@@ -127,6 +142,7 @@ public class DefaultLevel implements RouteLevel {
             ? new MatchResult(ret.toArray(EMPTY_URIS), 
                     this._isCheckResponseStatus,
                     genRewriteRequest(info.getPath()), 
+                    genRewriteResponse(info.getPath()), 
                     genNeedAuthorization(info.getPath()),
                     null)
             : null;
@@ -150,6 +166,16 @@ public class DefaultLevel implements RouteLevel {
             }
         }
         return NOP_REQ_REWRITER;
+    }
+    
+    private Action1<HttpResponse> genRewriteResponse(final String path) {
+        for (ResponseRewriter rewriter : this._responseRewriters) {
+            final Action1<HttpResponse> func = rewriter.genRewriting(path);
+            if (null!=func) {
+                return func;
+            }
+        }
+        return NOP_RESP_REWRITER;
     }
     
     private Func1<HttpRequest, Boolean> genNeedAuthorization(final String path) {
@@ -196,6 +222,9 @@ public class DefaultLevel implements RouteLevel {
     
     private final List<RequestRewriter> _requestRewriters = 
             new CopyOnWriteArrayList<RequestRewriter>();
+    
+    private final List<ResponseRewriter> _responseRewriters = 
+            new CopyOnWriteArrayList<ResponseRewriter>();
     
     private final List<PathAuthorizer> _authorizations = 
             new CopyOnWriteArrayList<PathAuthorizer>();

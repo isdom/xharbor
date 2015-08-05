@@ -11,7 +11,8 @@
                 <value>classpath:httpsvr.properties</value>
                 <value>classpath:level.properties</value>
                 <value>classpath:rule.properties</value>
-                <value>classpath:rewritepath.properties</value>
+                <value>classpath:rewritereqpath.properties</value>
+                <value>classpath:rewriterespheader.properties</value>
                 <value>classpath:authorizer.properties</value>
                 <value>classpath:smpresponser.properties</value>
                 <value>classpath:respheader.properties</value>
@@ -63,7 +64,8 @@
     <import resource="classpath:xharbor/httpsvr.xml"/>
     <import resource="classpath:xharbor/level.xml"/>
     <import resource="classpath:xharbor/rule.xml"/>
-    <import resource="classpath:xharbor/rewritepath.xml"/>
+    <import resource="classpath:xharbor/rewritereqpath.xml"/>
+    <import resource="classpath:xharbor/rewriterespheader.xml"/>
     <import resource="classpath:xharbor/authorizer.xml"/>
     <import resource="classpath:xharbor/smpresponser.xml"/>
     <import resource="classpath:unit/respheader.xml"/>

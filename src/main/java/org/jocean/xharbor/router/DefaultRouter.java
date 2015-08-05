@@ -33,6 +33,7 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
             new TargetSet(RouteLevel.EMPTY_URIS, 
                     false, 
                     RouteLevel.NOP_REQ_REWRITER, 
+                    RouteLevel.NOP_RESP_REWRITER, 
                     RouteLevel.NOP_NEEDAUTHORIZATION, 
                     null,
                     null);
@@ -64,6 +65,7 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
                         result._uris, 
                         result._isCheckResponseStatus, 
                         result._rewriteRequest,
+                        result._rewriteResponse,
                         result._needAuthorization, 
                         result._shortResponse,
                         this._serviceMemo);
