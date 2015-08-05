@@ -12,7 +12,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.router.DefaultRouter;
 import org.jocean.xharbor.routing.PathAuthorizer;
-import org.jocean.xharbor.routing.PathRewriter;
+import org.jocean.xharbor.routing.RequestRewriter;
 import org.jocean.xharbor.routing.Responser;
 import org.jocean.xharbor.routing.RouteLevel;
 import org.jocean.xharbor.routing.RouteRule;
@@ -20,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import rx.functions.Action0;
+import rx.functions.Action1;
 import rx.functions.Func1;
 
 public class DefaultLevel implements RouteLevel {
@@ -71,13 +72,13 @@ public class DefaultLevel implements RouteLevel {
         return this;
     }
 
-    public void addPathRewriter(final PathRewriter rewriter) {
-        this._rewritePaths.add(rewriter);
+    public void addRequestRewriter(final RequestRewriter rewriter) {
+        this._requestRewriters.add(rewriter);
         doReset();
     }
     
-    public void removePathRewriter(final PathRewriter rewriter) {
-        this._rewritePaths.remove(rewriter);
+    public void removeRequestRewriter(final RequestRewriter rewriter) {
+        this._requestRewriters.remove(rewriter);
         doReset();
     }
     
@@ -109,7 +110,7 @@ public class DefaultLevel implements RouteLevel {
         if (null!=shortResponse) {
             return new MatchResult(FAKE_URIS, 
                     false,
-                    NOP_REWRITEPATH, 
+                    NOP_REQ_REWRITER, 
                     NOP_NEEDAUTHORIZATION,
                     shortResponse);
         }
@@ -125,7 +126,7 @@ public class DefaultLevel implements RouteLevel {
         return !ret.isEmpty() 
             ? new MatchResult(ret.toArray(EMPTY_URIS), 
                     this._isCheckResponseStatus,
-                    genRewritePath(info.getPath()), 
+                    genRewriteRequest(info.getPath()), 
                     genNeedAuthorization(info.getPath()),
                     null)
             : null;
@@ -141,14 +142,14 @@ public class DefaultLevel implements RouteLevel {
         return null;
     }
 
-    private Func1<String, String> genRewritePath(final String path) {
-        for (PathRewriter rewriter : this._rewritePaths) {
-            final Func1<String, String> func = rewriter.genRewriting(path);
+    private Action1<HttpRequest> genRewriteRequest(final String path) {
+        for (RequestRewriter rewriter : this._requestRewriters) {
+            final Action1<HttpRequest> func = rewriter.genRewriting(path);
             if (null!=func) {
                 return func;
             }
         }
-        return NOP_REWRITEPATH;
+        return NOP_REQ_REWRITER;
     }
     
     private Func1<HttpRequest, Boolean> genNeedAuthorization(final String path) {
@@ -193,8 +194,8 @@ public class DefaultLevel implements RouteLevel {
     private final List<RouteRule> _rules = 
             new CopyOnWriteArrayList<RouteRule>();
     
-    private final List<PathRewriter> _rewritePaths = 
-            new CopyOnWriteArrayList<PathRewriter>();
+    private final List<RequestRewriter> _requestRewriters = 
+            new CopyOnWriteArrayList<RequestRewriter>();
     
     private final List<PathAuthorizer> _authorizations = 
             new CopyOnWriteArrayList<PathAuthorizer>();

@@ -1,36 +1,40 @@
 package org.jocean.xharbor.routing.impl;
 
+import io.netty.handler.codec.http.HttpRequest;
+
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.jocean.xharbor.routing.PathRewriter;
+import org.jocean.xharbor.routing.RequestRewriter;
 import org.jocean.xharbor.routing.RouteLevel;
 
-import rx.functions.Func1;
+import rx.functions.Action1;
 
-public class DefaultRewriter implements PathRewriter {
-    public DefaultRewriter(
+public class PathRewriter implements RequestRewriter {
+    public PathRewriter(
             final RouteLevel level,
             final String pathPattern, 
             final String replaceTo) {
         this._level = level;
         this._pathPattern = safeCompilePattern(pathPattern);
         this._replaceTo = replaceTo;
-        this._level.addPathRewriter(this);
+        this._level.addRequestRewriter(this);
     }
     
     public void stop() {
-        this._level.removePathRewriter(this);
+        this._level.removeRequestRewriter(this);
     }
     
     @Override
-    public Func1<String, String> genRewriting(final String path) {
+    public Action1<HttpRequest> genRewriting(final String path) {
         final Matcher matcher = this._pathPattern.matcher(path);
         if ( matcher.find() ) {
-            return new Func1<String, String>() {
+            return new Action1<HttpRequest>() {
                 @Override
-                public String call(final String input) {
-                    return _pathPattern.matcher(input).replaceFirst(_replaceTo);
+                public void call(final HttpRequest request) {
+                    request.setUri(
+                        _pathPattern.matcher(request.getUri())
+                            .replaceFirst(_replaceTo));
                 }
                 
                 @Override

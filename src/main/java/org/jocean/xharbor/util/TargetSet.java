@@ -5,6 +5,7 @@ package org.jocean.xharbor.util;
 
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponse;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -16,6 +17,7 @@ import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.ServiceMemo;
 import org.jocean.xharbor.api.Target;
 
+import rx.functions.Action1;
 import rx.functions.Func1;
 
 /**
@@ -29,13 +31,13 @@ public class TargetSet implements Dispatcher {
     public TargetSet(
             final URI[] uris, 
             final boolean isCheckResponseStatus, 
-            final Func1<String, String> rewritePath, 
+            final Action1<HttpRequest> rewriteRequest, 
             final Func1<HttpRequest, Boolean> needAuthorization, 
             final Func1<HttpRequest, FullHttpResponse> shortResponse,
             final ServiceMemo serviceMemo            ) {
         this._serviceMemo = serviceMemo;
         this._isCheckResponseStatus = isCheckResponseStatus;
-        this._rewritePath = rewritePath;
+        this._rewriteRequest = rewriteRequest;
         this._needAuthorization = needAuthorization;
         this._shortResponse = shortResponse;
         this._targets = new ArrayList<TargetImpl>() {
@@ -52,7 +54,7 @@ public class TargetSet implements Dispatcher {
         return Arrays.toString( new ArrayList<String>() {
             private static final long serialVersionUID = 1L;
         {
-            this.add("rewrite:" + _rewritePath.toString());
+            this.add("rewriteRequest:" + _rewriteRequest.toString());
             this.add("authorize:" + _needAuthorization.toString());
             for (TargetImpl peer : _targets) {
                 this.add(peer._uri.toString() + ":down(" + isTargetDown(peer)
@@ -115,8 +117,8 @@ public class TargetSet implements Dispatcher {
         }
         
         @Override
-        public String rewritePath(final String path) {
-            return _rewritePath.call(path);
+        public void rewriteRequest(final HttpRequest request) {
+            _rewriteRequest.call(request);
         }
         
         @Override
@@ -153,6 +155,12 @@ public class TargetSet implements Dispatcher {
             return null!=_shortResponse ? _shortResponse.call(httpRequest) : null;
         }
         
+        @Override
+        public void rewriteResponse(final HttpResponse response) {
+            // TODO Auto-generated method stub
+            
+        }
+        
         TargetImpl(final URI uri) {
             this._uri = uri;
         }
@@ -165,7 +173,7 @@ public class TargetSet implements Dispatcher {
     
     private final ServiceMemo _serviceMemo;
     private final boolean _isCheckResponseStatus;
-    private final Func1<String, String> _rewritePath;
+    private final Action1<HttpRequest> _rewriteRequest;
     private final Func1<HttpRequest, Boolean> _needAuthorization;
     private final Func1<HttpRequest, FullHttpResponse> _shortResponse;
     private final TargetImpl[] _targets;

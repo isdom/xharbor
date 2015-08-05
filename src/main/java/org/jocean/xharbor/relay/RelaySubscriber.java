@@ -222,8 +222,8 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                 stepmemo.beginBizStep(STEP.TRANSFER_CONTENT);
                 
                 //  add temp for enable rewrite 2015.03.26
-                this._request.setUri(
-                    target.rewritePath(this._request.getUri()));
+                //  modify rewrite path to rewrite request
+                target.rewriteRequest(this._request);
                 
                 final Observable<HttpObject> response = 
                     _httpClient.defineInteraction(

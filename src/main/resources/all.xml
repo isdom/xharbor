@@ -11,7 +11,7 @@
                 <value>classpath:httpsvr.properties</value>
                 <value>classpath:level.properties</value>
                 <value>classpath:rule.properties</value>
-                <value>classpath:rewrite.properties</value>
+                <value>classpath:rewritepath.properties</value>
                 <value>classpath:authorizer.properties</value>
                 <value>classpath:smpresponser.properties</value>
                 <value>classpath:respheader.properties</value>

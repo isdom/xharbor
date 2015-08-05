@@ -32,7 +32,7 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
     private static final TargetSet EMPTY_TARGETSET = 
             new TargetSet(RouteLevel.EMPTY_URIS, 
                     false, 
-                    RouteLevel.NOP_REWRITEPATH, 
+                    RouteLevel.NOP_REQ_REWRITER, 
                     RouteLevel.NOP_NEEDAUTHORIZATION, 
                     null,
                     null);
@@ -63,7 +63,7 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
                 return new TargetSet(
                         result._uris, 
                         result._isCheckResponseStatus, 
-                        result._rewritePath, 
+                        result._rewriteRequest,
                         result._needAuthorization, 
                         result._shortResponse,
                         this._serviceMemo);
