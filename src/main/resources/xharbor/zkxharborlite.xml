@@ -4,40 +4,7 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
         
-    <bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
-        <property name="locations">
-            <list>
-                <value>classpath:${conf:xharbor}.properties</value>
-            </list>
-        </property>
-        <property name="fileEncoding" value="UTF-8"/>
-    </bean>
-    
-    <bean id="eventEngine" class="org.jocean.event.extend.Runners"
-        factory-method="build">
-        <constructor-arg>
-            <bean class="org.jocean.event.extend.Runners.Config">
-                <constructor-arg value="org.jocean:type=xharbor"/>
-                <constructor-arg value="xharbor"/>
-                <constructor-arg>
-                    <bean class="org.jocean.event.extend.Services" 
-                        factory-method="lookupOrCreateTimerService">
-                        <constructor-arg value="xharbor"/>
-                    </bean>
-                </constructor-arg>
-                <constructor-arg>
-                    <bean class="org.jocean.event.extend.Services" 
-                        factory-method="lookupOrCreateFlowBasedExecutorSource">
-                        <constructor-arg value="xharbor"/>
-                    </bean>
-                </constructor-arg>
-            </bean>
-        </constructor-arg>
-    </bean>
-    
-    <bean id="httpClient" class="org.jocean.http.client.impl.DefaultHttpClient" />
-    
-    <bean id="httpServer" class="org.jocean.http.server.impl.DefaultHttpServer"/>
+    <import resource="classpath:unit/zkbooterlite.xml"/>
     
     <bean id="timer" class="io.netty.util.HashedWheelTimer" />
 
@@ -61,32 +28,6 @@
     
     <bean id="noRoutingMemo" class="org.jocean.xharbor.util.RoutingInfoMemoImpl"/>
    
-    <bean id="zkClient" class="org.apache.curator.framework.CuratorFrameworkFactory"
-        factory-method="newClient"
-        init-method="start">
-        <constructor-arg value="${zk.address:121.41.45.51:2181}"/>
-        <constructor-arg>
-            <bean class="org.apache.curator.retry.ExponentialBackoffRetry">
-                <constructor-arg value="1000"/>
-                <constructor-arg value="3"/>
-            </bean>
-        </constructor-arg>
-    </bean>
-     
-    <bean id="unitAgent" class="org.jocean.j2se.unit.UnitAgent"/>
-    
-    <bean id="unitUpdater" class="org.jocean.j2se.zk.ZKUpdater"
-        init-method="start" destroy-method="stop">
-        <constructor-arg ref="eventEngine"/>
-        <constructor-arg ref="zkClient"/>
-        <constructor-arg value="${zk.units.path}"/>
-        <constructor-arg>
-            <bean class="org.jocean.j2se.unit.UnitOperator">
-                <constructor-arg ref="unitAgent"/>
-            </bean>
-        </constructor-arg>
-    </bean>
- 
     <bean id="directMemory" class="org.jocean.xharbor.util.DirectMemoryIndicator"/>
     
     <bean id="zkExporter" class="org.springframework.jmx.export.MBeanExporter"
@@ -97,7 +38,6 @@
                 <entry key="org.jocean:name=serviceMemo"    value-ref="serviceMemo"/>
                 <entry key="org.jocean:name=noRouting"      value-ref="noRoutingMemo"/>
                 <entry key="org.jocean:type=router,name=stats" value-ref="statsRegister"/>
-                <entry key="org.jocean:name=unitAgent"      value-ref="unitAgent"/>
             </map>
         </property>
     </bean>

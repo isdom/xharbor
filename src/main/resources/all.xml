@@ -15,7 +15,7 @@
                 <value>classpath:rewriterespheader.properties</value>
                 <value>classpath:authorizer.properties</value>
                 <value>classpath:smpresponser.properties</value>
-                <value>classpath:respheader.properties</value>
+                <value>classpath:addheader.properties</value>
             </list>
         </property>
         <property name="fileEncoding" value="UTF-8"/>
@@ -68,7 +68,7 @@
     <import resource="classpath:xharbor/rewriterespheader.xml"/>
     <import resource="classpath:xharbor/authorizer.xml"/>
     <import resource="classpath:xharbor/smpresponser.xml"/>
-    <import resource="classpath:unit/respheader.xml"/>
+    <import resource="classpath:unit/addheader.xml"/>
     <import resource="classpath:unit/jmxsrv.xml"/>
     
 </beans>
