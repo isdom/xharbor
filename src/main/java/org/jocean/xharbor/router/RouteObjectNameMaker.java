@@ -1,22 +1,20 @@
 package org.jocean.xharbor.router;
 
-import org.jocean.idiom.Function;
-import org.jocean.idiom.Pair;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.RoutingInfo;
 
+import rx.functions.Func2;
+
 public class RouteObjectNameMaker implements
-        Function<Pair<RoutingInfo, Dispatcher>, String> {
+        Func2<RoutingInfo, Dispatcher, String> {
     
     private static final String normalizeString(final String input) {
         return input.replaceAll(":", "-");
     }
 
     @Override
-    public String apply(final Pair<RoutingInfo, Dispatcher> input) {
-        final Dispatcher dispatcher = input.getSecond();
+    public String call(final RoutingInfo info, final Dispatcher dispatcher) {
         if (dispatcher.IsValid()) {
-            final RoutingInfo info = input.getFirst();
             return "path=" + normalizeString(info.getPath()) + ",method="
                     + info.getMethod() + ",name=routes";
         } else {
