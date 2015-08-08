@@ -17,7 +17,7 @@ public class Main {
         @SuppressWarnings({ "unused", "resource" })
         final ApplicationContext ctx =
                 new ClassPathXmlApplicationContext(
-                        new String[]{"all.xml"});
+                        new String[]{"xharbor/all.xml"});
     }
 
 }
