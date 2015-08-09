@@ -147,13 +147,18 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
 //                    setEndReason("relay.NOROUTING");
                     final HttpVersion version = _request.getProtocolVersion();
                     _cached.request()
-                        .doOnCompleted(new Action0() {
-                            @Override
-                            public void call() {
-                                RxNettys.response200OK(version)
-                                    .subscribe(_trade.responseObserver());
-                            }})
-                        .subscribe();
+                    .doOnTerminate(new Action0() {
+                        @Override
+                        public void call() {
+                            _cached.destroy();
+                        }})
+                    .doOnCompleted(new Action0() {
+                        @Override
+                        public void call() {
+                            RxNettys.response200OK(version)
+                                .subscribe(_trade.responseObserver());
+                        }})
+                    .subscribe();
                     return;
                 }
                 
@@ -162,7 +167,13 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                     final FullHttpResponse response = 
                             target.needShortResponse(this._request);
                     if (null != response) {
-                        _cached.request().doOnCompleted(new Action0() {
+                        _cached.request()
+                        .doOnTerminate(new Action0() {
+                            @Override
+                            public void call() {
+                                _cached.destroy();
+                            }})
+                        .doOnCompleted(new Action0() {
                             @Override
                             public void call() {
                                 Observable.just(response).subscribe(
@@ -182,16 +193,21 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
 //                    setEndReason("relay.HTTP_UNAUTHORIZED");
                     final HttpVersion version = _request.getProtocolVersion();
                     _cached.request()
-                        .doOnCompleted(new Action0() {
-                            @Override
-                            public void call() {
-                                memo.incBizResult(RESULT.HTTP_UNAUTHORIZED, watch4Result.stopAndRestart());
-                                RxNettys.response401Unauthorized(
-                                        version,
-                                        "Basic realm=\"iplusmed\"")
-                                    .subscribe(_trade.responseObserver());
-                            }})
-                        .subscribe();
+                    .doOnTerminate(new Action0() {
+                        @Override
+                        public void call() {
+                            _cached.destroy();
+                        }})
+                    .doOnCompleted(new Action0() {
+                        @Override
+                        public void call() {
+                            memo.incBizResult(RESULT.HTTP_UNAUTHORIZED, watch4Result.stopAndRestart());
+                            RxNettys.response401Unauthorized(
+                                    version,
+                                    "Basic realm=\"iplusmed\"")
+                                .subscribe(_trade.responseObserver());
+                        }})
+                    .subscribe();
                     return;
                 }
                 
@@ -227,29 +243,30 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                             public HttpObject call(Object in) {
                                 return (HttpObject)in;
                             }});
-                response.doOnNext(new Action1<HttpObject>() {
-                        @Override
-                        public void call(final HttpObject obj) {
-                            if (obj instanceof HttpResponse) {
-                                stepmemo.beginBizStep(STEP.RECV_RESP);
-                                target.rewriteResponse((HttpResponse)obj);
-                            }
-                        }})
-                    .doOnError(new Action1<Throwable>() {
-                        @Override
-                        public void call(final Throwable e) {
-                            stepmemo.endBizStep();
-                            memo.incBizResult(RESULT.RELAY_FAILURE, watch4Result.stopAndRestart());
-                            _cached.destroy();
-                        }})
-                    .doOnCompleted(new Action0() {
-                        @Override
-                        public void call() {
-                            stepmemo.endBizStep();
-                            memo.incBizResult(RESULT.RELAY_SUCCESS, watch4Result.stopAndRestart());
-                            _cached.destroy();
-                        }})
-                    .subscribe(_trade.responseObserver());
+                response
+                .doOnNext(new Action1<HttpObject>() {
+                    @Override
+                    public void call(final HttpObject obj) {
+                        if (obj instanceof HttpResponse) {
+                            stepmemo.beginBizStep(STEP.RECV_RESP);
+                            target.rewriteResponse((HttpResponse)obj);
+                        }
+                    }})
+                .doOnError(new Action1<Throwable>() {
+                    @Override
+                    public void call(final Throwable e) {
+                        stepmemo.endBizStep();
+                        memo.incBizResult(RESULT.RELAY_FAILURE, watch4Result.stopAndRestart());
+                        _cached.destroy();
+                    }})
+                .doOnCompleted(new Action0() {
+                    @Override
+                    public void call() {
+                        stepmemo.endBizStep();
+                        memo.incBizResult(RESULT.RELAY_SUCCESS, watch4Result.stopAndRestart());
+                        _cached.destroy();
+                    }})
+                .subscribe(_trade.responseObserver());
             }
         }
     };
