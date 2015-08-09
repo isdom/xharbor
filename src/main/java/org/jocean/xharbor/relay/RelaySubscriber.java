@@ -138,7 +138,23 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                 final RoutingInfo info = routectx.getProperty("routingInfo");
                 routectx.clear();
                 
-                final Target target = null != dispatcher ? dispatcher.dispatch() : null;
+                final Observable<? extends HttpObject> httpResponse = 
+                    dispatcher.response(_request, _cached);
+                _cached.request()
+                .doOnTerminate(new Action0() {
+                    @Override
+                    public void call() {
+                        _cached.destroy();
+                    }})
+                .doOnCompleted(new Action0() {
+                    @Override
+                    public void call() {
+                        httpResponse.subscribe(_trade.responseObserver());
+                    }})
+                .subscribe();
+
+                if (false) {
+                final Target target = dispatcher.dispatch();
                 
                 if ( null == target ) {
                     LOG.warn("can't found matched target service for request:[{}]\njust return 200 OK for trade ({}).", 
@@ -267,6 +283,7 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                         _cached.destroy();
                     }})
                 .subscribe(_trade.responseObserver());
+                }
             }
         }
     };

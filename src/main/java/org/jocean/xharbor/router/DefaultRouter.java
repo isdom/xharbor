@@ -3,11 +3,17 @@
  */
 package org.jocean.xharbor.router;
 
+import io.netty.handler.codec.http.HttpObject;
+import io.netty.handler.codec.http.HttpRequest;
+
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.SortedSet;
 import java.util.concurrent.ConcurrentSkipListSet;
 
+import org.jocean.http.client.HttpClient;
+import org.jocean.http.server.CachedRequest;
+import org.jocean.http.util.RxNettys;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.Router;
 import org.jocean.xharbor.api.RoutingInfo;
@@ -19,13 +25,14 @@ import org.jocean.xharbor.util.TargetSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import rx.Observable;
+
 /**
  * @author isdom
  *
  */
 public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBean {
     
-    @SuppressWarnings("unused")
     private static final Logger LOG = LoggerFactory
             .getLogger(DefaultRouter.class);
 
@@ -36,10 +43,25 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
                     RouteLevel.NOP_RESP_REWRITER, 
                     RouteLevel.NOP_NEEDAUTHORIZATION, 
                     null,
-                    null);
+                    null,
+                    null) {
+        
+        @Override
+        public Observable<? extends HttpObject> response(
+                final HttpRequest request, 
+                final CachedRequest cached) {
+            LOG.warn("can't found matched target service for request:[{}]\njust return 200 OK.", 
+                    request);
+            //   TODO, mark this status
+//            _noRoutingMemo.incRoutingInfo(info);
+//            setEndReason("relay.NOROUTING");
+            return RxNettys.response200OK(request.getProtocolVersion());
+        }
+    };
 
-    public DefaultRouter(final ServiceMemo serviceMemo) {
+    public DefaultRouter(final ServiceMemo serviceMemo, final HttpClient httpClient) {
         this._serviceMemo = serviceMemo;
+        this._httpClient = httpClient;
     }
     
     @Override
@@ -68,7 +90,8 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
                         result._rewriteResponse,
                         result._needAuthorization, 
                         result._shortResponse,
-                        this._serviceMemo);
+                        this._serviceMemo,
+                        this._httpClient);
             }
         }
         return EMPTY_TARGETSET;
@@ -83,5 +106,6 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
     }
     
     private final ServiceMemo _serviceMemo;
+    private final HttpClient _httpClient;
     private final SortedSet<RouteLevel> _levels = new ConcurrentSkipListSet<RouteLevel>();
 }

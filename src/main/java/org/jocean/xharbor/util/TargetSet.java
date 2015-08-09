@@ -4,19 +4,30 @@
 package org.jocean.xharbor.util;
 
 import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpVersion;
 
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.jocean.http.Feature;
+import org.jocean.http.client.HttpClient;
+import org.jocean.http.server.CachedRequest;
+import org.jocean.http.util.RxNettys;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.ServiceMemo;
 import org.jocean.xharbor.api.Target;
+import org.jocean.xharbor.api.RelayMemo.RESULT;
+import org.jocean.xharbor.api.RelayMemo.STEP;
 
+import rx.Observable;
+import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.functions.Func1;
 
@@ -35,7 +46,10 @@ public class TargetSet implements Dispatcher {
             final Action1<HttpResponse> rewriteResponse, 
             final Func1<HttpRequest, Boolean> needAuthorization, 
             final Func1<HttpRequest, FullHttpResponse> shortResponse,
-            final ServiceMemo serviceMemo            ) {
+            final ServiceMemo serviceMemo, 
+            final HttpClient httpClient            
+            ) {
+        this._httpClient = httpClient;
         this._serviceMemo = serviceMemo;
         this._isCheckResponseStatus = isCheckResponseStatus;
         this._rewriteRequest = rewriteRequest;
@@ -179,4 +193,70 @@ public class TargetSet implements Dispatcher {
     private final Func1<HttpRequest, Boolean> _needAuthorization;
     private final Func1<HttpRequest, FullHttpResponse> _shortResponse;
     private final TargetImpl[] _targets;
+
+    private FullHttpResponse needShortResponse(final HttpRequest httpRequest) {
+        return null!=_shortResponse ? _shortResponse.call(httpRequest) : null;
+    }
+    
+    private boolean isNeedAuthorization(final HttpRequest httpRequest) {
+        return _needAuthorization.call(httpRequest);
+    }
+    
+    private void rewriteRequest(final HttpRequest request) {
+        _rewriteRequest.call(request);
+    }
+    
+    private void rewriteResponse(final HttpResponse response) {
+        _rewriteResponse.call(response);
+    }
+    
+    @Override
+    public Observable<? extends HttpObject> response(
+            final HttpRequest request, 
+            final CachedRequest cached) {
+        final FullHttpResponse shortResponse = 
+                needShortResponse(request);
+        if (null != shortResponse) {
+            return Observable.just(shortResponse);
+        } else if (isNeedAuthorization(request)) {
+//              setEndReason("relay.HTTP_UNAUTHORIZED");
+            // memo.incBizResult(RESULT.HTTP_UNAUTHORIZED,
+            // watch4Result.stopAndRestart());
+            return RxNettys.response401Unauthorized(
+                request.getProtocolVersion(), 
+                "Basic realm=\"iplusmed\"");
+        } else {
+            rewriteRequest(request);
+            
+            final Target target = dispatch();
+            final Observable<HttpObject> response = 
+                _httpClient.defineInteraction(
+                    new InetSocketAddress(
+                        target.serviceUri().getHost(), 
+                        target.serviceUri().getPort()), 
+                        cached.request(),
+                        Feature.ENABLE_LOGGING)
+                    .filter(new Func1<Object, Boolean>() {
+                        @Override
+                        public Boolean call(Object in) {
+                            return in instanceof HttpObject;
+                        }})
+                     .map(new Func1<Object, HttpObject>() {
+                        @Override
+                        public HttpObject call(Object in) {
+                            return (HttpObject)in;
+                        }})
+                    .doOnNext(new Action1<HttpObject>() {
+                        @Override
+                        public void call(final HttpObject obj) {
+                            if (obj instanceof HttpResponse) {
+    //                            stepmemo.beginBizStep(STEP.RECV_RESP);
+                                rewriteResponse((HttpResponse)obj);
+                            }
+                        }});
+            return response;
+        }
+    }
+
+    private final HttpClient _httpClient;
 }

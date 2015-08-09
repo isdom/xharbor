@@ -23,6 +23,7 @@
     
     <bean id="defaultRouter" class="org.jocean.xharbor.router.DefaultRouter">
         <constructor-arg ref="serviceMemo"/>
+        <constructor-arg ref="httpClient"/>
     </bean>
     
     <bean id="cachedRouter" class="org.jocean.xharbor.router.CachedRouter" 
