@@ -46,8 +46,6 @@ import rx.observers.SerializedSubscriber;
  */
 public class RelaySubscriber extends Subscriber<HttpTrade> {
 
-    private static final String MONITOR_CHECKALIVE = "monitor://checkalive";
-    
     private static class RouterCtxImpl implements Router.Context {
         private final HashMap<String, Object> _map = new HashMap<String, Object>();
         
@@ -159,19 +157,6 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                     return;
                 }
                 
-                if (MONITOR_CHECKALIVE.equalsIgnoreCase(target.serviceUri().toString())) {
-//                    setEndReason("relay.CHECKALIVE."+_target.serviceUri().toString().replace(':', '-'));
-                    final HttpVersion version = _request.getProtocolVersion();
-                    _cached.request()
-                        .doOnCompleted(new Action0() {
-                            @Override
-                            public void call() {
-                                RxNettys.response200OK(version)
-                                    .subscribe(_trade.responseObserver());
-                            }})
-                        .subscribe();
-                    return;
-                }
                 {
                     // response direct
                     final FullHttpResponse response = 
