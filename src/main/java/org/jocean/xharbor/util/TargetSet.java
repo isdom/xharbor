@@ -7,7 +7,6 @@ import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
-import io.netty.handler.codec.http.HttpVersion;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -21,13 +20,11 @@ import org.jocean.http.client.HttpClient;
 import org.jocean.http.server.CachedRequest;
 import org.jocean.http.util.RxNettys;
 import org.jocean.xharbor.api.Dispatcher;
+import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.api.ServiceMemo;
 import org.jocean.xharbor.api.Target;
-import org.jocean.xharbor.api.RelayMemo.RESULT;
-import org.jocean.xharbor.api.RelayMemo.STEP;
 
 import rx.Observable;
-import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.functions.Func1;
 
@@ -212,6 +209,7 @@ public class TargetSet implements Dispatcher {
     
     @Override
     public Observable<? extends HttpObject> response(
+            final RoutingInfo info,
             final HttpRequest request, 
             final CachedRequest cached) {
         final FullHttpResponse shortResponse = 

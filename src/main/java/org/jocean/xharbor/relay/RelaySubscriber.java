@@ -139,7 +139,7 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                 routectx.clear();
                 
                 final Observable<? extends HttpObject> httpResponse = 
-                    dispatcher.response(_request, _cached);
+                    dispatcher.response(info, _request, _cached);
                 _cached.request()
                 .doOnTerminate(new Action0() {
                     @Override

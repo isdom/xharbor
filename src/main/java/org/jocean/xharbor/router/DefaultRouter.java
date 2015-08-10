@@ -17,6 +17,7 @@ import org.jocean.http.util.RxNettys;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.Router;
 import org.jocean.xharbor.api.RoutingInfo;
+import org.jocean.xharbor.api.RoutingInfoMemo;
 import org.jocean.xharbor.api.ServiceMemo;
 import org.jocean.xharbor.routing.RouteLevel;
 import org.jocean.xharbor.routing.RouteLevel.MatchResult;
@@ -36,7 +37,7 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
     private static final Logger LOG = LoggerFactory
             .getLogger(DefaultRouter.class);
 
-    private static final TargetSet EMPTY_TARGETSET = 
+    private final TargetSet EMPTY_TARGETSET = 
             new TargetSet(RouteLevel.EMPTY_URIS, 
                     false, 
                     RouteLevel.NOP_REQ_REWRITER, 
@@ -48,19 +49,25 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
         
         @Override
         public Observable<? extends HttpObject> response(
+                final RoutingInfo info,
                 final HttpRequest request, 
                 final CachedRequest cached) {
             LOG.warn("can't found matched target service for request:[{}]\njust return 200 OK.", 
                     request);
             //   TODO, mark this status
-//            _noRoutingMemo.incRoutingInfo(info);
+            _noRoutingMemo.incRoutingInfo(info);
 //            setEndReason("relay.NOROUTING");
             return RxNettys.response200OK(request.getProtocolVersion());
         }
     };
 
-    public DefaultRouter(final ServiceMemo serviceMemo, final HttpClient httpClient) {
+    public DefaultRouter(
+            final ServiceMemo   serviceMemo, 
+            final HttpClient    httpClient,
+            final RoutingInfoMemo noRoutingMemo
+            ) {
         this._serviceMemo = serviceMemo;
+        this._noRoutingMemo = noRoutingMemo;
         this._httpClient = httpClient;
     }
     
@@ -106,6 +113,7 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
     }
     
     private final ServiceMemo _serviceMemo;
+    private final RoutingInfoMemo _noRoutingMemo;
     private final HttpClient _httpClient;
     private final SortedSet<RouteLevel> _levels = new ConcurrentSkipListSet<RouteLevel>();
 }
