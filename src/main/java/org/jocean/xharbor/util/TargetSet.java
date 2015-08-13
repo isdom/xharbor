@@ -19,12 +19,19 @@ import org.jocean.http.Feature;
 import org.jocean.http.client.HttpClient;
 import org.jocean.http.server.CachedRequest;
 import org.jocean.http.util.RxNettys;
+import org.jocean.idiom.StopWatch;
+import org.jocean.idiom.stats.BizMemo;
+import org.jocean.idiom.stats.BizMemo.StepMemo;
 import org.jocean.xharbor.api.Dispatcher;
+import org.jocean.xharbor.api.RelayMemo;
+import org.jocean.xharbor.api.RelayMemo.RESULT;
 import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.api.ServiceMemo;
 import org.jocean.xharbor.api.Target;
+import org.jocean.xharbor.api.RelayMemo.STEP;
 
 import rx.Observable;
+import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.functions.Func1;
 
@@ -44,8 +51,10 @@ public class TargetSet implements Dispatcher {
             final Func1<HttpRequest, Boolean> needAuthorization, 
             final Func1<HttpRequest, FullHttpResponse> shortResponse,
             final ServiceMemo serviceMemo, 
-            final HttpClient httpClient            
+            final HttpClient httpClient,
+            final RelayMemo.Builder memoBuilder
             ) {
+        this._memoBuilder = memoBuilder;
         this._httpClient = httpClient;
         this._serviceMemo = serviceMemo;
         this._isCheckResponseStatus = isCheckResponseStatus;
@@ -129,6 +138,7 @@ public class TargetSet implements Dispatcher {
             return this._uri;
         }
         
+        /*
         @Override
         public void rewriteRequest(final HttpRequest request) {
             _rewriteRequest.call(request);
@@ -148,6 +158,13 @@ public class TargetSet implements Dispatcher {
         public boolean isCheckResponseStatus() {
             return _isCheckResponseStatus;
         }
+        
+        @Override
+        public FullHttpResponse needShortResponse(final HttpRequest httpRequest) {
+            return null!=_shortResponse ? _shortResponse.call(httpRequest) : null;
+        }
+        
+        */
 
         @Override
         public int addWeight(final int deltaWeight) {
@@ -166,11 +183,6 @@ public class TargetSet implements Dispatcher {
         @Override
         public void markServiceDownStatus(final boolean isDown) {
             _serviceMemo.markServiceDownStatus(this._uri, isDown);
-        }
-        
-        @Override
-        public FullHttpResponse needShortResponse(final HttpRequest httpRequest) {
-            return null!=_shortResponse ? _shortResponse.call(httpRequest) : null;
         }
         
         TargetImpl(final URI uri) {
@@ -212,49 +224,71 @@ public class TargetSet implements Dispatcher {
             final RoutingInfo info,
             final HttpRequest request, 
             final CachedRequest cached) {
+        
+        final Target target = dispatch();
+        final RelayMemo memo = _memoBuilder.build(target, info);
+        final StopWatch watch4Result = new StopWatch();
+        
         final FullHttpResponse shortResponse = 
                 needShortResponse(request);
         if (null != shortResponse) {
             return Observable.just(shortResponse);
         } else if (isNeedAuthorization(request)) {
-//              setEndReason("relay.HTTP_UNAUTHORIZED");
-            // memo.incBizResult(RESULT.HTTP_UNAUTHORIZED,
-            // watch4Result.stopAndRestart());
             return RxNettys.response401Unauthorized(
-                request.getProtocolVersion(), 
-                "Basic realm=\"iplusmed\"");
+                    request.getProtocolVersion(), 
+                    "Basic realm=\"iplusmed\"")
+                .doOnCompleted(new Action0() {
+                    @Override
+                    public void call() {
+                        memo.incBizResult(RESULT.HTTP_UNAUTHORIZED, 
+                                watch4Result.stopAndRestart());
+                    }});
         } else {
+            final StepMemo<STEP> stepmemo = 
+                    BizMemo.Util.buildStepMemo(memo, new StopWatch());
+            stepmemo.beginBizStep(STEP.ROUTING);
+            
             rewriteRequest(request);
             
-            final Target target = dispatch();
             final Observable<HttpObject> response = 
                 _httpClient.defineInteraction(
                     new InetSocketAddress(
                         target.serviceUri().getHost(), 
                         target.serviceUri().getPort()), 
-                        cached.request(),
-                        Feature.ENABLE_LOGGING)
-                    .filter(new Func1<Object, Boolean>() {
-                        @Override
-                        public Boolean call(Object in) {
-                            return in instanceof HttpObject;
-                        }})
-                     .map(new Func1<Object, HttpObject>() {
-                        @Override
-                        public HttpObject call(Object in) {
-                            return (HttpObject)in;
-                        }})
+                    cached.request()
                     .doOnNext(new Action1<HttpObject>() {
                         @Override
-                        public void call(final HttpObject obj) {
-                            if (obj instanceof HttpResponse) {
-    //                            stepmemo.beginBizStep(STEP.RECV_RESP);
-                                rewriteResponse((HttpResponse)obj);
+                        public void call(final HttpObject httpObj) {
+                            if (httpObj instanceof HttpRequest) {
+                                stepmemo.beginBizStep(STEP.TRANSFER_CONTENT);
                             }
+                        }}),
+                    Feature.ENABLE_LOGGING)
+                    .compose(RxNettys.objects2httpobjs())
+                    .doOnNext(new Action1<HttpObject>() {
+                        @Override
+                        public void call(final HttpObject httpObj) {
+                            if (httpObj instanceof HttpResponse) {
+                                stepmemo.beginBizStep(STEP.RECV_RESP);
+                                rewriteResponse((HttpResponse)httpObj);
+                            }
+                        }})
+                    .doOnError(new Action1<Throwable>() {
+                        @Override
+                        public void call(final Throwable e) {
+                            stepmemo.endBizStep();
+                            memo.incBizResult(RESULT.RELAY_FAILURE, watch4Result.stopAndRestart());
+                        }})
+                    .doOnCompleted(new Action0() {
+                        @Override
+                        public void call() {
+                            stepmemo.endBizStep();
+                            memo.incBizResult(RESULT.RELAY_SUCCESS, watch4Result.stopAndRestart());
                         }});
             return response;
         }
     }
 
     private final HttpClient _httpClient;
+    private final RelayMemo.Builder _memoBuilder;
 }

@@ -15,7 +15,6 @@ import org.jocean.idiom.stats.BizMemo;
 public interface RelayMemo extends BizMemo<RelayMemo.STEP, RelayMemo.RESULT> {
     public enum STEP { 
         ROUTING,
-        OBTAINING_HTTPCLIENT,
         TRANSFER_CONTENT,
         RECV_RESP,
     }

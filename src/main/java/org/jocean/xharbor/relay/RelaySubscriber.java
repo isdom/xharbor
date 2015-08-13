@@ -3,41 +3,24 @@
  */
 package org.jocean.xharbor.relay;
 
-import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponse;
-import io.netty.handler.codec.http.HttpVersion;
 
-import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.jocean.http.Feature;
-import org.jocean.http.client.HttpClient;
 import org.jocean.http.server.CachedRequest;
 import org.jocean.http.server.HttpServer.HttpTrade;
-import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.ExceptionUtils;
-import org.jocean.idiom.StopWatch;
-import org.jocean.idiom.stats.BizMemo;
-import org.jocean.idiom.stats.BizMemo.StepMemo;
 import org.jocean.xharbor.api.Dispatcher;
-import org.jocean.xharbor.api.RelayMemo;
-import org.jocean.xharbor.api.RelayMemo.RESULT;
-import org.jocean.xharbor.api.RelayMemo.STEP;
 import org.jocean.xharbor.api.Router;
 import org.jocean.xharbor.api.RoutingInfo;
-import org.jocean.xharbor.api.RoutingInfoMemo;
-import org.jocean.xharbor.api.Target;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import rx.Observable;
 import rx.Subscriber;
 import rx.functions.Action0;
-import rx.functions.Action1;
-import rx.functions.Func1;
 import rx.observers.SerializedSubscriber;
 
 /**
@@ -75,15 +58,15 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
             LoggerFactory.getLogger(RelaySubscriber.class);
 
     public RelaySubscriber(
-            final Router<HttpRequest, Dispatcher> router, 
-            final RelayMemo.Builder memoBuilder,
-            final RoutingInfoMemo   noRoutingMemo,
-            final HttpClient   httpClient
+            final Router<HttpRequest, Dispatcher> router
+//            final RelayMemo.Builder memoBuilder,
+//            final RoutingInfoMemo   noRoutingMemo,
+//            final HttpClient   httpClient
             ) {
         this._router = router;
-        this._memoBuilder = memoBuilder;
-        this._noRoutingMemo = noRoutingMemo;
-        this._httpClient = httpClient;
+//        this._memoBuilder = memoBuilder;
+//        this._noRoutingMemo = noRoutingMemo;
+//        this._httpClient = httpClient;
     }
     
     @Override
@@ -153,6 +136,7 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                     }})
                 .subscribe();
 
+                /*
                 if (false) {
                 final Target target = dispatcher.dispatch();
                 
@@ -283,13 +267,13 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                         _cached.destroy();
                     }})
                 .subscribe(_trade.responseObserver());
-                }
+                }*/
             }
         }
     };
     
-    private final HttpClient _httpClient;
-    private final RelayMemo.Builder _memoBuilder;
-    private final RoutingInfoMemo _noRoutingMemo;
+//    private final HttpClient _httpClient;
+//    private final RelayMemo.Builder _memoBuilder;
+//    private final RoutingInfoMemo _noRoutingMemo;
     private final Router<HttpRequest, Dispatcher> _router;
 }

@@ -25,6 +25,7 @@
         <constructor-arg ref="serviceMemo"/>
         <constructor-arg ref="httpClient"/>
         <constructor-arg ref="noRoutingMemo" />
+        <constructor-arg ref="memoBuilder" />
     </bean>
     
     <bean id="cachedRouter" class="org.jocean.xharbor.router.CachedRouter" 

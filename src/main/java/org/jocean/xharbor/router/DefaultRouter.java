@@ -15,6 +15,7 @@ import org.jocean.http.client.HttpClient;
 import org.jocean.http.server.CachedRequest;
 import org.jocean.http.util.RxNettys;
 import org.jocean.xharbor.api.Dispatcher;
+import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.Router;
 import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.api.RoutingInfoMemo;
@@ -45,6 +46,7 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
                     RouteLevel.NOP_NEEDAUTHORIZATION, 
                     null,
                     null,
+                    null,
                     null) {
         
         @Override
@@ -64,11 +66,13 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
     public DefaultRouter(
             final ServiceMemo   serviceMemo, 
             final HttpClient    httpClient,
-            final RoutingInfoMemo noRoutingMemo
+            final RoutingInfoMemo noRoutingMemo,
+            final RelayMemo.Builder memoBuilder
             ) {
         this._serviceMemo = serviceMemo;
         this._noRoutingMemo = noRoutingMemo;
         this._httpClient = httpClient;
+        this._memoBuilder = memoBuilder;
     }
     
     @Override
@@ -98,7 +102,8 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
                         result._needAuthorization, 
                         result._shortResponse,
                         this._serviceMemo,
-                        this._httpClient);
+                        this._httpClient,
+                        this._memoBuilder);
             }
         }
         return EMPTY_TARGETSET;
@@ -114,6 +119,7 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
     
     private final ServiceMemo _serviceMemo;
     private final RoutingInfoMemo _noRoutingMemo;
+    private final RelayMemo.Builder _memoBuilder;
     private final HttpClient _httpClient;
     private final SortedSet<RouteLevel> _levels = new ConcurrentSkipListSet<RouteLevel>();
 }
