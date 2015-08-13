@@ -40,7 +40,6 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
 
     private final TargetSet EMPTY_TARGETSET = 
             new TargetSet(RouteLevel.EMPTY_URIS, 
-                    false, 
                     RouteLevel.NOP_REQ_REWRITER, 
                     RouteLevel.NOP_RESP_REWRITER, 
                     RouteLevel.NOP_NEEDAUTHORIZATION, 
@@ -50,7 +49,7 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
                     null) {
         
         @Override
-        public Observable<? extends HttpObject> response(
+        public Observable<HttpObject> response(
                 final RoutingInfo info,
                 final HttpRequest request, 
                 final CachedRequest cached) {
@@ -96,7 +95,6 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
             if (null != result) {
                 return new TargetSet(
                         result._uris, 
-                        result._isCheckResponseStatus, 
                         result._rewriteRequest,
                         result._rewriteResponse,
                         result._needAuthorization, 

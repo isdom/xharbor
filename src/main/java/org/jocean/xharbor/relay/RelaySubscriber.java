@@ -8,6 +8,7 @@ import io.netty.handler.codec.http.HttpRequest;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jocean.http.server.CachedRequest;
 import org.jocean.http.server.HttpServer.HttpTrade;
@@ -21,6 +22,8 @@ import org.slf4j.LoggerFactory;
 import rx.Observable;
 import rx.Subscriber;
 import rx.functions.Action0;
+import rx.functions.Action1;
+import rx.functions.Func1;
 import rx.observers.SerializedSubscriber;
 
 /**
@@ -88,6 +91,29 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                 new RequestSubscriber(trade)));
     }
     
+    private static Observable<HttpObject> buildHttpResponse(
+            final Dispatcher dispatcher, 
+            final HttpRequest request,
+            final CachedRequest cached,
+            final RoutingInfo info,
+            final AtomicBoolean canRetry) {
+        return dispatcher.response(info, request, cached)
+            .onErrorResumeNext(new Func1<Throwable, Observable<HttpObject>>() {
+                @Override
+                public Observable<HttpObject> call(final Throwable e) {
+                    if (canRetry.get()) {
+                        return buildHttpResponse(dispatcher, request, cached, info, canRetry);
+                    } else {
+                        return Observable.error(e);
+                    }
+                }})
+            .doOnNext(new Action1<HttpObject>() {
+                @Override
+                public void call(final HttpObject httpObj) {
+                    canRetry.set(false);
+                }});
+    }
+    
     class RequestSubscriber extends Subscriber<HttpObject> {
         private final HttpTrade _trade;
         private HttpRequest _request;
@@ -121,18 +147,16 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                 final RoutingInfo info = routectx.getProperty("routingInfo");
                 routectx.clear();
                 
-                final Observable<? extends HttpObject> httpResponse = 
-                    dispatcher.response(info, _request, _cached);
-                _cached.request()
-                .doOnTerminate(new Action0() {
+                _cached.request().doOnCompleted(new Action0() {
                     @Override
                     public void call() {
-                        _cached.destroy();
-                    }})
-                .doOnCompleted(new Action0() {
-                    @Override
-                    public void call() {
-                        httpResponse.subscribe(_trade.responseObserver());
+                        buildHttpResponse(dispatcher, _request, _cached, info, new AtomicBoolean(true))
+                            .doOnTerminate(new Action0() {
+                                @Override
+                                public void call() {
+                                    _cached.destroy();
+                                }})
+                            .subscribe(_trade.responseObserver());
                     }})
                 .subscribe();
 

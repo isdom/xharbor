@@ -19,7 +19,7 @@ public interface Dispatcher {
     
     public boolean IsValid();
     
-    public Observable<? extends HttpObject> response(
+    public Observable<HttpObject> response(
             final RoutingInfo info,
             final HttpRequest request, 
             final CachedRequest cached);

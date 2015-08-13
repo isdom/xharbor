@@ -69,11 +69,6 @@ public class DefaultLevel implements RouteLevel {
         doReset();
     }
     
-    public DefaultLevel setIsCheckResponseStatus(final boolean isCheckResponseStatus) {
-        this._isCheckResponseStatus = isCheckResponseStatus;
-        return this;
-    }
-
     public void addRequestRewriter(final RequestRewriter rewriter) {
         this._requestRewriters.add(rewriter);
         doReset();
@@ -123,7 +118,6 @@ public class DefaultLevel implements RouteLevel {
         final Func1<HttpRequest, FullHttpResponse> shortResponse = genShortResponse(info);
         if (null!=shortResponse) {
             return new MatchResult(FAKE_URIS, 
-                    false,
                     NOP_REQ_REWRITER, 
                     NOP_RESP_REWRITER, 
                     NOP_NEEDAUTHORIZATION,
@@ -140,7 +134,6 @@ public class DefaultLevel implements RouteLevel {
         }
         return !ret.isEmpty() 
             ? new MatchResult(ret.toArray(EMPTY_URIS), 
-                    this._isCheckResponseStatus,
                     genRewriteRequest(info.getPath()), 
                     genRewriteResponse(info.getPath()), 
                     genNeedAuthorization(info.getPath()),
@@ -212,8 +205,6 @@ public class DefaultLevel implements RouteLevel {
     private final DefaultRouter _router;
     
     private final int _priority;
-    
-    private volatile boolean _isCheckResponseStatus;
     
     private Action0 _resetAction;
     

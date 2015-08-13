@@ -45,7 +45,6 @@ public class TargetSet implements Dispatcher {
     
     public TargetSet(
             final URI[] uris, 
-            final boolean isCheckResponseStatus, 
             final Action1<HttpRequest> rewriteRequest, 
             final Action1<HttpResponse> rewriteResponse, 
             final Func1<HttpRequest, Boolean> needAuthorization, 
@@ -57,7 +56,6 @@ public class TargetSet implements Dispatcher {
         this._memoBuilder = memoBuilder;
         this._httpClient = httpClient;
         this._serviceMemo = serviceMemo;
-        this._isCheckResponseStatus = isCheckResponseStatus;
         this._rewriteRequest = rewriteRequest;
         this._rewriteResponse = rewriteResponse;
         this._needAuthorization = needAuthorization;
@@ -138,34 +136,6 @@ public class TargetSet implements Dispatcher {
             return this._uri;
         }
         
-        /*
-        @Override
-        public void rewriteRequest(final HttpRequest request) {
-            _rewriteRequest.call(request);
-        }
-        
-        @Override
-        public void rewriteResponse(final HttpResponse response) {
-            _rewriteResponse.call(response);
-        }
-        
-        @Override
-        public boolean isNeedAuthorization(final HttpRequest httpRequest) {
-            return _needAuthorization.call(httpRequest);
-        }
-        
-        @Override
-        public boolean isCheckResponseStatus() {
-            return _isCheckResponseStatus;
-        }
-        
-        @Override
-        public FullHttpResponse needShortResponse(final HttpRequest httpRequest) {
-            return null!=_shortResponse ? _shortResponse.call(httpRequest) : null;
-        }
-        
-        */
-
         @Override
         public int addWeight(final int deltaWeight) {
             int weight = this._effectiveWeight.addAndGet(deltaWeight);
@@ -196,7 +166,6 @@ public class TargetSet implements Dispatcher {
     }
     
     private final ServiceMemo _serviceMemo;
-    private final boolean _isCheckResponseStatus;
     private final Action1<HttpRequest> _rewriteRequest;
     private final Action1<HttpResponse> _rewriteResponse;
     private final Func1<HttpRequest, Boolean> _needAuthorization;
@@ -220,7 +189,7 @@ public class TargetSet implements Dispatcher {
     }
     
     @Override
-    public Observable<? extends HttpObject> response(
+    public Observable<HttpObject> response(
             final RoutingInfo info,
             final HttpRequest request, 
             final CachedRequest cached) {
@@ -232,7 +201,7 @@ public class TargetSet implements Dispatcher {
         final FullHttpResponse shortResponse = 
                 needShortResponse(request);
         if (null != shortResponse) {
-            return Observable.just(shortResponse);
+            return Observable.<HttpObject>just(shortResponse);
         } else if (isNeedAuthorization(request)) {
             return RxNettys.response401Unauthorized(
                     request.getProtocolVersion(), 
