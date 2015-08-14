@@ -17,18 +17,21 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.jocean.http.Feature;
 import org.jocean.http.client.HttpClient;
-import org.jocean.http.server.CachedRequest;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.StopWatch;
+import org.jocean.idiom.rx.RxObservables;
 import org.jocean.idiom.stats.BizMemo;
 import org.jocean.idiom.stats.BizMemo.StepMemo;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.RelayMemo.RESULT;
+import org.jocean.xharbor.api.RelayMemo.STEP;
 import org.jocean.xharbor.api.RoutingInfo;
+import org.jocean.xharbor.api.RoutingInfoMemo;
 import org.jocean.xharbor.api.ServiceMemo;
 import org.jocean.xharbor.api.Target;
-import org.jocean.xharbor.api.RelayMemo.STEP;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import rx.Observable;
 import rx.functions.Action0;
@@ -40,6 +43,9 @@ import rx.functions.Func1;
  *
  */
 public class TargetSet implements Dispatcher {
+    
+    private static final Logger LOG = LoggerFactory
+            .getLogger(TargetSet.class);
 
     private static final int MAX_EFFECTIVEWEIGHT = 1000;
     
@@ -51,8 +57,10 @@ public class TargetSet implements Dispatcher {
             final Func1<HttpRequest, FullHttpResponse> shortResponse,
             final ServiceMemo serviceMemo, 
             final HttpClient httpClient,
-            final RelayMemo.Builder memoBuilder
+            final RelayMemo.Builder memoBuilder,
+            final RoutingInfoMemo noRoutingMemo
             ) {
+        this._noRoutingMemo = noRoutingMemo;
         this._memoBuilder = memoBuilder;
         this._httpClient = httpClient;
         this._serviceMemo = serviceMemo;
@@ -192,39 +200,53 @@ public class TargetSet implements Dispatcher {
     public Observable<HttpObject> response(
             final RoutingInfo info,
             final HttpRequest request, 
-            final CachedRequest cached) {
+            final Observable<HttpObject> fullRequest) {
         
         final Target target = dispatch();
+        if (null==target) {
+            LOG.warn("can't found matched target service for request:[{}]\njust return 200 OK.", 
+                    request);
+            _noRoutingMemo.incRoutingInfo(info);
+            //   TODO, mark this status
+    //        setEndReason("relay.NOROUTING");
+            return RxObservables.delaySubscriptionUntilCompleted(
+                    RxNettys.response200OK(request.getProtocolVersion()),
+                    fullRequest);
+        }
+        
         final RelayMemo memo = _memoBuilder.build(target, info);
         final StopWatch watch4Result = new StopWatch();
         
         final FullHttpResponse shortResponse = 
                 needShortResponse(request);
         if (null != shortResponse) {
-            return Observable.<HttpObject>just(shortResponse);
+            return RxObservables.delaySubscriptionUntilCompleted(
+                    Observable.<HttpObject>just(shortResponse),
+                    fullRequest);
         } else if (isNeedAuthorization(request)) {
-            return RxNettys.response401Unauthorized(
-                    request.getProtocolVersion(), 
-                    "Basic realm=\"iplusmed\"")
-                .doOnCompleted(new Action0() {
-                    @Override
-                    public void call() {
-                        memo.incBizResult(RESULT.HTTP_UNAUTHORIZED, 
-                                watch4Result.stopAndRestart());
-                    }});
+            return RxObservables.delaySubscriptionUntilCompleted(
+                    RxNettys.response401Unauthorized(
+                            request.getProtocolVersion(), 
+                            "Basic realm=\"iplusmed\"")
+                        .doOnCompleted(new Action0() {
+                            @Override
+                            public void call() {
+                                memo.incBizResult(RESULT.HTTP_UNAUTHORIZED, 
+                                        watch4Result.stopAndRestart());
+                            }}),
+                    fullRequest);
         } else {
             final StepMemo<STEP> stepmemo = 
-                    BizMemo.Util.buildStepMemo(memo, new StopWatch());
+                BizMemo.Util.buildStepMemo(memo, new StopWatch());
             stepmemo.beginBizStep(STEP.ROUTING);
             
             rewriteRequest(request);
             
-            final Observable<HttpObject> response = 
-                _httpClient.defineInteraction(
+            return _httpClient.defineInteraction(
                     new InetSocketAddress(
                         target.serviceUri().getHost(), 
                         target.serviceUri().getPort()), 
-                    cached.request()
+                    fullRequest
                     .doOnNext(new Action1<HttpObject>() {
                         @Override
                         public void call(final HttpObject httpObj) {
@@ -254,10 +276,10 @@ public class TargetSet implements Dispatcher {
                             stepmemo.endBizStep();
                             memo.incBizResult(RESULT.RELAY_SUCCESS, watch4Result.stopAndRestart());
                         }});
-            return response;
         }
     }
 
     private final HttpClient _httpClient;
     private final RelayMemo.Builder _memoBuilder;
+    private final RoutingInfoMemo _noRoutingMemo;
 }

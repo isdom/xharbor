@@ -64,9 +64,6 @@
         <constructor-arg>
             <bean class="org.jocean.xharbor.relay.RelaySubscriber">
                 <constructor-arg ref="router" />
-                <constructor-arg ref="memoBuilder" />
-                <constructor-arg ref="noRoutingMemo" />
-                <constructor-arg ref="httpClient" />
             </bean>
         </constructor-arg>
     </bean>

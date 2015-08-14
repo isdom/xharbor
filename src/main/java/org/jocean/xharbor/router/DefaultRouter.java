@@ -12,8 +12,8 @@ import java.util.SortedSet;
 import java.util.concurrent.ConcurrentSkipListSet;
 
 import org.jocean.http.client.HttpClient;
-import org.jocean.http.server.CachedRequest;
 import org.jocean.http.util.RxNettys;
+import org.jocean.idiom.rx.RxObservables;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.Router;
@@ -46,19 +46,22 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
                     null,
                     null,
                     null,
+                    null,
                     null) {
         
         @Override
         public Observable<HttpObject> response(
                 final RoutingInfo info,
                 final HttpRequest request, 
-                final CachedRequest cached) {
+                final Observable<HttpObject> fullRequest) {
             LOG.warn("can't found matched target service for request:[{}]\njust return 200 OK.", 
                     request);
-            //   TODO, mark this status
             _noRoutingMemo.incRoutingInfo(info);
+            //   TODO, mark this status
 //            setEndReason("relay.NOROUTING");
-            return RxNettys.response200OK(request.getProtocolVersion());
+            return RxObservables.delaySubscriptionUntilCompleted(
+                    RxNettys.response200OK(request.getProtocolVersion()),
+                    fullRequest);
         }
     };
 
@@ -101,7 +104,8 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
                         result._shortResponse,
                         this._serviceMemo,
                         this._httpClient,
-                        this._memoBuilder);
+                        this._memoBuilder,
+                        this._noRoutingMemo);
             }
         }
         return EMPTY_TARGETSET;

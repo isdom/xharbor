@@ -60,16 +60,8 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
     private static final Logger LOG =
             LoggerFactory.getLogger(RelaySubscriber.class);
 
-    public RelaySubscriber(
-            final Router<HttpRequest, Dispatcher> router
-//            final RelayMemo.Builder memoBuilder,
-//            final RoutingInfoMemo   noRoutingMemo,
-//            final HttpClient   httpClient
-            ) {
+    public RelaySubscriber(final Router<HttpRequest, Dispatcher> router) {
         this._router = router;
-//        this._memoBuilder = memoBuilder;
-//        this._noRoutingMemo = noRoutingMemo;
-//        this._httpClient = httpClient;
     }
     
     @Override
@@ -94,15 +86,15 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
     private static Observable<HttpObject> buildHttpResponse(
             final Dispatcher dispatcher, 
             final HttpRequest request,
-            final CachedRequest cached,
+            final Observable<HttpObject> fullRequest,
             final RoutingInfo info,
             final AtomicBoolean canRetry) {
-        return dispatcher.response(info, request, cached)
+        return dispatcher.response(info, request, fullRequest)
             .onErrorResumeNext(new Func1<Throwable, Observable<HttpObject>>() {
                 @Override
                 public Observable<HttpObject> call(final Throwable e) {
                     if (canRetry.get()) {
-                        return buildHttpResponse(dispatcher, request, cached, info, canRetry);
+                        return buildHttpResponse(dispatcher, request, fullRequest, info, canRetry);
                     } else {
                         return Observable.error(e);
                     }
@@ -116,7 +108,6 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
     
     class RequestSubscriber extends Subscriber<HttpObject> {
         private final HttpTrade _trade;
-        private HttpRequest _request;
         private final CachedRequest _cached;
       
         RequestSubscriber(final HttpTrade trade) {
@@ -140,164 +131,23 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
         @Override
         public void onNext(final HttpObject msg) {
             if (msg instanceof HttpRequest) {
-                this._request = (HttpRequest)msg;
+                final HttpRequest req = (HttpRequest)msg;
                 final RouterCtxImpl routectx = new RouterCtxImpl();
                 
-                final Dispatcher dispatcher = _router.calculateRoute(this._request, routectx);
+                final Dispatcher dispatcher = _router.calculateRoute(req, routectx);
                 final RoutingInfo info = routectx.getProperty("routingInfo");
                 routectx.clear();
                 
-                _cached.request().doOnCompleted(new Action0() {
-                    @Override
-                    public void call() {
-                        buildHttpResponse(dispatcher, _request, _cached, info, new AtomicBoolean(true))
-                            .doOnTerminate(new Action0() {
-                                @Override
-                                public void call() {
-                                    _cached.destroy();
-                                }})
-                            .subscribe(_trade.responseObserver());
-                    }})
-                .subscribe();
-
-                /*
-                if (false) {
-                final Target target = dispatcher.dispatch();
-                
-                if ( null == target ) {
-                    LOG.warn("can't found matched target service for request:[{}]\njust return 200 OK for trade ({}).", 
-                            msg, this._trade);
-                    _noRoutingMemo.incRoutingInfo(info);
-//                    setEndReason("relay.NOROUTING");
-                    final HttpVersion version = _request.getProtocolVersion();
-                    _cached.request()
+                buildHttpResponse(dispatcher, req, _cached.request(), info, new AtomicBoolean(true))
                     .doOnTerminate(new Action0() {
                         @Override
                         public void call() {
                             _cached.destroy();
                         }})
-                    .doOnCompleted(new Action0() {
-                        @Override
-                        public void call() {
-                            RxNettys.response200OK(version)
-                                .subscribe(_trade.responseObserver());
-                        }})
-                    .subscribe();
-                    return;
-                }
-                
-                {
-                    // response direct
-                    final FullHttpResponse response = 
-                            target.needShortResponse(this._request);
-                    if (null != response) {
-                        _cached.request()
-                        .doOnTerminate(new Action0() {
-                            @Override
-                            public void call() {
-                                _cached.destroy();
-                            }})
-                        .doOnCompleted(new Action0() {
-                            @Override
-                            public void call() {
-                                Observable.just(response).subscribe(
-                                        _trade.responseObserver());
-                            }
-                        }).subscribe();
-                        return;
-                    }
-                }
-                
-                final RelayMemo memo = _memoBuilder.build(target, info);
-                final StopWatch watch4Result = new StopWatch();
-                final StepMemo<STEP> stepmemo = 
-                        BizMemo.Util.buildStepMemo(memo, new StopWatch());
-                
-                if (target.isNeedAuthorization(this._request)) {
-//                    setEndReason("relay.HTTP_UNAUTHORIZED");
-                    final HttpVersion version = _request.getProtocolVersion();
-                    _cached.request()
-                    .doOnTerminate(new Action0() {
-                        @Override
-                        public void call() {
-                            _cached.destroy();
-                        }})
-                    .doOnCompleted(new Action0() {
-                        @Override
-                        public void call() {
-                            memo.incBizResult(RESULT.HTTP_UNAUTHORIZED, watch4Result.stopAndRestart());
-                            RxNettys.response401Unauthorized(
-                                    version,
-                                    "Basic realm=\"iplusmed\"")
-                                .subscribe(_trade.responseObserver());
-                        }})
-                    .subscribe();
-                    return;
-                }
-                
-//                _transformer = _target.getHttpRequestTransformerOf(_requestWrapper.request());
-//                
-                //  ?
-                stepmemo.beginBizStep(STEP.ROUTING);
-//                
-                if ( LOG.isDebugEnabled() ) {
-                    LOG.debug("dispatch to ({}) for request({})", target.serviceUri(), msg);
-                }
-                
-                stepmemo.beginBizStep(STEP.TRANSFER_CONTENT);
-                
-                //  add temp for enable rewrite 2015.03.26
-                //  modify rewrite path to rewrite request
-                target.rewriteRequest(this._request);
-                
-                final Observable<HttpObject> response = 
-                    _httpClient.defineInteraction(
-                        new InetSocketAddress(
-                            target.serviceUri().getHost(), 
-                            target.serviceUri().getPort()), 
-                            _cached.request(),
-                            Feature.ENABLE_LOGGING)
-                        .filter(new Func1<Object, Boolean>() {
-                            @Override
-                            public Boolean call(Object in) {
-                                return in instanceof HttpObject;
-                            }})
-                         .map(new Func1<Object, HttpObject>() {
-                            @Override
-                            public HttpObject call(Object in) {
-                                return (HttpObject)in;
-                            }});
-                response
-                .doOnNext(new Action1<HttpObject>() {
-                    @Override
-                    public void call(final HttpObject obj) {
-                        if (obj instanceof HttpResponse) {
-                            stepmemo.beginBizStep(STEP.RECV_RESP);
-                            target.rewriteResponse((HttpResponse)obj);
-                        }
-                    }})
-                .doOnError(new Action1<Throwable>() {
-                    @Override
-                    public void call(final Throwable e) {
-                        stepmemo.endBizStep();
-                        memo.incBizResult(RESULT.RELAY_FAILURE, watch4Result.stopAndRestart());
-                        _cached.destroy();
-                    }})
-                .doOnCompleted(new Action0() {
-                    @Override
-                    public void call() {
-                        stepmemo.endBizStep();
-                        memo.incBizResult(RESULT.RELAY_SUCCESS, watch4Result.stopAndRestart());
-                        _cached.destroy();
-                    }})
-                .subscribe(_trade.responseObserver());
-                }*/
+                    .subscribe(_trade.responseObserver());
             }
         }
     };
     
-//    private final HttpClient _httpClient;
-//    private final RelayMemo.Builder _memoBuilder;
-//    private final RoutingInfoMemo _noRoutingMemo;
     private final Router<HttpRequest, Dispatcher> _router;
 }

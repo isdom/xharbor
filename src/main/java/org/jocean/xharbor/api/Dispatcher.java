@@ -3,8 +3,6 @@
  */
 package org.jocean.xharbor.api;
 
-import org.jocean.http.server.CachedRequest;
-
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import rx.Observable;
@@ -22,5 +20,5 @@ public interface Dispatcher {
     public Observable<HttpObject> response(
             final RoutingInfo info,
             final HttpRequest request, 
-            final CachedRequest cached);
+            final Observable<HttpObject> fullRequest);
 }
