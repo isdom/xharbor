@@ -85,7 +85,7 @@ public class TargetSet implements Dispatcher {
             this.add("rewriteRequest:" + _rewriteRequest.toString());
             this.add("authorize:" + _needAuthorization.toString());
             for (TargetImpl peer : _targets) {
-                this.add(peer._uri.toString() + ":down(" + isTargetDown(peer)
+                this.add(peer._uri.toString() + ":active(" + isTargetActive(peer)
                         + "):effectiveWeight(" + peer._effectiveWeight.get()
                         + "):currentWeight(" + peer._currentWeight.get()
                         + ")"
@@ -99,7 +99,7 @@ public class TargetSet implements Dispatcher {
         int total = 0;
         TargetImpl best = null;
         for ( TargetImpl peer : this._targets ) {
-            if ( !isTargetDown(peer) ) {
+            if ( !isTargetActive(peer) ) {
                 // peer->current_weight += peer->effective_weight; 
                 final int effectiveWeight = peer._effectiveWeight.get();
                 final int currentWeight = peer._currentWeight.addAndGet( effectiveWeight );
@@ -133,8 +133,8 @@ public class TargetSet implements Dispatcher {
      * @param peer
      * @return
      */
-    private boolean isTargetDown(final TargetImpl peer) {
-        return this._serviceMemo.isServiceDown(peer._uri) || peer._down.get();
+    private boolean isTargetActive(final TargetImpl peer) {
+        return !(this._serviceMemo.isServiceDown(peer._uri) || peer._down.get());
     }
     
     private class TargetImpl implements Target {
