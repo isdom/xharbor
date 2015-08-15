@@ -66,8 +66,8 @@ public class DefaultDispatcher implements Dispatcher {
         this._serviceMemo = serviceMemo;
         this._rewriteRequest = rewriteRequest;
         this._rewriteResponse = rewriteResponse;
-        this._needAuthorization = needAuthorization;
-        this._shortResponse = shortResponse;
+        this._authorization = needAuthorization;
+        this._responser = shortResponse;
         this._targets = new ArrayList<TargetImpl>() {
             private static final long serialVersionUID = 1L;
         {
@@ -83,7 +83,7 @@ public class DefaultDispatcher implements Dispatcher {
             private static final long serialVersionUID = 1L;
         {
             this.add("rewriteRequest:" + _rewriteRequest.toString());
-            this.add("authorize:" + _needAuthorization.toString());
+            this.add("authorize:" + _authorization.toString());
             for (TargetImpl peer : _targets) {
                 this.add(peer._uri.toString() + ":active(" + isTargetActive(peer)
                         + "):effectiveWeight(" + peer._effectiveWeight.get()
@@ -176,16 +176,16 @@ public class DefaultDispatcher implements Dispatcher {
     private final ServiceMemo _serviceMemo;
     private final Action1<HttpRequest> _rewriteRequest;
     private final Action1<HttpResponse> _rewriteResponse;
-    private final Func1<HttpRequest, Boolean> _needAuthorization;
-    private final Func1<HttpRequest, FullHttpResponse> _shortResponse;
+    private final Func1<HttpRequest, Boolean> _authorization;
+    private final Func1<HttpRequest, FullHttpResponse> _responser;
     private final TargetImpl[] _targets;
 
-    private FullHttpResponse needShortResponse(final HttpRequest httpRequest) {
-        return null!=_shortResponse ? _shortResponse.call(httpRequest) : null;
+    private FullHttpResponse tryResponse(final HttpRequest httpRequest) {
+        return null!=_responser ? _responser.call(httpRequest) : null;
     }
     
     private boolean isNeedAuthorization(final HttpRequest httpRequest) {
-        return _needAuthorization.call(httpRequest);
+        return _authorization.call(httpRequest);
     }
     
     private void rewriteRequest(final HttpRequest request) {
@@ -218,7 +218,7 @@ public class DefaultDispatcher implements Dispatcher {
         final StopWatch watch4Result = new StopWatch();
         
         final FullHttpResponse shortResponse = 
-                needShortResponse(request);
+                tryResponse(request);
         if (null != shortResponse) {
             return RxObservables.delaySubscriptionUntilCompleted(
                     Observable.<HttpObject>just(shortResponse),
