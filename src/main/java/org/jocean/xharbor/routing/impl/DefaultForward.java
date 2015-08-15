@@ -4,11 +4,11 @@ import java.net.URI;
 import java.util.regex.Pattern;
 
 import org.jocean.xharbor.api.RoutingInfo;
-import org.jocean.xharbor.routing.RouteLevel;
-import org.jocean.xharbor.routing.RouteRule;
+import org.jocean.xharbor.routing.RuleSet;
+import org.jocean.xharbor.routing.ForwardRule;
 
-public class DefaultRule implements RouteRule {
-    public DefaultRule(final RouteLevel level, 
+public class DefaultForward implements ForwardRule {
+    public DefaultForward(final RuleSet level, 
             final String uri,
             final String methodPattern, 
             final String pathPattern) throws Exception {
@@ -17,11 +17,11 @@ public class DefaultRule implements RouteRule {
         this._methodPattern = safeCompilePattern(methodPattern);
         this._pathPattern = safeCompilePattern(pathPattern);
         
-        this._level.addRule(this);
+        this._level.addForward(this);
     }
     
     public void stop() {
-        this._level.removeRule(this);
+        this._level.removeForward(this);
     }
     
     public URI match(final RoutingInfo info) {
@@ -46,7 +46,7 @@ public class DefaultRule implements RouteRule {
                 + ",path=" + _pathPattern + "]";
     }
 
-    private final RouteLevel _level;
+    private final RuleSet _level;
     private final URI _uri;
     private final Pattern _methodPattern;
     private final Pattern _pathPattern;

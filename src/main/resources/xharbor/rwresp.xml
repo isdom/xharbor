@@ -4,11 +4,13 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
     
-    <bean id="level" class="org.jocean.xharbor.routing.impl.DefaultLevel" 
+    <bean id="extraHeaders" class="java.util.concurrent.ConcurrentHashMap"/>
+    
+    <bean class="org.jocean.xharbor.routing.impl.ResponseHeaderRewriter" 
         destroy-method="stop">
-        <constructor-arg value="${level}"/>
-        <constructor-arg ref="defaultRouter"/>
-        <property name="resetAction" ref="resetAction"/>
+        <constructor-arg ref="ruleSet"/>
+        <constructor-arg value="${rewrite.path}"/>
+        <constructor-arg ref="extraHeaders"/>
     </bean>
     
 </beans>

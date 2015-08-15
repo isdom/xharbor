@@ -6,6 +6,6 @@ import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpRequest;
 import rx.functions.Func1;
 
-public interface Responser {
-    public Func1<HttpRequest, FullHttpResponse> genShortResponse(final RoutingInfo info);
+public interface RespondRule {
+    public Func1<HttpRequest, FullHttpResponse> genResponser(final RoutingInfo info);
 }

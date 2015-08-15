@@ -4,6 +4,6 @@ import java.net.URI;
 
 import org.jocean.xharbor.api.RoutingInfo;
 
-public interface RouteRule {
+public interface ForwardRule {
     public URI match(final RoutingInfo info);
 }

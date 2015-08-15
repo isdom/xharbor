@@ -12,7 +12,7 @@ import org.jocean.xharbor.api.RoutingInfo;
 import rx.functions.Action1;
 import rx.functions.Func1;
 
-public interface RouteLevel extends Comparable<RouteLevel> {
+public interface RuleSet extends Comparable<RuleSet> {
     
     static final URI[] EMPTY_URIS = new URI[0];
     
@@ -32,7 +32,7 @@ public interface RouteLevel extends Comparable<RouteLevel> {
         public String toString() {
             return "NOP Response Rewriter";
         }};
-    static final Func1<HttpRequest, Boolean> NOP_NEEDAUTHORIZATION = new Func1<HttpRequest, Boolean>() {
+    static final Func1<HttpRequest, Boolean> NOP_AUTHORIZATION = new Func1<HttpRequest, Boolean>() {
         @Override
         public Boolean call(final HttpRequest request) {
             return false;
@@ -46,43 +46,43 @@ public interface RouteLevel extends Comparable<RouteLevel> {
         public final URI[] _uris;
         public final Action1<HttpRequest> _rewriteRequest;
         public final Action1<HttpResponse> _rewriteResponse;
-        public final Func1<HttpRequest, Boolean> _needAuthorization;
-        public final Func1<HttpRequest,FullHttpResponse> _shortResponse;
+        public final Func1<HttpRequest, Boolean> _authorization;
+        public final Func1<HttpRequest,FullHttpResponse> _responses;
         
         public MatchResult(final URI[] uris, 
                 final Action1<HttpRequest> rewriteRequest,
                 final Action1<HttpResponse> rewriteResponse, 
-                final Func1<HttpRequest, Boolean> needAuthorization, 
-                final Func1<HttpRequest,FullHttpResponse> shortResponse) {
+                final Func1<HttpRequest, Boolean> authorization, 
+                final Func1<HttpRequest,FullHttpResponse> responser) {
             this._uris = uris;
             this._rewriteRequest = rewriteRequest;
             this._rewriteResponse = rewriteResponse;
-            this._needAuthorization = needAuthorization;
-            this._shortResponse = shortResponse;
+            this._authorization = authorization;
+            this._responses = responser;
         }
     }
     
     public int getPriority();
 
-    public void addRule(final RouteRule rule);
+    public void addForward(final ForwardRule forward);
     
-    public void removeRule(final RouteRule rule);
+    public void removeForward(final ForwardRule forward);
     
-    public void addRequestRewriter(final RequestRewriter rewriter);
+    public void addRequestRewriter(final RewriteRequestRule rewriter);
     
-    public void removeRequestRewriter(final RequestRewriter rewriter);
+    public void removeRequestRewriter(final RewriteRequestRule rewriter);
     
-    public void addResponseRewriter(final ResponseRewriter rewriter);
+    public void addResponseRewriter(final RewriteResponseRule rewriter);
     
-    public void removeResponseRewriter(final ResponseRewriter rewriter);
+    public void removeResponseRewriter(final RewriteResponseRule rewriter);
     
-    public void addPathAuthorizer(final PathAuthorizer authorizer);
+    public void addAuthorization(final AuthorizationRule authorizer);
     
-    public void removePathAuthorizer(final PathAuthorizer authorizer);
+    public void removeAuthorization(final AuthorizationRule authorizer);
     
-    public void addResponser(final Responser responser);
+    public void addRespond(final RespondRule responser);
     
-    public void removeResponser(final Responser responser);
+    public void removeRespond(final RespondRule responser);
     
     public MatchResult match(final RoutingInfo info);
 

@@ -1,7 +1,7 @@
 /**
  * 
  */
-package org.jocean.xharbor.util;
+package org.jocean.xharbor.router;
 
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpObject;
@@ -42,14 +42,14 @@ import rx.functions.Func1;
  * @author isdom
  *
  */
-public class TargetSet implements Dispatcher {
+public class DefaultDispatcher implements Dispatcher {
     
     private static final Logger LOG = LoggerFactory
-            .getLogger(TargetSet.class);
+            .getLogger(DefaultDispatcher.class);
 
     private static final int MAX_EFFECTIVEWEIGHT = 1000;
     
-    public TargetSet(
+    public DefaultDispatcher(
             final URI[] uris, 
             final Action1<HttpRequest> rewriteRequest, 
             final Action1<HttpResponse> rewriteResponse, 

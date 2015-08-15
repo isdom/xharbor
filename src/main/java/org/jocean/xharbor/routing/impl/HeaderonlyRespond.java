@@ -10,14 +10,14 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 import org.jocean.xharbor.api.RoutingInfo;
-import org.jocean.xharbor.routing.Responser;
-import org.jocean.xharbor.routing.RouteLevel;
+import org.jocean.xharbor.routing.RespondRule;
+import org.jocean.xharbor.routing.RuleSet;
 
 import rx.functions.Func1;
 
-public class HeaderonlyResponser implements Responser {
-    public HeaderonlyResponser(
-            final RouteLevel level,
+public class HeaderonlyRespond implements RespondRule {
+    public HeaderonlyRespond(
+            final RuleSet level,
             final String methodPattern, 
             final String pathPattern, 
             final int responseStatus, 
@@ -28,15 +28,15 @@ public class HeaderonlyResponser implements Responser {
         this._responseStatus = responseStatus;
         this._extraHeaders = extraHeaders;
         
-        this._level.addResponser(this);
+        this._level.addRespond(this);
     }
     
     public void stop() {
-        this._level.removeResponser(this);
+        this._level.removeRespond(this);
     }
     
     @Override
-    public Func1<HttpRequest, FullHttpResponse> genShortResponse(final RoutingInfo info) {
+    public Func1<HttpRequest, FullHttpResponse> genResponser(final RoutingInfo info) {
         if (isMatch(this._pathPattern, info.getPath())
            && isMatch(this._methodPattern, info.getMethod())) {
             return _func1;
@@ -68,7 +68,7 @@ public class HeaderonlyResponser implements Responser {
             return response;
         }};
         
-    private final RouteLevel _level;
+    private final RuleSet _level;
     private final Pattern _pathPattern;
     private final Pattern _methodPattern;
     private final int _responseStatus;

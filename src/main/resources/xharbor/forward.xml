@@ -4,12 +4,12 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
     
-    <bean class="org.jocean.xharbor.routing.impl.DefaultAuthorizer" 
+    <bean class="org.jocean.xharbor.routing.impl.DefaultForward" 
         destroy-method="stop">
-        <constructor-arg ref="level"/>
-        <constructor-arg value="${auth.path}"/>
-        <constructor-arg value="${auth.user}"/>
-        <constructor-arg value="${auth.password}"/>
+        <constructor-arg ref="ruleSet"/>
+        <constructor-arg value="${forward.to}"/>
+        <constructor-arg value="${forward.method:}"/>
+        <constructor-arg value="${forward.path}"/>
     </bean>
     
 </beans>

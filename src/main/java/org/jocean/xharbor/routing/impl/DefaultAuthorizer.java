@@ -9,8 +9,9 @@ import java.util.regex.Pattern;
 
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.Pair;
-import org.jocean.xharbor.routing.PathAuthorizer;
-import org.jocean.xharbor.routing.RouteLevel;
+import org.jocean.xharbor.api.RoutingInfo;
+import org.jocean.xharbor.routing.AuthorizationRule;
+import org.jocean.xharbor.routing.RuleSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,13 +19,13 @@ import rx.functions.Func1;
 
 import com.google.common.io.BaseEncoding;
 
-public class DefaultAuthorizer implements PathAuthorizer {
+public class DefaultAuthorizer implements AuthorizationRule {
     
     private static final Logger LOG = LoggerFactory
             .getLogger(DefaultAuthorizer.class);
     
     public DefaultAuthorizer(
-            final RouteLevel level,
+            final RuleSet level,
             final String pathPattern, 
             final String user, 
             final String password) {
@@ -33,16 +34,16 @@ public class DefaultAuthorizer implements PathAuthorizer {
         this._user = user;
         this._password = password;
         
-        this._level.addPathAuthorizer(this);
+        this._level.addAuthorization(this);
     }
     
     public void stop() {
-        this._level.removePathAuthorizer(this);
+        this._level.removeAuthorization(this);
     }
     
     @Override
-    public Func1<HttpRequest, Boolean> genNeedAuthorization(final String path) {
-        final Matcher matcher = this._pathPattern.matcher(path);
+    public Func1<HttpRequest, Boolean> genAuthorization(final RoutingInfo info) {
+        final Matcher matcher = this._pathPattern.matcher(info.getPath());
         if ( matcher.find() ) {
             return new Func1<HttpRequest, Boolean>() {
                 @Override
@@ -112,7 +113,7 @@ public class DefaultAuthorizer implements PathAuthorizer {
         return null != regex && !"".equals(regex) ? Pattern.compile(regex) : null;
     }
     
-    private final RouteLevel _level;
+    private final RuleSet _level;
     private final Pattern _pathPattern;
     private final String _user;
     private final String _password;

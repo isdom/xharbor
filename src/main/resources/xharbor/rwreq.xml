@@ -4,12 +4,11 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
     
-    <bean class="org.jocean.xharbor.routing.impl.DefaultRule" 
+    <bean class="org.jocean.xharbor.routing.impl.RequestPathRewriter" 
         destroy-method="stop">
-        <constructor-arg ref="level"/>
-        <constructor-arg value="${rule.uri}"/>
-        <constructor-arg value="${rule.method:}"/>
-        <constructor-arg value="${rule.path}"/>
+        <constructor-arg ref="ruleSet"/>
+        <constructor-arg value="${rewrite.path}"/>
+        <constructor-arg value="${rewrite.to}"/>
     </bean>
     
 </beans>

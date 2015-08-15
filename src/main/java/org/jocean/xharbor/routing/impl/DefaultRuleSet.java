@@ -12,12 +12,12 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.router.DefaultRouter;
-import org.jocean.xharbor.routing.PathAuthorizer;
-import org.jocean.xharbor.routing.RequestRewriter;
-import org.jocean.xharbor.routing.ResponseRewriter;
-import org.jocean.xharbor.routing.Responser;
-import org.jocean.xharbor.routing.RouteLevel;
-import org.jocean.xharbor.routing.RouteRule;
+import org.jocean.xharbor.routing.AuthorizationRule;
+import org.jocean.xharbor.routing.RewriteRequestRule;
+import org.jocean.xharbor.routing.RewriteResponseRule;
+import org.jocean.xharbor.routing.RespondRule;
+import org.jocean.xharbor.routing.RuleSet;
+import org.jocean.xharbor.routing.ForwardRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,11 +25,11 @@ import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.functions.Func1;
 
-public class DefaultLevel implements RouteLevel {
+public class DefaultRuleSet implements RuleSet {
     
     @SuppressWarnings("unused")
     private static final Logger LOG = LoggerFactory
-            .getLogger(DefaultLevel.class);
+            .getLogger(DefaultRuleSet.class);
     
     static final URI[] FAKE_URIS = new URI[1];
     
@@ -40,18 +40,18 @@ public class DefaultLevel implements RouteLevel {
         }
     }
     
-    public DefaultLevel(final int priority, final DefaultRouter router) {
+    public DefaultRuleSet(final int priority, final DefaultRouter router) {
         this._priority = priority;
         this._router = router;
-        this._router.addLevel(this);
+        this._router.addRules(this);
     }
     
     public void stop() {
-        this._router.removeLevel(this);
+        this._router.removeRules(this);
     }
     
     @Override
-    public int compareTo(final RouteLevel o) {
+    public int compareTo(final RuleSet o) {
         return o.getPriority() - this._priority;
     }
     
@@ -59,91 +59,91 @@ public class DefaultLevel implements RouteLevel {
         return this._priority;
     }
 
-    public void addRule(final RouteRule rule) {
-        this._rules.add(rule);
+    public void addForward(final ForwardRule forward) {
+        this._forwards.add(forward);
         doReset();
     }
     
-    public void removeRule(final RouteRule rule) {
-        this._rules.remove(rule);
+    public void removeForward(final ForwardRule forward) {
+        this._forwards.remove(forward);
         doReset();
     }
     
-    public void addRequestRewriter(final RequestRewriter rewriter) {
+    public void addRequestRewriter(final RewriteRequestRule rewriter) {
         this._requestRewriters.add(rewriter);
         doReset();
     }
     
-    public void removeRequestRewriter(final RequestRewriter rewriter) {
+    public void removeRequestRewriter(final RewriteRequestRule rewriter) {
         this._requestRewriters.remove(rewriter);
         doReset();
     }
     
     @Override
-    public void addResponseRewriter(final ResponseRewriter rewriter) {
+    public void addResponseRewriter(final RewriteResponseRule rewriter) {
         this._responseRewriters.add(rewriter);
         doReset();
     }
 
     @Override
-    public void removeResponseRewriter(final ResponseRewriter rewriter) {
+    public void removeResponseRewriter(final RewriteResponseRule rewriter) {
         this._responseRewriters.remove(rewriter);
         doReset();
     }
     
-    public void addPathAuthorizer(final PathAuthorizer authorizer) {
+    public void addAuthorization(final AuthorizationRule authorizer) {
         this._authorizations.add(authorizer);
         doReset();
     }
     
-    public void removePathAuthorizer(final PathAuthorizer authorizer) {
+    public void removeAuthorization(final AuthorizationRule authorizer) {
         this._authorizations.remove(authorizer);
         doReset();
     }
     
     @Override
-    public void addResponser(final Responser responser) {
-        this._responsers.add(responser);
+    public void addRespond(final RespondRule respond) {
+        this._responds.add(respond);
         doReset();
     }
 
     @Override
-    public void removeResponser(final Responser responser) {
-        this._responsers.remove(responser);
+    public void removeRespond(final RespondRule respond) {
+        this._responds.remove(respond);
         doReset();
     }
     
     @Override
     public MatchResult match(final RoutingInfo info) {
-        final Func1<HttpRequest, FullHttpResponse> shortResponse = genShortResponse(info);
-        if (null!=shortResponse) {
+        final Func1<HttpRequest, FullHttpResponse> responser = genShortResponse(info);
+        if (null!=responser) {
             return new MatchResult(FAKE_URIS, 
                     NOP_REQ_REWRITER, 
                     NOP_RESP_REWRITER, 
-                    NOP_NEEDAUTHORIZATION,
-                    shortResponse);
+                    NOP_AUTHORIZATION,
+                    responser);
         }
         
         final List<URI> ret = new ArrayList<URI>();
         
-        for (RouteRule rule : this._rules) {
-            final URI uri = rule.match(info);
+        for (ForwardRule forward : this._forwards) {
+            final URI uri = forward.match(info);
             if (null!=uri) {
                 ret.add(uri);
             }
         }
         return !ret.isEmpty() 
             ? new MatchResult(ret.toArray(EMPTY_URIS), 
-                    genRewriteRequest(info.getPath()), 
-                    genRewriteResponse(info.getPath()), 
-                    genNeedAuthorization(info.getPath()),
+                    genRewriteRequest(info), 
+                    genRewriteResponse(info), 
+                    genAuthorization(info),
                     null)
             : null;
     }
 
     private Func1<HttpRequest, FullHttpResponse> genShortResponse(final RoutingInfo info) {
-        for (Responser responser : this._responsers) {
-            final Func1<HttpRequest, FullHttpResponse> func = responser.genShortResponse(info);
+        for (RespondRule responser : this._responds) {
+            final Func1<HttpRequest, FullHttpResponse> func = responser.genResponser(info);
             if (null!=func) {
                 return func;
             }
@@ -151,9 +151,9 @@ public class DefaultLevel implements RouteLevel {
         return null;
     }
 
-    private Action1<HttpRequest> genRewriteRequest(final String path) {
-        for (RequestRewriter rewriter : this._requestRewriters) {
-            final Action1<HttpRequest> func = rewriter.genRewriting(path);
+    private Action1<HttpRequest> genRewriteRequest(final RoutingInfo info) {
+        for (RewriteRequestRule rewriter : this._requestRewriters) {
+            final Action1<HttpRequest> func = rewriter.genRewriting(info);
             if (null!=func) {
                 return func;
             }
@@ -161,9 +161,9 @@ public class DefaultLevel implements RouteLevel {
         return NOP_REQ_REWRITER;
     }
     
-    private Action1<HttpResponse> genRewriteResponse(final String path) {
-        for (ResponseRewriter rewriter : this._responseRewriters) {
-            final Action1<HttpResponse> func = rewriter.genRewriting(path);
+    private Action1<HttpResponse> genRewriteResponse(final RoutingInfo info) {
+        for (RewriteResponseRule rewriter : this._responseRewriters) {
+            final Action1<HttpResponse> func = rewriter.genRewriting(info);
             if (null!=func) {
                 return func;
             }
@@ -171,14 +171,14 @@ public class DefaultLevel implements RouteLevel {
         return NOP_RESP_REWRITER;
     }
     
-    private Func1<HttpRequest, Boolean> genNeedAuthorization(final String path) {
-        for (PathAuthorizer authorizer : this._authorizations) {
-            final Func1<HttpRequest, Boolean> func = authorizer.genNeedAuthorization(path);
+    private Func1<HttpRequest, Boolean> genAuthorization(final RoutingInfo info) {
+        for (AuthorizationRule authorizer : this._authorizations) {
+            final Func1<HttpRequest, Boolean> func = authorizer.genAuthorization(info);
             if (null!=func) {
                 return func;
             }
         }
-        return NOP_NEEDAUTHORIZATION;
+        return NOP_AUTHORIZATION;
     }
 
     @Override
@@ -186,7 +186,7 @@ public class DefaultLevel implements RouteLevel {
         return new ArrayList<String>() {
             private static final long serialVersionUID = 1L;
         {
-            for (RouteRule rule : _rules) {
+            for (ForwardRule rule : _forwards) {
                 this.add(Integer.toString(_priority) + ":" + rule.toString());
             }
         }};
@@ -208,18 +208,18 @@ public class DefaultLevel implements RouteLevel {
     
     private Action0 _resetAction;
     
-    private final List<RouteRule> _rules = 
-            new CopyOnWriteArrayList<RouteRule>();
+    private final List<ForwardRule> _forwards = 
+            new CopyOnWriteArrayList<ForwardRule>();
     
-    private final List<RequestRewriter> _requestRewriters = 
-            new CopyOnWriteArrayList<RequestRewriter>();
+    private final List<RewriteRequestRule> _requestRewriters = 
+            new CopyOnWriteArrayList<RewriteRequestRule>();
     
-    private final List<ResponseRewriter> _responseRewriters = 
-            new CopyOnWriteArrayList<ResponseRewriter>();
+    private final List<RewriteResponseRule> _responseRewriters = 
+            new CopyOnWriteArrayList<RewriteResponseRule>();
     
-    private final List<PathAuthorizer> _authorizations = 
-            new CopyOnWriteArrayList<PathAuthorizer>();
+    private final List<AuthorizationRule> _authorizations = 
+            new CopyOnWriteArrayList<AuthorizationRule>();
 
-    private final List<Responser> _responsers = 
-            new CopyOnWriteArrayList<Responser>();
+    private final List<RespondRule> _responds = 
+            new CopyOnWriteArrayList<RespondRule>();
 }

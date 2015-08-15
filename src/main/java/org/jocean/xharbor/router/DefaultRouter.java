@@ -20,10 +20,9 @@ import org.jocean.xharbor.api.Router;
 import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.api.RoutingInfoMemo;
 import org.jocean.xharbor.api.ServiceMemo;
-import org.jocean.xharbor.routing.RouteLevel;
-import org.jocean.xharbor.routing.RouteLevel.MatchResult;
+import org.jocean.xharbor.routing.RuleSet;
+import org.jocean.xharbor.routing.RuleSet.MatchResult;
 import org.jocean.xharbor.util.RulesMXBean;
-import org.jocean.xharbor.util.TargetSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,11 +37,11 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
     private static final Logger LOG = LoggerFactory
             .getLogger(DefaultRouter.class);
 
-    private final TargetSet EMPTY_TARGETSET = 
-            new TargetSet(RouteLevel.EMPTY_URIS, 
-                    RouteLevel.NOP_REQ_REWRITER, 
-                    RouteLevel.NOP_RESP_REWRITER, 
-                    RouteLevel.NOP_NEEDAUTHORIZATION, 
+    private final DefaultDispatcher EMPTY_DISPATCHER = 
+            new DefaultDispatcher(RuleSet.EMPTY_URIS, 
+                    RuleSet.NOP_REQ_REWRITER, 
+                    RuleSet.NOP_RESP_REWRITER, 
+                    RuleSet.NOP_AUTHORIZATION, 
                     null,
                     null,
                     null,
@@ -82,7 +81,7 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
         return new ArrayList<String>() {
             private static final long serialVersionUID = 1L;
         {
-            final Iterator<RouteLevel> itr = _levels.iterator();
+            final Iterator<RuleSet> itr = _allruleset.iterator();
             while (itr.hasNext()) {
                 this.addAll(itr.next().getRules());
             }
@@ -91,37 +90,37 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
     
     @Override
     public Dispatcher calculateRoute(final RoutingInfo info, final Context routectx) {
-        final Iterator<RouteLevel> itr = this._levels.iterator();
+        final Iterator<RuleSet> itr = this._allruleset.iterator();
         while (itr.hasNext()) {
-            final RouteLevel level = itr.next();
-            final MatchResult result = level.match(info);
+            final RuleSet rules = itr.next();
+            final MatchResult result = rules.match(info);
             if (null != result) {
-                return new TargetSet(
+                return new DefaultDispatcher(
                         result._uris, 
                         result._rewriteRequest,
                         result._rewriteResponse,
-                        result._needAuthorization, 
-                        result._shortResponse,
+                        result._authorization, 
+                        result._responses,
                         this._serviceMemo,
                         this._httpClient,
                         this._memoBuilder,
                         this._noRoutingMemo);
             }
         }
-        return EMPTY_TARGETSET;
+        return EMPTY_DISPATCHER;
     }
 
-    public void addLevel(final RouteLevel level) {
-        this._levels.add(level);
+    public void addRules(final RuleSet rules) {
+        this._allruleset.add(rules);
     }
     
-    public void removeLevel(final RouteLevel level) {
-        this._levels.remove(level);
+    public void removeRules(final RuleSet rules) {
+        this._allruleset.remove(rules);
     }
     
     private final ServiceMemo _serviceMemo;
     private final RoutingInfoMemo _noRoutingMemo;
     private final RelayMemo.Builder _memoBuilder;
     private final HttpClient _httpClient;
-    private final SortedSet<RouteLevel> _levels = new ConcurrentSkipListSet<RouteLevel>();
+    private final SortedSet<RuleSet> _allruleset = new ConcurrentSkipListSet<RuleSet>();
 }

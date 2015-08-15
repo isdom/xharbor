@@ -6,14 +6,15 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.jocean.xharbor.routing.ResponseRewriter;
-import org.jocean.xharbor.routing.RouteLevel;
+import org.jocean.xharbor.api.RoutingInfo;
+import org.jocean.xharbor.routing.RewriteResponseRule;
+import org.jocean.xharbor.routing.RuleSet;
 
 import rx.functions.Action1;
 
-public class ResponseHeaderRewriter implements ResponseRewriter {
+public class ResponseHeaderRewriter implements RewriteResponseRule {
     public ResponseHeaderRewriter(
-            final RouteLevel level,
+            final RuleSet level,
             final String pathPattern,
             final Map<String, String> extraHeaders) {
         this._level = level;
@@ -27,8 +28,8 @@ public class ResponseHeaderRewriter implements ResponseRewriter {
     }
     
     @Override
-    public Action1<HttpResponse> genRewriting(final String path) {
-        final Matcher matcher = this._pathPattern.matcher(path);
+    public Action1<HttpResponse> genRewriting(final RoutingInfo info) {
+        final Matcher matcher = this._pathPattern.matcher(info.getPath());
         if ( matcher.find() ) {
             return new Action1<HttpResponse>() {
                 @Override
@@ -51,7 +52,7 @@ public class ResponseHeaderRewriter implements ResponseRewriter {
         return null != regex && !"".equals(regex) ? Pattern.compile(regex) : null;
     }
     
-    private final RouteLevel _level;
+    private final RuleSet _level;
     private final Pattern _pathPattern;
     private final Map<String, String> _extraHeaders;
 }
