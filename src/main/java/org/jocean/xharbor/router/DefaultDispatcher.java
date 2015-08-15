@@ -99,7 +99,7 @@ public class DefaultDispatcher implements Dispatcher {
         int total = 0;
         TargetImpl best = null;
         for ( TargetImpl peer : this._targets ) {
-            if ( !isTargetActive(peer) ) {
+            if ( isTargetActive(peer) ) {
                 // peer->current_weight += peer->effective_weight; 
                 final int effectiveWeight = peer._effectiveWeight.get();
                 final int currentWeight = peer._currentWeight.addAndGet( effectiveWeight );
