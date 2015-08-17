@@ -1,9 +1,8 @@
 package org.jocean.xharbor.routing;
 
-import java.net.URI;
-
 import org.jocean.xharbor.api.RoutingInfo;
+import org.jocean.xharbor.api.Target;
 
 public interface ForwardRule {
-    public URI match(final RoutingInfo info);
+    public Target match(final RoutingInfo info);
 }

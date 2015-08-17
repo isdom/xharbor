@@ -10,7 +10,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import org.jocean.http.Feature;
 import org.jocean.xharbor.api.RoutingInfo;
+import org.jocean.xharbor.api.Target;
 import org.jocean.xharbor.router.DefaultRouter;
 import org.jocean.xharbor.routing.AuthorizationRule;
 import org.jocean.xharbor.routing.RewriteRequestRule;
@@ -23,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import rx.functions.Action0;
 import rx.functions.Action1;
+import rx.functions.Func0;
 import rx.functions.Func1;
 
 public class DefaultRuleSet implements RuleSet {
@@ -31,13 +34,24 @@ public class DefaultRuleSet implements RuleSet {
     private static final Logger LOG = LoggerFactory
             .getLogger(DefaultRuleSet.class);
     
-    static final URI[] FAKE_URIS = new URI[1];
+    static final URI[] FAKE_URI = new URI[1];
+    static final Target[] FAKE_TARGETS = new Target[1];
     
     static {
         try {
-            FAKE_URIS[0] = new URI("http://255.255.255.255");
+            FAKE_URI[0] = new URI("http://255.255.255.255");
         } catch (Exception e) {
         }
+        FAKE_TARGETS[0] = new Target() {
+            @Override
+            public URI serviceUri() {
+                return FAKE_URI[0];
+            }
+
+            @Override
+            public Func0<Feature[]> features() {
+                return null;
+            }};
     }
     
     public DefaultRuleSet(final int priority, final DefaultRouter router) {
@@ -115,25 +129,25 @@ public class DefaultRuleSet implements RuleSet {
     
     @Override
     public MatchResult match(final RoutingInfo info) {
-        final Func1<HttpRequest, FullHttpResponse> responser = genShortResponse(info);
+        final Func1<HttpRequest, FullHttpResponse> responser = genResponser(info);
         if (null!=responser) {
-            return new MatchResult(FAKE_URIS, 
+            return new MatchResult(FAKE_TARGETS, 
                     NOP_REQ_REWRITER, 
                     NOP_RESP_REWRITER, 
                     NOP_AUTHORIZATION,
                     responser);
         }
         
-        final List<URI> ret = new ArrayList<URI>();
+        final List<Target> targets = new ArrayList<>();
         
         for (ForwardRule forward : this._forwards) {
-            final URI uri = forward.match(info);
-            if (null!=uri) {
-                ret.add(uri);
+            final Target target = forward.match(info);
+            if (null!=target) {
+                targets.add(target);
             }
         }
-        return !ret.isEmpty() 
-            ? new MatchResult(ret.toArray(EMPTY_URIS), 
+        return !targets.isEmpty() 
+            ? new MatchResult(targets.toArray(EMPTY_TARGETS), 
                     genRewriteRequest(info), 
                     genRewriteResponse(info), 
                     genAuthorization(info),
@@ -141,7 +155,7 @@ public class DefaultRuleSet implements RuleSet {
             : null;
     }
 
-    private Func1<HttpRequest, FullHttpResponse> genShortResponse(final RoutingInfo info) {
+    private Func1<HttpRequest, FullHttpResponse> genResponser(final RoutingInfo info) {
         for (RespondRule responser : this._responds) {
             final Func1<HttpRequest, FullHttpResponse> func = responser.genResponser(info);
             if (null!=func) {

@@ -14,11 +14,11 @@ import org.jocean.idiom.Visitor2;
 import org.jocean.idiom.stats.TimeIntervalMemo;
 import org.jocean.j2se.stats.BizMemoSupportMBean;
 import org.jocean.j2se.stats.TIMemoImplOfRanges;
+import org.jocean.xharbor.api.MarkableTarget;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.RelayMemo.RESULT;
 import org.jocean.xharbor.api.RelayMemo.STEP;
 import org.jocean.xharbor.api.RoutingInfo;
-import org.jocean.xharbor.api.Target;
 
 import com.google.common.collect.Range;
 
@@ -40,7 +40,7 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
     }
     
     @Override
-    public RelayMemo build(final Target target, final RoutingInfo info) {
+    public RelayMemo build(final MarkableTarget target, final RoutingInfo info) {
         return InterfaceUtils.combineImpls(
             RelayMemo.class, 
             this._level0Memo,

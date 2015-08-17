@@ -8,6 +8,7 @@
         destroy-method="stop">
         <constructor-arg ref="ruleSet"/>
         <constructor-arg value="${forward.to}"/>
+        <constructor-arg value="${forward.httpconf:default}"/>
         <constructor-arg value="${forward.method:}"/>
         <constructor-arg value="${forward.path}"/>
     </bean>

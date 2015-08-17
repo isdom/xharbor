@@ -5,6 +5,10 @@ package org.jocean.xharbor.api;
 
 import java.net.URI;
 
+import org.jocean.http.Feature;
+
+import rx.functions.Func0;
+
 /**
  * @author isdom
  *
@@ -13,9 +17,5 @@ public interface Target {
         
     public URI serviceUri();
     
-    public void markServiceDownStatus(final boolean isDown);
-    
-    public int addWeight(final int deltaWeight);
-    
-    public void markAPIDownStatus(final boolean isDown);
+    public Func0<Feature[]> features();
 }

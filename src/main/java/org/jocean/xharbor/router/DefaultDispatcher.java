@@ -23,6 +23,7 @@ import org.jocean.idiom.rx.RxObservables;
 import org.jocean.idiom.stats.BizMemo;
 import org.jocean.idiom.stats.BizMemo.StepMemo;
 import org.jocean.xharbor.api.Dispatcher;
+import org.jocean.xharbor.api.MarkableTarget;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.RelayMemo.RESULT;
 import org.jocean.xharbor.api.RelayMemo.STEP;
@@ -36,6 +37,7 @@ import org.slf4j.LoggerFactory;
 import rx.Observable;
 import rx.functions.Action0;
 import rx.functions.Action1;
+import rx.functions.Func0;
 import rx.functions.Func1;
 
 /**
@@ -50,11 +52,11 @@ public class DefaultDispatcher implements Dispatcher {
     private static final int MAX_EFFECTIVEWEIGHT = 1000;
     
     public DefaultDispatcher(
-            final URI[] uris, 
+            final Target[] targets, 
             final Action1<HttpRequest> rewriteRequest, 
             final Action1<HttpResponse> rewriteResponse, 
-            final Func1<HttpRequest, Boolean> needAuthorization, 
-            final Func1<HttpRequest, FullHttpResponse> shortResponse,
+            final Func1<HttpRequest, Boolean> authorization, 
+            final Func1<HttpRequest, FullHttpResponse> responser,
             final ServiceMemo serviceMemo, 
             final HttpClient httpClient,
             final RelayMemo.Builder memoBuilder,
@@ -66,15 +68,15 @@ public class DefaultDispatcher implements Dispatcher {
         this._serviceMemo = serviceMemo;
         this._rewriteRequest = rewriteRequest;
         this._rewriteResponse = rewriteResponse;
-        this._authorization = needAuthorization;
-        this._responser = shortResponse;
-        this._targets = new ArrayList<TargetImpl>() {
+        this._authorization = authorization;
+        this._responser = responser;
+        this._targets = new ArrayList<MarkableTargetImpl>() {
             private static final long serialVersionUID = 1L;
         {
-            for ( URI uri : uris) {
-                this.add(new TargetImpl(uri));
+            for ( Target target : targets) {
+                this.add(new MarkableTargetImpl(target));
             }
-        }}.toArray(new TargetImpl[0]);
+        }}.toArray(new MarkableTargetImpl[0]);
     }
     
     @Override
@@ -84,8 +86,8 @@ public class DefaultDispatcher implements Dispatcher {
         {
             this.add("rewriteRequest:" + _rewriteRequest.toString());
             this.add("authorize:" + _authorization.toString());
-            for (TargetImpl peer : _targets) {
-                this.add(peer._uri.toString() + ":active(" + isTargetActive(peer)
+            for (MarkableTargetImpl peer : _targets) {
+                this.add(peer._target.toString() + ":active(" + isTargetActive(peer)
                         + "):effectiveWeight(" + peer._effectiveWeight.get()
                         + "):currentWeight(" + peer._currentWeight.get()
                         + ")"
@@ -94,11 +96,10 @@ public class DefaultDispatcher implements Dispatcher {
         }}.toArray(new String[0]) );
     }
 
-    @Override
-    public Target dispatch() {
+    private MarkableTarget dispatch() {
         int total = 0;
-        TargetImpl best = null;
-        for ( TargetImpl peer : this._targets ) {
+        MarkableTargetImpl best = null;
+        for ( MarkableTargetImpl peer : this._targets ) {
             if ( isTargetActive(peer) ) {
                 // peer->current_weight += peer->effective_weight; 
                 final int effectiveWeight = peer._effectiveWeight.get();
@@ -133,15 +134,24 @@ public class DefaultDispatcher implements Dispatcher {
      * @param peer
      * @return
      */
-    private boolean isTargetActive(final TargetImpl peer) {
-        return !(this._serviceMemo.isServiceDown(peer._uri) || peer._down.get());
+    private boolean isTargetActive(final MarkableTargetImpl peer) {
+        return !(this._serviceMemo.isServiceDown(peer._target.serviceUri()) || peer._down.get());
     }
     
-    private class TargetImpl implements Target {
+    private class MarkableTargetImpl implements MarkableTarget {
+        
+        MarkableTargetImpl(final Target target) {
+            this._target = target;
+        }
         
         @Override
         public URI serviceUri() {
-            return this._uri;
+            return this._target.serviceUri();
+        }
+        
+        @Override
+        public Func0<Feature[]> features() {
+            return this._target.features();
         }
         
         @Override
@@ -160,14 +170,10 @@ public class DefaultDispatcher implements Dispatcher {
         
         @Override
         public void markServiceDownStatus(final boolean isDown) {
-            _serviceMemo.markServiceDownStatus(this._uri, isDown);
+            _serviceMemo.markServiceDownStatus(this._target.serviceUri(), isDown);
         }
         
-        TargetImpl(final URI uri) {
-            this._uri = uri;
-        }
-        
-        private final URI _uri;
+        private final Target _target;
         private final AtomicInteger _currentWeight = new AtomicInteger(1);
         private final AtomicInteger _effectiveWeight = new AtomicInteger(1);
         private final AtomicBoolean _down = new AtomicBoolean(false);
@@ -178,7 +184,7 @@ public class DefaultDispatcher implements Dispatcher {
     private final Action1<HttpResponse> _rewriteResponse;
     private final Func1<HttpRequest, Boolean> _authorization;
     private final Func1<HttpRequest, FullHttpResponse> _responser;
-    private final TargetImpl[] _targets;
+    private final MarkableTargetImpl[] _targets;
 
     private FullHttpResponse tryResponse(final HttpRequest httpRequest) {
         return null!=_responser ? _responser.call(httpRequest) : null;
@@ -202,7 +208,7 @@ public class DefaultDispatcher implements Dispatcher {
             final HttpRequest request, 
             final Observable<HttpObject> fullRequest) {
         
-        final Target target = dispatch();
+        final MarkableTarget target = dispatch();
         if (null==target) {
             LOG.warn("can't found matched target service for request:[{}]\njust return 200 OK.", 
                     request);
@@ -254,7 +260,7 @@ public class DefaultDispatcher implements Dispatcher {
                                 stepmemo.beginBizStep(STEP.TRANSFER_CONTENT);
                             }
                         }}),
-                    Feature.ENABLE_LOGGING)
+                    target.features().call())
                     .compose(RxNettys.objects2httpobjs())
                     .doOnNext(new Action1<HttpObject>() {
                         @Override

@@ -9,9 +9,9 @@ import io.netty.util.TimerTask;
 
 import java.util.concurrent.TimeUnit;
 
+import org.jocean.xharbor.api.MarkableTarget;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.RoutingInfo;
-import org.jocean.xharbor.api.Target;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,7 +29,7 @@ public class RelayMemoBuilderForDispatchFeedback implements RelayMemo.Builder {
     }
     
     @Override
-    public RelayMemo build(final Target target, final RoutingInfo info) {
+    public RelayMemo build(final MarkableTarget target, final RoutingInfo info) {
         return new RelayMemo() {
             @Override
             public void beginBizStep(final STEP step) {
@@ -66,7 +66,7 @@ public class RelayMemoBuilderForDispatchFeedback implements RelayMemo.Builder {
 
     private void markAPIDown4Result(
             final long period, 
-            final Target target, 
+            final MarkableTarget target, 
             final RoutingInfo info, 
             final String result) {
         target.markAPIDownStatus(true);
@@ -85,7 +85,7 @@ public class RelayMemoBuilderForDispatchFeedback implements RelayMemo.Builder {
 
     private void markServiceDown4Result(
             final long period, 
-            final Target target,
+            final MarkableTarget target,
             final String result) {
         target.markServiceDownStatus(true);
         LOG.warn("relay failed for {}, so mark service {} down.",

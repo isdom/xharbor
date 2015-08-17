@@ -3,17 +3,26 @@ package org.jocean.xharbor.routing.impl;
 import java.net.URI;
 import java.util.regex.Pattern;
 
+import org.jocean.http.Feature;
+import org.jocean.http.util.FeaturesBuilder;
+import org.jocean.idiom.BeanHolder;
+import org.jocean.idiom.BeanHolderAware;
 import org.jocean.xharbor.api.RoutingInfo;
-import org.jocean.xharbor.routing.RuleSet;
+import org.jocean.xharbor.api.Target;
 import org.jocean.xharbor.routing.ForwardRule;
+import org.jocean.xharbor.routing.RuleSet;
 
-public class DefaultForward implements ForwardRule {
+import rx.functions.Func0;
+
+public class DefaultForward implements ForwardRule, BeanHolderAware {
     public DefaultForward(final RuleSet level, 
             final String uri,
+            final String featuresName,
             final String methodPattern, 
             final String pathPattern) throws Exception {
         this._level = level;
         this._uri = new URI(uri);
+        this._featuresName = featuresName;
         this._methodPattern = safeCompilePattern(methodPattern);
         this._pathPattern = safeCompilePattern(pathPattern);
         
@@ -24,10 +33,28 @@ public class DefaultForward implements ForwardRule {
         this._level.removeForward(this);
     }
     
-    public URI match(final RoutingInfo info) {
+    @Override
+    public void setBeanHolder(final BeanHolder beanHolder) {
+        this._beanHolder = beanHolder;
+    }
+    
+    public Target match(final RoutingInfo info) {
         return ( isMatched(this._methodPattern, info.getMethod()) 
                 && isMatched(this._pathPattern, info.getPath()) ) 
-             ? this._uri 
+             ? new Target() {
+                @Override
+                public URI serviceUri() {
+                    return _uri ;
+                }
+                @Override
+                public Func0<Feature[]> features() {
+                    final FeaturesBuilder builder = _beanHolder.getBean(_featuresName, FeaturesBuilder.class);
+                    return builder;
+                }
+                @Override
+                public String toString() {
+                    return "[uri:" + _uri+ ",features:" + _featuresName + "]";
+                }}
              : null;
     }
     
@@ -50,4 +77,6 @@ public class DefaultForward implements ForwardRule {
     private final URI _uri;
     private final Pattern _methodPattern;
     private final Pattern _pathPattern;
+    private BeanHolder _beanHolder;
+    private final String _featuresName;
 }

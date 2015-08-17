@@ -4,17 +4,17 @@ import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 
-import java.net.URI;
 import java.util.Collection;
 
 import org.jocean.xharbor.api.RoutingInfo;
+import org.jocean.xharbor.api.Target;
 
 import rx.functions.Action1;
 import rx.functions.Func1;
 
 public interface RuleSet extends Comparable<RuleSet> {
     
-    static final URI[] EMPTY_URIS = new URI[0];
+    static final Target[] EMPTY_TARGETS = new Target[0];
     
     static final Action1<HttpRequest> NOP_REQ_REWRITER = new Action1<HttpRequest>() {
         @Override
@@ -43,18 +43,19 @@ public interface RuleSet extends Comparable<RuleSet> {
         }};
         
     public class MatchResult {
-        public final URI[] _uris;
+        public final Target[] _targets;
         public final Action1<HttpRequest> _rewriteRequest;
         public final Action1<HttpResponse> _rewriteResponse;
         public final Func1<HttpRequest, Boolean> _authorization;
         public final Func1<HttpRequest,FullHttpResponse> _responses;
         
-        public MatchResult(final URI[] uris, 
+        public MatchResult(final Target[] targets, 
                 final Action1<HttpRequest> rewriteRequest,
                 final Action1<HttpResponse> rewriteResponse, 
                 final Func1<HttpRequest, Boolean> authorization, 
-                final Func1<HttpRequest,FullHttpResponse> responser) {
-            this._uris = uris;
+                final Func1<HttpRequest,FullHttpResponse> responser
+                ) {
+            this._targets = targets;
             this._rewriteRequest = rewriteRequest;
             this._rewriteResponse = rewriteResponse;
             this._authorization = authorization;

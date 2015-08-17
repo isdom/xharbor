@@ -38,7 +38,7 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
             .getLogger(DefaultRouter.class);
 
     private final DefaultDispatcher EMPTY_DISPATCHER = 
-            new DefaultDispatcher(RuleSet.EMPTY_URIS, 
+            new DefaultDispatcher(RuleSet.EMPTY_TARGETS, 
                     RuleSet.NOP_REQ_REWRITER, 
                     RuleSet.NOP_RESP_REWRITER, 
                     RuleSet.NOP_AUTHORIZATION, 
@@ -96,7 +96,7 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
             final MatchResult result = rules.match(info);
             if (null != result) {
                 return new DefaultDispatcher(
-                        result._uris, 
+                        result._targets, 
                         result._rewriteRequest,
                         result._rewriteResponse,
                         result._authorization, 

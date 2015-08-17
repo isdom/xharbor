@@ -12,9 +12,6 @@ import rx.Observable;
  *
  */
 public interface Dispatcher {
-    
-    public Target dispatch();
-    
     public boolean IsValid();
     
     public Observable<HttpObject> response(
