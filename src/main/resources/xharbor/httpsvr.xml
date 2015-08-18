@@ -4,8 +4,8 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
     
-    <import resource="classpath:unit/httpfeatures.xml"/>
-    
+    <bean id="httpfeatures" class="java.util.concurrent.CopyOnWriteArrayList" />
+        
     <bean id="agentServer" 
         factory-bean="httpServer" 
         factory-method="defineServer">
@@ -15,7 +15,11 @@
                 <constructor-arg value="${http.port:8080}"/>
             </bean>
         </constructor-arg>
-        <constructor-arg ref="featuresBuilder"/>
+        <constructor-arg>
+		    <bean class="org.jocean.http.util.FeaturesBuilder"">
+		        <constructor-arg ref="httpfeatures"/>
+		    </bean>
+        </constructor-arg>
     </bean>
     
     <bean id="tradeSubscription" 
