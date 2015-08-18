@@ -9,12 +9,12 @@
             <list>
                 <value>classpath:jmxsrv.properties</value>
                 <value>classpath:httpsvr.properties</value>
-                <value>classpath:level.properties</value>
-                <value>classpath:rule.properties</value>
-                <value>classpath:rewritereqpath.properties</value>
-                <value>classpath:rewriterespheader.properties</value>
-                <value>classpath:authorizer.properties</value>
-                <value>classpath:smpresponser.properties</value>
+                <value>classpath:rules.properties</value>
+                <value>classpath:forward.properties</value>
+                <value>classpath:rwreq.properties</value>
+                <value>classpath:rwresp.properties</value>
+                <value>classpath:auth.properties</value>
+                <value>classpath:respond.properties</value>
                 <value>classpath:addheader.properties</value>
             </list>
         </property>
