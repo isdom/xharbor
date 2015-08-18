@@ -16,7 +16,7 @@
             </bean>
         </constructor-arg>
         <constructor-arg>
-		    <bean class="org.jocean.http.util.FeaturesBuilder"">
+		    <bean class="org.jocean.http.util.FeaturesBuilder">
 		        <constructor-arg ref="httpfeatures"/>
 		    </bean>
         </constructor-arg>
