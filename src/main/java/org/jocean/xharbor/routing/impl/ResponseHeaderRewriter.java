@@ -14,17 +14,17 @@ import rx.functions.Action1;
 
 public class ResponseHeaderRewriter implements RewriteResponseRule {
     public ResponseHeaderRewriter(
-            final RuleSet level,
+            final RuleSet rules,
             final String pathPattern,
             final Map<String, String> extraHeaders) {
-        this._level = level;
+        this._rules = rules;
         this._pathPattern = safeCompilePattern(pathPattern);
         this._extraHeaders = extraHeaders;
-        this._level.addResponseRewriter(this);
+        this._rules.addResponseRewriter(this);
     }
     
     public void stop() {
-        this._level.removeResponseRewriter(this);
+        this._rules.removeResponseRewriter(this);
     }
     
     @Override
@@ -52,7 +52,7 @@ public class ResponseHeaderRewriter implements RewriteResponseRule {
         return null != regex && !"".equals(regex) ? Pattern.compile(regex) : null;
     }
     
-    private final RuleSet _level;
+    private final RuleSet _rules;
     private final Pattern _pathPattern;
     private final Map<String, String> _extraHeaders;
 }

@@ -15,22 +15,22 @@ import org.jocean.xharbor.routing.RuleSet;
 import rx.functions.Func0;
 
 public class DefaultForward implements ForwardRule, BeanHolderAware {
-    public DefaultForward(final RuleSet level, 
+    public DefaultForward(final RuleSet rules, 
             final String uri,
             final String featuresName,
             final String methodPattern, 
             final String pathPattern) throws Exception {
-        this._level = level;
+        this._rules = rules;
         this._uri = new URI(uri);
         this._featuresName = featuresName;
         this._methodPattern = safeCompilePattern(methodPattern);
         this._pathPattern = safeCompilePattern(pathPattern);
         
-        this._level.addForward(this);
+        this._rules.addForward(this);
     }
     
     public void stop() {
-        this._level.removeForward(this);
+        this._rules.removeForward(this);
     }
     
     @Override
@@ -73,7 +73,7 @@ public class DefaultForward implements ForwardRule, BeanHolderAware {
                 + ",path=" + _pathPattern + "]";
     }
 
-    private final RuleSet _level;
+    private final RuleSet _rules;
     private final URI _uri;
     private final Pattern _methodPattern;
     private final Pattern _pathPattern;

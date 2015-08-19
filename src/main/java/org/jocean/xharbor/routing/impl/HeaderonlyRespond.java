@@ -17,22 +17,22 @@ import rx.functions.Func1;
 
 public class HeaderonlyRespond implements RespondRule {
     public HeaderonlyRespond(
-            final RuleSet level,
+            final RuleSet rules,
             final String methodPattern, 
             final String pathPattern, 
             final int responseStatus, 
             final Map<String, String> extraHeaders) {
-        this._level = level;
+        this._rules = rules;
         this._pathPattern = safeCompilePattern(pathPattern);
         this._methodPattern = safeCompilePattern(methodPattern);
         this._responseStatus = responseStatus;
         this._extraHeaders = extraHeaders;
         
-        this._level.addRespond(this);
+        this._rules.addRespond(this);
     }
     
     public void stop() {
-        this._level.removeRespond(this);
+        this._rules.removeRespond(this);
     }
     
     @Override
@@ -68,7 +68,7 @@ public class HeaderonlyRespond implements RespondRule {
             return response;
         }};
         
-    private final RuleSet _level;
+    private final RuleSet _rules;
     private final Pattern _pathPattern;
     private final Pattern _methodPattern;
     private final int _responseStatus;

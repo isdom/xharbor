@@ -13,17 +13,17 @@ import rx.functions.Action1;
 
 public class RequestPathRewriter implements RewriteRequestRule {
     public RequestPathRewriter(
-            final RuleSet level,
+            final RuleSet rules,
             final String pathPattern, 
             final String replaceTo) {
-        this._level = level;
+        this._rules = rules;
         this._pathPattern = safeCompilePattern(pathPattern);
         this._replaceTo = replaceTo;
-        this._level.addRequestRewriter(this);
+        this._rules.addRequestRewriter(this);
     }
     
     public void stop() {
-        this._level.removeRequestRewriter(this);
+        this._rules.removeRequestRewriter(this);
     }
     
     @Override
@@ -51,7 +51,7 @@ public class RequestPathRewriter implements RewriteRequestRule {
         return null != regex && !"".equals(regex) ? Pattern.compile(regex) : null;
     }
     
-    private final RuleSet _level;
+    private final RuleSet _rules;
     private final Pattern _pathPattern;
     private final String _replaceTo;
 }

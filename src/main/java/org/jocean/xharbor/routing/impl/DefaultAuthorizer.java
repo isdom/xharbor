@@ -25,20 +25,20 @@ public class DefaultAuthorizer implements AuthorizationRule {
             .getLogger(DefaultAuthorizer.class);
     
     public DefaultAuthorizer(
-            final RuleSet level,
+            final RuleSet rules,
             final String pathPattern, 
             final String user, 
             final String password) {
-        this._level = level;
+        this._rules = rules;
         this._pathPattern = safeCompilePattern(pathPattern);
         this._user = user;
         this._password = password;
         
-        this._level.addAuthorization(this);
+        this._rules.addAuthorization(this);
     }
     
     public void stop() {
-        this._level.removeAuthorization(this);
+        this._rules.removeAuthorization(this);
     }
     
     @Override
@@ -113,7 +113,7 @@ public class DefaultAuthorizer implements AuthorizationRule {
         return null != regex && !"".equals(regex) ? Pattern.compile(regex) : null;
     }
     
-    private final RuleSet _level;
+    private final RuleSet _rules;
     private final Pattern _pathPattern;
     private final String _user;
     private final String _password;
