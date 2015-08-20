@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.jocean.http.Feature;
 import org.jocean.http.client.HttpClient;
 import org.jocean.http.util.RxNettys;
+import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxObservables;
 import org.jocean.idiom.stats.BizMemo;
@@ -274,6 +275,8 @@ public class DefaultDispatcher implements Dispatcher {
                         @Override
                         public void call(final Throwable e) {
                             stepmemo.endBizStep();
+                            LOG.error("exception when transfer, detail: {}",
+                                    ExceptionUtils.exception2detail(e));
                             memo.incBizResult(RESULT.RELAY_FAILURE, watch4Result.stopAndRestart());
                         }})
                     .doOnCompleted(new Action0() {
