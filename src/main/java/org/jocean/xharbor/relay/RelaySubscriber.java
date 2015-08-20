@@ -3,6 +3,7 @@
  */
 package org.jocean.xharbor.relay;
 
+import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 
@@ -138,13 +139,21 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                 final RoutingInfo info = routectx.getProperty("routingInfo");
                 routectx.clear();
                 
-                buildHttpResponse(dispatcher, req, _cached.request(), info, new AtomicBoolean(true))
-                    .doOnTerminate(new Action0() {
-                        @Override
-                        public void call() {
-                            _cached.destroy();
-                        }})
-                    .subscribe(_trade.responseObserver());
+                _cached.request().doOnCompleted(new Action0() {
+                    @Override
+                    public void call() {
+                        final FullHttpRequest fullreq = _cached.retainFullHttpRequest();
+                        buildHttpResponse(dispatcher, req, 
+                                Observable.<HttpObject>just(fullreq), info, new AtomicBoolean(true))
+                        .doOnTerminate(new Action0() {
+                            @Override
+                            public void call() {
+                                fullreq.release();
+                                _cached.destroy();
+                            }})
+                        .subscribe(_trade.responseObserver());
+                    }})
+                    .subscribe();
             }
         }
     };
