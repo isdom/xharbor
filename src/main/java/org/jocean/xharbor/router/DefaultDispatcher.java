@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.http.Feature;
 import org.jocean.http.client.HttpClient;
@@ -248,6 +249,7 @@ public class DefaultDispatcher implements Dispatcher {
             stepmemo.beginBizStep(STEP.ROUTING);
             
             rewriteRequest(request);
+            final AtomicReference<HttpResponse> resp = new AtomicReference<HttpResponse>();
             
             return _httpClient.defineInteraction(
                     new InetSocketAddress(
@@ -267,6 +269,7 @@ public class DefaultDispatcher implements Dispatcher {
                         @Override
                         public void call(final HttpObject httpObj) {
                             if (httpObj instanceof HttpResponse) {
+                                resp.set((HttpResponse)httpObj);
                                 stepmemo.beginBizStep(STEP.RECV_RESP);
                                 rewriteResponse((HttpResponse)httpObj);
                             }
@@ -283,7 +286,16 @@ public class DefaultDispatcher implements Dispatcher {
                         @Override
                         public void call() {
                             stepmemo.endBizStep();
-                            memo.incBizResult(RESULT.RELAY_SUCCESS, watch4Result.stopAndRestart());
+                            final long ttl = watch4Result.stopAndRestart();
+                            memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
+                            LOG.info("{}\ncost:[{}]s for client http connection ({})\nrequest:[{}]\ndispatch to:[{}]\nresponse:[{}]",
+                                    "RELAY_SUCCESS", 
+                                    ttl / (float)1000.0, 
+                                    //this._channelCtx.channel(), 
+                                    "unknown",
+                                    request, 
+                                    target.serviceUri(), 
+                                    resp.get());
                         }});
         }
     }
