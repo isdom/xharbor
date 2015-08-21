@@ -46,7 +46,7 @@ start)
     JAVA_OPTS="${JAVA_OPTS} -Xms${HEAP_MEMORY} -Xmx${HEAP_MEMORY} -XX:PermSize=${PERM_MEMORY} -XX:MaxPermSize=${PERM_MEMORY}  "
     JAVA_OPTS="${JAVA_OPTS} -XX:MaxDirectMemorySize=${DIRECT_MEMORY}"
     JAVA_OPTS="${JAVA_OPTS} -XX:+AlwaysPreTouch"
-    JAVA_OPTS="${JAVA_OPTS} -Drx.ring-buffer.size=1024000"
+    # JAVA_OPTS="${JAVA_OPTS} -Drx.ring-buffer.size=1024000"
     JAVA_OPTS="${JAVA_OPTS} -Dio.netty.allocator.type=pooled"
     JAVA_OPTS="${JAVA_OPTS} -Dio.netty.leakDetectionLevel=PARANOID"
     JAVA_OPTS="${JAVA_OPTS} -Duser.dir=${SERVER_HOME} -Dapp.name=$SERVER_NAME"
