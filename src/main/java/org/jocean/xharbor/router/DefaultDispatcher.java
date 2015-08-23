@@ -103,11 +103,11 @@ public class DefaultDispatcher implements Dispatcher {
         MarkableTargetImpl best = null;
         for ( MarkableTargetImpl peer : this._targets ) {
             if ( isTargetActive(peer) ) {
-                // peer->current_weight += peer->effective_weight; 
+                // nginx C code: peer->current_weight += peer->effective_weight; 
                 final int effectiveWeight = peer._effectiveWeight.get();
                 final int currentWeight = peer._currentWeight.addAndGet( effectiveWeight );
                 total += effectiveWeight;
-                
+//  nginx C code:                 
 //                if (best == NULL || peer->current_weight > best->current_weight) {
 //                    best = peer;
 //                }
@@ -121,7 +121,7 @@ public class DefaultDispatcher implements Dispatcher {
             return null;
         }
         
-//        best->current_weight -= total;
+// nginx C code: best->current_weight -= total;
         best._currentWeight.addAndGet(-total);
         
         return best;
@@ -206,17 +206,16 @@ public class DefaultDispatcher implements Dispatcher {
     
     @Override
     public Observable<HttpObject> response(
+            final Object transport,
             final RoutingInfo info,
             final HttpRequest request, 
             final Observable<HttpObject> fullRequest) {
         
         final MarkableTarget target = dispatch();
         if (null==target) {
-            LOG.warn("can't found matched target service for request:[{}]\njust return 200 OK.", 
-                    request);
+            LOG.warn("can't found matched target service for http inbound ({})\nrequest:[{}]\njust return 200 OK.", 
+                    transport, request);
             _noRoutingMemo.incRoutingInfo(info);
-            //   TODO, mark this status
-    //        setEndReason("relay.NOROUTING");
             return RxObservables.delaySubscriptionUntilCompleted(
                     RxNettys.response200OK(request.getProtocolVersion()),
                     fullRequest);
@@ -225,11 +224,11 @@ public class DefaultDispatcher implements Dispatcher {
         final RelayMemo memo = _memoBuilder.build(target, info);
         final StopWatch watch4Result = new StopWatch();
         
-        final FullHttpResponse shortResponse = 
+        final FullHttpResponse directResponse = 
                 tryResponse(request);
-        if (null != shortResponse) {
+        if (null != directResponse) {
             return RxObservables.delaySubscriptionUntilCompleted(
-                    Observable.<HttpObject>just(shortResponse),
+                    Observable.<HttpObject>just(directResponse),
                     fullRequest);
         } else if (isNeedAuthorization(request)) {
             return RxObservables.delaySubscriptionUntilCompleted(
@@ -249,14 +248,13 @@ public class DefaultDispatcher implements Dispatcher {
             stepmemo.beginBizStep(STEP.ROUTING);
             
             rewriteRequest(request);
-            final AtomicReference<HttpResponse> resp = new AtomicReference<HttpResponse>();
+            final AtomicReference<HttpResponse> respRef = new AtomicReference<HttpResponse>();
             
             return _httpClient.defineInteraction(
                     new InetSocketAddress(
                         target.serviceUri().getHost(), 
                         target.serviceUri().getPort()), 
-                    fullRequest
-                    .doOnNext(new Action1<HttpObject>() {
+                    fullRequest.doOnNext(new Action1<HttpObject>() {
                         @Override
                         public void call(final HttpObject httpObj) {
                             if (httpObj instanceof HttpRequest) {
@@ -269,7 +267,7 @@ public class DefaultDispatcher implements Dispatcher {
                         @Override
                         public void call(final HttpObject httpObj) {
                             if (httpObj instanceof HttpResponse) {
-                                resp.set((HttpResponse)httpObj);
+                                respRef.set((HttpResponse)httpObj);
                                 stepmemo.beginBizStep(STEP.RECV_RESP);
                                 rewriteResponse((HttpResponse)httpObj);
                             }
@@ -288,14 +286,13 @@ public class DefaultDispatcher implements Dispatcher {
                             stepmemo.endBizStep();
                             final long ttl = watch4Result.stopAndRestart();
                             memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
-                            LOG.info("{}\ncost:[{}]s for client http connection ({})\nrequest:[{}]\ndispatch to:[{}]\nresponse:[{}]",
+                            LOG.info("{}\ncost:[{}]s for http inbound ({})\nrequest:[{}]\ndispatch to:[{}]\nresponse:[{}]",
                                     "RELAY_SUCCESS", 
                                     ttl / (float)1000.0, 
-                                    //this._channelCtx.channel(), 
-                                    "unknown",
+                                    transport, 
                                     request, 
                                     target.serviceUri(), 
-                                    resp.get());
+                                    respRef.get());
                         }});
         }
     }

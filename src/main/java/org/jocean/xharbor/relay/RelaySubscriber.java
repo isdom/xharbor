@@ -85,16 +85,17 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
     
     private static Observable<HttpObject> buildHttpResponse(
             final Dispatcher dispatcher, 
+            final Object transport,
             final HttpRequest request,
             final Observable<HttpObject> fullRequest,
             final RoutingInfo info,
             final AtomicBoolean canRetry) {
-        return dispatcher.response(info, request, fullRequest)
+        return dispatcher.response(transport, info, request, fullRequest)
             .onErrorResumeNext(new Func1<Throwable, Observable<HttpObject>>() {
                 @Override
                 public Observable<HttpObject> call(final Throwable e) {
                     if (canRetry.get()) {
-                        return buildHttpResponse(dispatcher, request, fullRequest, info, canRetry);
+                        return buildHttpResponse(dispatcher, transport, request, fullRequest, info, canRetry);
                     } else {
                         return Observable.error(e);
                     }
@@ -138,29 +139,13 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                 final RoutingInfo info = routectx.getProperty("routingInfo");
                 routectx.clear();
                 
-                buildHttpResponse(dispatcher, req, _cached.request(), info, new AtomicBoolean(true))
+                buildHttpResponse(dispatcher, _trade.transport(), req, _cached.request(), info, new AtomicBoolean(true))
                     .doOnTerminate(new Action0() {
                         @Override
                         public void call() {
                             _cached.destroy();
                         }})
                     .subscribe(_trade.responseObserver());
-                
-//                _cached.request().doOnCompleted(new Action0() {
-//                    @Override
-//                    public void call() {
-//                        final FullHttpRequest fullreq = _cached.retainFullHttpRequest();
-//                        buildHttpResponse(dispatcher, req, 
-//                                Observable.<HttpObject>just(fullreq), info, new AtomicBoolean(true))
-//                        .doOnTerminate(new Action0() {
-//                            @Override
-//                            public void call() {
-//                                fullreq.release();
-//                                _cached.destroy();
-//                            }})
-//                        .subscribe(_trade.responseObserver());
-//                    }})
-//                    .subscribe();
             }
         }
     };

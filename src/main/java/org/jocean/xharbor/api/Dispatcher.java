@@ -15,6 +15,7 @@ public interface Dispatcher {
     public boolean IsValid();
     
     public Observable<HttpObject> response(
+            final Object transport,
             final RoutingInfo info,
             final HttpRequest request, 
             final Observable<HttpObject> fullRequest);

@@ -28,13 +28,10 @@
     
     <bean id="noRoutingMemo" class="org.jocean.xharbor.util.RoutingInfoMemoImpl"/>
    
-    <bean id="directMemory" class="org.jocean.xharbor.util.DirectMemoryIndicator"/>
-    
     <bean id="zkExporter" class="org.springframework.jmx.export.MBeanExporter"
           lazy-init="false">
         <property name="beans">
             <map>
-                <entry key="org.jocean:name=directMemory"   value-ref="directMemory"/>
                 <entry key="org.jocean:name=serviceMemo"    value-ref="serviceMemo"/>
                 <entry key="org.jocean:name=noRouting"      value-ref="noRoutingMemo"/>
                 <entry key="org.jocean:type=router,name=stats" value-ref="statsRegister"/>
