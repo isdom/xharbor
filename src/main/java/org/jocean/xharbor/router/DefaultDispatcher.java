@@ -3,6 +3,7 @@
  */
 package org.jocean.xharbor.router;
 
+import io.netty.channel.Channel;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
@@ -18,8 +19,10 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.http.Feature;
 import org.jocean.http.client.HttpClient;
+import org.jocean.http.util.Nettys.ChannelAware;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.ExceptionUtils;
+import org.jocean.idiom.JOArrays;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxObservables;
 import org.jocean.idiom.stats.BizMemo;
@@ -250,6 +253,16 @@ public class DefaultDispatcher implements Dispatcher {
             rewriteRequest(request);
             final AtomicReference<HttpResponse> respRef = new AtomicReference<HttpResponse>();
             
+            final class ChannelGetter extends Feature.AbstractFeature0 
+                implements ChannelAware {
+                @Override
+                public void setChannel(final Channel channel) {
+                    _channel = channel;
+                }
+                private Channel _channel;
+            }
+            final ChannelGetter channelGetter = new ChannelGetter();
+            
             return _httpClient.defineInteraction(
                     new InetSocketAddress(
                         target.serviceUri().getHost(), 
@@ -261,7 +274,8 @@ public class DefaultDispatcher implements Dispatcher {
                                 stepmemo.beginBizStep(STEP.TRANSFER_CONTENT);
                             }
                         }}),
-                    target.features().call())
+                    JOArrays.addFirst(Feature[].class, target.features().call(),
+                            channelGetter))
                     .compose(RxNettys.objects2httpobjs())
                     .doOnNext(new Action1<HttpObject>() {
                         @Override
@@ -286,10 +300,11 @@ public class DefaultDispatcher implements Dispatcher {
                             stepmemo.endBizStep();
                             final long ttl = watch4Result.stopAndRestart();
                             memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
-                            LOG.info("{}\ncost:[{}]s for http inbound ({})\nrequest:[{}]\ndispatch to:[{}]\nresponse:[{}]",
+                            LOG.info("{}\ncost:[{}]s for http inbound ({})\nand outbound ({})\nrequest:[{}]\ndispatch to:[{}]\nresponse:[{}]",
                                     "RELAY_SUCCESS", 
                                     ttl / (float)1000.0, 
                                     transport, 
+                                    channelGetter._channel,
                                     request, 
                                     target.serviceUri(), 
                                     respRef.get());
