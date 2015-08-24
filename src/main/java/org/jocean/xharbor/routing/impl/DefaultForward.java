@@ -11,10 +11,16 @@ import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.api.Target;
 import org.jocean.xharbor.routing.ForwardRule;
 import org.jocean.xharbor.routing.RuleSet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import rx.functions.Func0;
 
 public class DefaultForward implements ForwardRule, BeanHolderAware {
+    
+    private static final Logger LOG = LoggerFactory
+            .getLogger(DefaultForward.class);
+    
     public DefaultForward(final RuleSet rules, 
             final String uri,
             final String featuresName,
@@ -49,7 +55,11 @@ public class DefaultForward implements ForwardRule, BeanHolderAware {
                 @Override
                 public Func0<Feature[]> features() {
                     final FeaturesBuilder builder = _beanHolder.getBean(_featuresName, FeaturesBuilder.class);
-                    return builder;
+                    if (null==builder) {
+                        LOG.warn("forward rule {} require FeaturesBuilder named({}) not exist! please check xharbor config!",
+                                DefaultForward.this, _featuresName);
+                    }
+                    return null!=builder ? builder : Feature.FEATURESBUILDER_FOR_EMPTY;
                 }
                 @Override
                 public String toString() {
@@ -68,15 +78,15 @@ public class DefaultForward implements ForwardRule, BeanHolderAware {
     
     @Override
     public String toString() {
-        return "[uri=" + _uri
-                + ":method=" + _methodPattern 
-                + ",path=" + _pathPattern + "]";
+        return "[forward(METHOD=" + _methodPattern 
+                + "/PATH=" + _pathPattern
+                + ")-->" + _uri + "]";
     }
 
     private final RuleSet _rules;
-    private final URI _uri;
     private final Pattern _methodPattern;
     private final Pattern _pathPattern;
+    private final URI _uri;
     private BeanHolder _beanHolder;
     private final String _featuresName;
 }

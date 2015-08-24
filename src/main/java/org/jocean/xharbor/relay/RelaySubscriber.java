@@ -122,10 +122,8 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
 
         @Override
         public void onError(final Throwable e) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("trade({}).request().onError ({}).", 
-                    this._trade, ExceptionUtils.exception2detail(e));
-            }
+            LOG.warn("trade({}).request().onError ({}).", 
+                this._trade, ExceptionUtils.exception2detail(e));
             this._cached.destroy();
         }
         
