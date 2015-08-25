@@ -51,6 +51,11 @@ public class DefaultRuleSet implements RuleSet {
             @Override
             public Func0<Feature[]> features() {
                 return null;
+            }
+
+            @Override
+            public String toString() {
+                return "FAKE_TARGET";
             }};
     }
     
