@@ -21,14 +21,13 @@ public interface RelayMemo extends BizMemo<RelayMemo.STEP, RelayMemo.RESULT> {
     
     public enum RESULT {
         RELAY_SUCCESS,
-        TRANSFORM_REQUEST,
-        CONNECTDESTINATION_FAILURE,
+        CONNECTDESTINATION_FAILURE, // TODO add this result
         RELAY_RETRY,
         HTTP_UNAUTHORIZED,
         HTTP_CLIENT_ERROR,
         HTTP_SERVER_ERROR,
         RELAY_FAILURE,
-        SOURCE_CANCELED,
+        INBOUND_CANCELED,
     }
     
     public interface Builder {

@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.http.Feature;
 import org.jocean.http.client.HttpClient;
+import org.jocean.http.server.HttpServer;
 import org.jocean.http.util.Nettys.ChannelAware;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.ExceptionUtils;
@@ -209,7 +210,7 @@ public class DefaultDispatcher implements Dispatcher {
     
     @Override
     public Observable<HttpObject> response(
-            final Object transport,
+            final ResponseCtx ctx,
             final RoutingInfo info,
             final HttpRequest request, 
             final Observable<HttpObject> fullRequest) {
@@ -217,7 +218,7 @@ public class DefaultDispatcher implements Dispatcher {
         final MarkableTarget target = dispatch();
         if (null==target) {
             LOG.warn("can't found matched target service for http inbound ({})\nrequest:[{}]\njust return 200 OK.", 
-                    transport, request);
+                    ctx.transport, request);
             _noRoutingMemo.incRoutingInfo(info);
             return RxObservables.delaySubscriptionUntilCompleted(
                     RxNettys.response200OK(request.getProtocolVersion()),
@@ -290,9 +291,32 @@ public class DefaultDispatcher implements Dispatcher {
                         @Override
                         public void call(final Throwable e) {
                             stepmemo.endBizStep();
+                            final long ttl = watch4Result.stopAndRestart();
                             LOG.error("exception when transfer, detail: {}",
                                     ExceptionUtils.exception2detail(e));
-                            memo.incBizResult(RESULT.RELAY_FAILURE, watch4Result.stopAndRestart());
+                            if (e instanceof HttpServer.TransportException) {
+                                memo.incBizResult(RESULT.INBOUND_CANCELED, ttl);
+                                LOG.warn("INBOUND_CANCELED\ncost:[{}]s for http inbound ({})\nand outbound ({})\nrequest:[{}]\ndispatch to:[{}]",
+                                        ttl / (float)1000.0,
+                                        ctx.transport,
+                                        channelGetter._channel,
+                                        request, 
+                                        target.serviceUri());
+
+                            } else {
+                                ctx.resultSetter = new Action1<RelayMemo.RESULT> () {
+                                    @Override
+                                    public void call(final RESULT result) {
+                                        memo.incBizResult(result, ttl);
+                                        LOG.warn("{}\ncost:[{}]s for http inbound ({})\nand outbound ({})\nrequest:[{}]\ndispatch to:[{}]",
+                                                result.toString(),
+                                                ttl / (float)1000.0,
+                                                ctx.transport,
+                                                channelGetter._channel,
+                                                request, 
+                                                target.serviceUri());
+                                    }};
+                            }
                         }})
                     .doOnCompleted(new Action0() {
                         @Override
@@ -300,10 +324,9 @@ public class DefaultDispatcher implements Dispatcher {
                             stepmemo.endBizStep();
                             final long ttl = watch4Result.stopAndRestart();
                             memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
-                            LOG.info("{}\ncost:[{}]s for http inbound ({})\nand outbound ({})\nrequest:[{}]\ndispatch to:[{}]\nresponse:[{}]",
-                                    "RELAY_SUCCESS", 
+                            LOG.info("RELAY_SUCCESS\ncost:[{}]s for http inbound ({})\nand outbound ({})\nrequest:[{}]\ndispatch to:[{}]\nresponse:[{}]",
                                     ttl / (float)1000.0, 
-                                    transport, 
+                                    ctx.transport, 
                                     channelGetter._channel,
                                     request, 
                                     target.serviceUri(), 

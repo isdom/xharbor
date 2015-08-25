@@ -50,12 +50,12 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
         
         @Override
         public Observable<HttpObject> response(
-                final Object transport,
+                final ResponseCtx ctx,
                 final RoutingInfo info,
                 final HttpRequest request, 
                 final Observable<HttpObject> fullRequest) {
             LOG.warn("can't found matched target service for http inbound ({})\nrequest:[{}]\njust return 200 OK.", 
-                    transport, request);
+                    ctx.transport, request);
             _noRoutingMemo.incRoutingInfo(info);
             return RxObservables.delaySubscriptionUntilCompleted(
                     RxNettys.response200OK(request.getProtocolVersion()),

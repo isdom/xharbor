@@ -11,9 +11,12 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jocean.http.server.CachedRequest;
+import org.jocean.http.server.HttpServer;
 import org.jocean.http.server.HttpServer.HttpTrade;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.xharbor.api.Dispatcher;
+import org.jocean.xharbor.api.Dispatcher.ResponseCtx;
+import org.jocean.xharbor.api.RelayMemo.RESULT;
 import org.jocean.xharbor.api.Router;
 import org.jocean.xharbor.api.RoutingInfo;
 import org.slf4j.Logger;
@@ -90,13 +93,16 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
             final Observable<HttpObject> fullRequest,
             final RoutingInfo info,
             final AtomicBoolean canRetry) {
-        return dispatcher.response(transport, info, request, fullRequest)
+        final ResponseCtx ctx = new ResponseCtx(transport);
+        return dispatcher.response(ctx, info, request, fullRequest)
             .onErrorResumeNext(new Func1<Throwable, Observable<HttpObject>>() {
                 @Override
                 public Observable<HttpObject> call(final Throwable e) {
-                    if (canRetry.get()) {
+                    if (!isInboundCanceled(e) && canRetry.get()) {
+                        assignResult(ctx, RESULT.RELAY_RETRY);
                         return buildHttpResponse(dispatcher, transport, request, fullRequest, info, canRetry);
                     } else {
+                        assignResult(ctx, RESULT.RELAY_FAILURE);
                         return Observable.error(e);
                     }
                 }})
@@ -107,6 +113,16 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                 }});
     }
     
+    private static boolean isInboundCanceled(final Throwable e) {
+        return e instanceof HttpServer.TransportException;
+    }
+
+    private static void assignResult(final ResponseCtx ctx, final RESULT result) {
+        if (null!=ctx.resultSetter) {
+            ctx.resultSetter.call(result);
+        }
+    }
+
     class RequestSubscriber extends Subscriber<HttpObject> {
         private final HttpTrade _trade;
         private final CachedRequest _cached;
