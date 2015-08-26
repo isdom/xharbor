@@ -4,8 +4,6 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
         
-    <import resource="classpath:unit/zkbooterlite.xml"/>
-    
     <bean id="timer" class="io.netty.util.HashedWheelTimer" />
 
     <bean id="statsRegister" class="org.jocean.xharbor.util.StatsImpl" />
@@ -28,7 +26,7 @@
     
     <bean id="noRoutingMemo" class="org.jocean.xharbor.util.RoutingInfoMemoImpl"/>
    
-    <bean id="zkExporter" class="org.springframework.jmx.export.MBeanExporter"
+    <bean id="xharborExporter" class="org.springframework.jmx.export.MBeanExporter"
           lazy-init="false">
         <property name="beans">
             <map>
