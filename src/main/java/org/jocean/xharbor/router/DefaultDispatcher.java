@@ -9,6 +9,7 @@ import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.ArrayList;
@@ -294,7 +295,15 @@ public class DefaultDispatcher implements Dispatcher {
                             final long ttl = watch4Result.stopAndRestart();
                             LOG.error("exception when transfer, detail: {}",
                                     ExceptionUtils.exception2detail(e));
-                            if (e instanceof HttpServer.TransportException) {
+                            if (e instanceof ConnectException) {
+                                memo.incBizResult(RESULT.CONNECTDESTINATION_FAILURE, ttl);
+                                LOG.warn("CONNECTDESTINATION_FAILURE\ncost:[{}]s for http inbound ({})\nand outbound ({})\nrequest:[{}]\ndispatch to:[{}]",
+                                        ttl / (float)1000.0,
+                                        ctx.transport,
+                                        channelGetter._channel,
+                                        request, 
+                                        target.serviceUri());
+                            } else if (e instanceof HttpServer.TransportException) {
                                 memo.incBizResult(RESULT.INBOUND_CANCELED, ttl);
                                 LOG.warn("INBOUND_CANCELED\ncost:[{}]s for http inbound ({})\nand outbound ({})\nrequest:[{}]\ndispatch to:[{}]",
                                         ttl / (float)1000.0,
@@ -302,7 +311,6 @@ public class DefaultDispatcher implements Dispatcher {
                                         channelGetter._channel,
                                         request, 
                                         target.serviceUri());
-
                             } else {
                                 ctx.resultSetter = new Action1<RelayMemo.RESULT> () {
                                     @Override
