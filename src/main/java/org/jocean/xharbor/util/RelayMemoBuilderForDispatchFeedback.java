@@ -52,6 +52,9 @@ public class RelayMemoBuilderForDispatchFeedback implements RelayMemo.Builder {
                 if (result.equals(RESULT.CONNECTDESTINATION_FAILURE)) {
                     markServiceDown4Result(60L, target, "CONNECTDESTINATION_FAILURE");
                 }
+                else if (result.equals(RESULT.RELAY_RETRY)) {
+                    markAPIDown4Result(60L, target, info, "RELAY_RETRY");
+                }
                 else if (result.equals(RESULT.RELAY_FAILURE)) {
                     markAPIDown4Result(60L, target, info, "RELAY_FAILURE");
                 }
