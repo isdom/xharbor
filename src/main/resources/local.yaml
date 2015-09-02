@@ -1,0 +1,80 @@
+name: units
+parameters: |
+  __spring.xml=xharbor/xharbor.xml,http/httpclient.xml,http/httpserver.xml
+children:
+  - name: jmxsrv
+    parameters: |
+      jmxmp.port = 0
+      jmxhtml.port = 8082
+  - name: nop.httpout
+    children:
+      - name: httpfeatures.compress
+        parameters: |
+          httpconf.name=compress
+        children:
+          - name: feature_compress
+          - name: feature_logging
+      - name: httpfeatures.default
+        parameters: |
+          httpconf.name=default
+        children:
+          - name: feature_logging
+  - name: router.biz
+    children:
+      - name: nop.httpin
+        children:
+          - name: httpsvr.8888
+            parameters: |
+              http.port=8888
+          - name: httpsvr.8443_https
+            parameters: |
+              http.port=8443
+            children:
+              - name: feature_ssl4server
+      - name: rules.100
+        parameters: |
+          priority=100
+        children:
+          - name: respond.checkhealth
+            parameters: |
+              request.method=HEAD|GET
+              request.path=^/$|/checkhealth
+              response.status=200
+          - name: forward.ydd
+            parameters: |
+              forward.path=/api1/[/|\\w]*\
+                    |/api2/[/|\\w]*
+              
+              forward.to=http://api.demo.com:80
+              forward.httpconf=compress
+          - name: rwresp.cors
+            parameters: |
+              rewrite.path=/api1/(\\w)*
+            children:
+              - name: addheader.cors.basic
+                parameters: |
+                  header.name=Access-Control-Allow-Origin
+                  header.value=*
+  - name: router.console
+    children:
+      - name: httpsvr.8889
+        parameters: |
+          http.port=8889
+      - name: rules.100
+        parameters: |
+          priority=100
+        children:
+          - name: forward.jmxhtml.self
+            parameters: |
+              forward.path=/jmxhtml\\.self/[/|\\w]*
+              forward.to=http://127.0.0.1:8082
+          - name: rwreq.jmxhtml
+            parameters: |
+              rewrite.path=/jmxhtml[\\w|\\.]*
+              rewrite.to=
+          - name: auth.jmxhtml
+            parameters: |
+              auth.path=/jmxhtml(\\w)*
+              auth.user=test
+              auth.password=test
+              

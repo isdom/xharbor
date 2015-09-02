@@ -35,7 +35,9 @@ dependencies {
     compile 'com.alibaba:fastjson:1.1.41'
 
     compile 'javax.ws.rs:javax.ws.rs-api:2.0'
-    /* compile 'org.glassfish.external:opendmk_jdmkrt_jar:1.0-b01-ea' */
+    
+    /* for yaml */
+    compile 'org.yaml:snakeyaml:1.16'
 
     runtime 'org.javassist:javassist:3.18.2-GA'
     compile 'com.jcraft:jzlib:1.1.2'
