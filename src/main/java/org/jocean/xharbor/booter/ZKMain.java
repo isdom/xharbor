@@ -20,5 +20,6 @@ public class ZKMain {
         @SuppressWarnings({ "resource", "unused" })
         final AbstractApplicationContext ctx = 
                 new ClassPathXmlApplicationContext("unit/zkbooter.xml");
+        Thread.currentThread().join();
     }
 }
