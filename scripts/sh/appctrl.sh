@@ -48,7 +48,9 @@ start)
     JAVA_OPTS="${JAVA_OPTS} -XX:+AlwaysPreTouch"
     # JAVA_OPTS="${JAVA_OPTS} -Drx.ring-buffer.size=1024000"
     JAVA_OPTS="${JAVA_OPTS} -Dio.netty.allocator.type=pooled"
-    JAVA_OPTS="${JAVA_OPTS} -Dio.netty.leakDetectionLevel=PARANOID"
+    JAVA_OPTS="${JAVA_OPTS} -Dio.netty.leakDetection.level=PARANOID"
+    JAVA_OPTS="${JAVA_OPTS} -Dio.netty.leakDetection.maxRecords=20"
+    JAVA_OPTS="${JAVA_OPTS} -Dio.netty.leakDetection.acquireAndReleaseOnly=true"
     JAVA_OPTS="${JAVA_OPTS} -Duser.dir=${SERVER_HOME} -Dapp.name=$SERVER_NAME"
     echo "start jvm args ${JAVA_OPTS}"
     nohup java $JAVA_OPTS -jar ${SERVER_HOME}/bin/$SERVER_NAME.jar >/dev/null &
