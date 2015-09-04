@@ -20,6 +20,5 @@ public class ZKMainLite {
         @SuppressWarnings({ "resource", "unused" })
         final AbstractApplicationContext ctx = 
                 new ClassPathXmlApplicationContext("unit/zkbooterlite.xml");
-        Thread.currentThread().join();
     }
 }
