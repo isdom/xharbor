@@ -69,14 +69,13 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
     
     @Override
     public void onCompleted() {
-        // TODO Auto-generated method stub
-        
+        LOG.warn("RelaySubscriber {} onCompleted", this);
     }
 
     @Override
     public void onError(final Throwable e) {
-        // TODO Auto-generated method stub
-        
+        LOG.warn("RelaySubscriber {} onError, detail:{}", 
+                this, ExceptionUtils.exception2detail(e));
     }
 
     @Override
