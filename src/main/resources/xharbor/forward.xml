@@ -10,7 +10,8 @@
         <constructor-arg value="${forward.to}"/>
         <constructor-arg value="${forward.httpconf:default}"/>
         <constructor-arg value="${forward.method:}"/>
-        <constructor-arg value="${forward.path}"/>
+        <constructor-arg value="${forward.path:}"/>
+        <constructor-arg value="${forward.xroute:}"/>
     </bean>
     
 </beans>

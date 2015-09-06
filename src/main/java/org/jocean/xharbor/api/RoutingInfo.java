@@ -8,6 +8,7 @@ package org.jocean.xharbor.api;
  *
  */
 public interface RoutingInfo {
+    public String getXRouteCode();
     public String getMethod();
     public String getPath();
 }

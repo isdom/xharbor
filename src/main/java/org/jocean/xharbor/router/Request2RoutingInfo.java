@@ -16,25 +16,17 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class Request2RoutingInfo implements Router<HttpRequest, RoutingInfo> {
+    private static final String X_ROUTE_CODE = "X-Route-Code";
     private static final Logger LOG = LoggerFactory
             .getLogger(Request2RoutingInfo.class);
 
     private static class RoutingInfoImpl implements RoutingInfo {
-        RoutingInfoImpl(final String method, final String path) {
+        RoutingInfoImpl(final String method, final String path, final String xroutecode) {
             this._method = method;
             this._path = path;
+            this._xroutecode = null!=xroutecode ? xroutecode : "";
         }
         
-        @Override
-        public String getMethod() {
-            return this._method;
-        }
-        
-        @Override
-        public String getPath() {
-            return this._path;
-        }
-
         @Override
         public int hashCode() {
             final int prime = 31;
@@ -42,6 +34,8 @@ public class Request2RoutingInfo implements Router<HttpRequest, RoutingInfo> {
             result = prime * result
                     + ((_method == null) ? 0 : _method.hashCode());
             result = prime * result + ((_path == null) ? 0 : _path.hashCode());
+            result = prime * result
+                    + ((_xroutecode == null) ? 0 : _xroutecode.hashCode());
             return result;
         }
 
@@ -64,14 +58,35 @@ public class Request2RoutingInfo implements Router<HttpRequest, RoutingInfo> {
                     return false;
             } else if (!_path.equals(other._path))
                 return false;
+            if (_xroutecode == null) {
+                if (other._xroutecode != null)
+                    return false;
+            } else if (!_xroutecode.equals(other._xroutecode))
+                return false;
             return true;
         }
 
         @Override
-        public String toString() {
-            return "[" + _method + " " + _path + "]";
+        public String getMethod() {
+            return this._method;
+        }
+        
+        @Override
+        public String getPath() {
+            return this._path;
         }
 
+        @Override
+        public String getXRouteCode() {
+            return this._xroutecode;
+        }
+        
+        @Override
+        public String toString() {
+            return "[" + _method + ":" + _path + "("+ _xroutecode + ")]";
+        }
+
+        private final String _xroutecode;
         private final String _method;
         private final String _path;
     }
@@ -80,7 +95,10 @@ public class Request2RoutingInfo implements Router<HttpRequest, RoutingInfo> {
     public RoutingInfo calculateRoute(final HttpRequest request, final Context routectx) {
         final QueryStringDecoder decoder = new QueryStringDecoder(request.getUri());
 
-        final RoutingInfo info = new RoutingInfoImpl(request.getMethod().name(), decoder.path());
+        final RoutingInfo info = new RoutingInfoImpl(
+                request.getMethod().name(), 
+                decoder.path(),
+                request.headers().get(X_ROUTE_CODE));
         routectx.setProperty("path", info.getPath());
         routectx.setProperty("routingInfo", info);
         if ( LOG.isDebugEnabled()) {
