@@ -10,13 +10,13 @@ children:
     children:
       - name: httpfeatures.compress
         parameters: |
-          httpconf.name=compress
+          features.name=compress
         children:
           - name: feature_compress
           - name: feature_logging
       - name: httpfeatures.default
         parameters: |
-          httpconf.name=default
+          features.name=default
         children:
           - name: feature_logging
   - name: router.biz
@@ -46,7 +46,7 @@ children:
                     |/api2/[/|\\w]*
               
               forward.to=http://api.demo.com:80
-              forward.httpconf=compress
+              features.name=compress
           - name: rwresp.cors
             parameters: |
               rewrite.path=/api1/(\\w)*
