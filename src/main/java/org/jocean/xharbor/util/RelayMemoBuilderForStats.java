@@ -4,8 +4,8 @@
 package org.jocean.xharbor.util;
 
 import java.net.URI;
-import java.util.List;
 
+import org.jocean.idiom.Emitter;
 import org.jocean.idiom.Function;
 import org.jocean.idiom.InterfaceUtils;
 import org.jocean.idiom.SimpleCache;
@@ -13,14 +13,15 @@ import org.jocean.idiom.Tuple;
 import org.jocean.idiom.Visitor2;
 import org.jocean.idiom.stats.TimeIntervalMemo;
 import org.jocean.j2se.stats.BizMemoSupportMBean;
-import org.jocean.j2se.stats.InfoListMaker;
 import org.jocean.j2se.stats.TIMemos;
-import org.jocean.j2se.stats.TIMemos.TIMemoWithOutput;
+import org.jocean.j2se.stats.TIMemos.EmitableTIMemo;
 import org.jocean.xharbor.api.MarkableTarget;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.RelayMemo.RESULT;
 import org.jocean.xharbor.api.RelayMemo.STEP;
 import org.jocean.xharbor.api.RoutingInfo;
+
+import rx.functions.Action1;
 
 /**
  * @author isdom
@@ -28,7 +29,7 @@ import org.jocean.xharbor.api.RoutingInfo;
  */
 public class RelayMemoBuilderForStats implements RelayMemo.Builder {
 
-    public RelayMemoBuilderForStats(final Visitor2<String, InfoListMaker> register) throws Exception {
+    public RelayMemoBuilderForStats(final Visitor2<String, Emitter<String>> register) throws Exception {
         this._register = register;
         this._level0Memo = new RelayMemoImpl()
         .fillTimeIntervalMemoWith(new Function<Enum<?>, TimeIntervalMemo>() {
@@ -62,34 +63,34 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
     }
     
     private static class RelayMemoImpl extends BizMemoSupportMBean<RelayMemoImpl, STEP, RESULT> 
-        implements RelayMemo, InfoListMaker {
+        implements RelayMemo, Emitter<String> {
         
         public RelayMemoImpl() {
             super(STEP.class, RESULT.class);
         }
         
         @Override
-        public void addInfoList(final List<String> infos) {
+        public void emit(final Action1<String> receptor) {
             for (STEP step : this._steps) {
-                infos.add("STEP:" + step.name() +":"+ this._stepCounters[step.ordinal()].get());
+                receptor.call("STEP:" + step.name() +":"+ this._stepCounters[step.ordinal()].get());
             }
             for (RESULT result : this._results) {
-                infos.add("RESULT:" + result.name() +":"+ this._resultCounters[result.ordinal()].get());
+                receptor.call("RESULT:" + result.name() +":"+ this._resultCounters[result.ordinal()].get());
             }
         }
     }
     
-    private final Visitor2<String, InfoListMaker> _register;
+    private final Visitor2<String, Emitter<String>> _register;
     
-    private Function<Tuple, TIMemoWithOutput> _ttlMemoMaker = new Function<Tuple, TIMemoWithOutput>() {
+    private Function<Tuple, EmitableTIMemo> _ttlMemoMaker = new Function<Tuple, EmitableTIMemo>() {
         @Override
-        public TIMemoWithOutput apply(final Tuple tuple) {
+        public EmitableTIMemo apply(final Tuple tuple) {
             return TIMemos.memo_10ms_30S();
         }};
         
-    private Visitor2<Tuple, TIMemoWithOutput> _ttlMemoRegister = new Visitor2<Tuple, TIMemoWithOutput>() {
+    private Visitor2<Tuple, EmitableTIMemo> _ttlMemoRegister = new Visitor2<Tuple, EmitableTIMemo>() {
         @Override
-        public void visit(final Tuple tuple, final TIMemoWithOutput newMemo) throws Exception {
+        public void visit(final Tuple tuple, final EmitableTIMemo newMemo) throws Exception {
             final StringBuilder sb = new StringBuilder();
             Character splitter = null;
             //                      for last Enum<?>
@@ -119,8 +120,8 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
             }
         }};
             
-    private SimpleCache<Tuple, TIMemoWithOutput> _ttlMemos  = 
-            new SimpleCache<Tuple, TIMemoWithOutput>(this._ttlMemoMaker, this._ttlMemoRegister);
+    private SimpleCache<Tuple, EmitableTIMemo> _ttlMemos  = 
+            new SimpleCache<Tuple, EmitableTIMemo>(this._ttlMemoMaker, this._ttlMemoRegister);
     
     private final Function<Tuple, RelayMemoImpl> _bizMemoMaker = 
             new Function<Tuple, RelayMemoImpl>() {
