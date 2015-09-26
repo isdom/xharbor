@@ -16,8 +16,7 @@ public class Main {
         
         @SuppressWarnings({ "unused", "resource" })
         final ApplicationContext ctx =
-                new ClassPathXmlApplicationContext(
-                        new String[]{"unit/localbooter.xml"});
+            new ClassPathXmlApplicationContext("unit/localbooter.xml");
     }
 
 }
