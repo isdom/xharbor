@@ -27,7 +27,6 @@ import rx.Subscriber;
 import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.functions.Func1;
-import rx.observers.SerializedSubscriber;
 
 /**
  * @author isdom
@@ -80,9 +79,8 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
 
     @Override
     public void onNext(final HttpTrade trade) {
-        trade.request().subscribe(
-            new SerializedSubscriber<HttpObject>(
-                new RequestSubscriber(trade)));
+        trade.request().serialize().subscribe(
+            new RequestSubscriber(trade));
     }
     
     private static Observable<HttpObject> buildHttpResponse(
