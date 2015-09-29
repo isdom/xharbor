@@ -23,12 +23,14 @@ children:
     children:
       - name: nop.httpin
         children:
-          - name: httpsvr.8888
+          - name: httpin.8888
             parameters: |
               http.port=8888
-          - name: httpsvr.8443_https
+              http.address=127.0.0.1
+          - name: httpin.8443_https
             parameters: |
               http.port=8443
+              http.address=127.0.0.1
             children:
               - name: feature_ssl4server
       - name: rules.100

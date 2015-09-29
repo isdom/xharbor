@@ -6,12 +6,14 @@
     
     <bean id="httpfeatures" class="java.util.concurrent.CopyOnWriteArrayList" />
         
+    <bean id="inboundIndicator" class="org.jocean.xharbor.mbean.RelayInboundIndicator"/>
+    
     <bean id="agentServer" 
         factory-bean="httpServer" 
         factory-method="defineServer">
         <constructor-arg>
             <bean class="java.net.InetSocketAddress">
-                <constructor-arg value="${http.ip:0.0.0.0}"/>
+                <constructor-arg value="${http.address:0.0.0.0}"/>
                 <constructor-arg value="${http.port:8080}"/>
             </bean>
         </constructor-arg>
@@ -19,6 +21,11 @@
 		    <bean class="org.jocean.http.util.FeaturesBuilder">
 		        <constructor-arg ref="httpfeatures"/>
 		    </bean>
+        </constructor-arg>
+        <constructor-arg>
+            <array value-type="org.jocean.http.Feature">
+                <ref bean="inboundIndicator"/>
+            </array>
         </constructor-arg>
     </bean>
     
