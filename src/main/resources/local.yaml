@@ -47,7 +47,7 @@ children:
               forward.path=/api1/[/|\\w]*\
                     |/api2/[/|\\w]*
               
-              forward.to=http://api.demo.com:80
+              forward.to=http://api.iplusmed.com:80
               features.name=compress
           - name: rwresp.cors
             parameters: |

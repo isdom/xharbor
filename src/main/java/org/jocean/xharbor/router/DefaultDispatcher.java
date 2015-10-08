@@ -3,8 +3,12 @@
  */
 package org.jocean.xharbor.router;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufInputStream;
 import io.netty.channel.Channel;
 import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -40,6 +44,9 @@ import org.jocean.xharbor.api.ServiceMemo;
 import org.jocean.xharbor.api.Target;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Charsets;
+import com.google.common.io.ByteStreams;
 
 import rx.Observable;
 import rx.functions.Action0;
@@ -274,6 +281,20 @@ public class DefaultDispatcher implements Dispatcher {
                         public void call(final HttpObject httpObj) {
                             if (httpObj instanceof HttpRequest) {
                                 stepmemo.beginBizStep(STEP.TRANSFER_CONTENT);
+                            } else if (httpObj instanceof HttpContent) {
+                                try {
+                                    if ( isJson(request.headers().get(HttpHeaders.Names.CONTENT_TYPE)) ) {
+                                        final ByteBuf content = ((HttpContent)httpObj).content();
+                                        final byte[] bytes = 
+                                            ByteStreams.toByteArray(new ByteBufInputStream(content.slice()));
+                                        LOG.info("DUMP CONTENT: request:[{}]'s json content is: {}", 
+                                                request, 
+                                                new String(bytes, Charsets.UTF_8));
+                                    }
+                                } catch (Exception e) {
+                                    LOG.warn("exception when dump content, detail: {}", 
+                                            ExceptionUtils.exception2detail(e));
+                                }
                             }
                         }}),
                     JOArrays.addFirst(Feature[].class, target.features().call(),
@@ -341,6 +362,10 @@ public class DefaultDispatcher implements Dispatcher {
                                     respRef.get());
                         }});
         }
+    }
+
+    private boolean isJson(final String contentType) {
+        return null != contentType && contentType.startsWith("application/json");
     }
 
     private final HttpClient _httpClient;
