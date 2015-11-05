@@ -49,6 +49,10 @@ children:
               
               forward.to=http://api.iplusmed.com:80
               features.name=compress
+          - name: forward.zkwebui
+            parameters: |
+              forward.path=/zkwebui/[/|\\w]*
+              forward.to=http://127.0.0.1:7080
           - name: rwresp.cors
             parameters: |
               rewrite.path=/api1/(\\w)*
