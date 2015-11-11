@@ -13,7 +13,7 @@ dependencies {
 
     compile 'io.reactivex:rxjava:1.0.15'
     
-    compile 'io.netty:netty-all:4.0.32.Final'
+    compile 'io.netty:netty-all:4.0.33.Final'
     compile 'javax.inject:javax.inject:1'
 
     /* jocean */
