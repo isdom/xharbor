@@ -9,15 +9,15 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.jocean.idiom.Emitter;
-import org.jocean.idiom.Visitor2;
 
 import rx.functions.Action1;
+import rx.functions.Action2;
 
 /**
  * @author isdom
  *
  */
-public class StatsImpl implements RulesMXBean, Visitor2<String,Emitter<String>> {
+public class StatsImpl implements RulesMXBean, Action2<String,Emitter<String>> {
 
     @Override
     public String[] getRoutingRules() {
@@ -43,7 +43,7 @@ public class StatsImpl implements RulesMXBean, Visitor2<String,Emitter<String>> 
     }
     
     @Override
-    public void visit(final String name, final Emitter<String> emitter) throws Exception {
+    public void call(final String name, final Emitter<String> emitter) {
         this._register.put(name, emitter);
     }
 

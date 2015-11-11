@@ -4,7 +4,6 @@
 package org.jocean.xharbor.router;
 
 import org.jocean.idiom.ExceptionUtils;
-import org.jocean.idiom.Function;
 import org.jocean.idiom.SimpleCache;
 import org.jocean.idiom.Visitor;
 import org.jocean.idiom.Visitor2;
@@ -16,6 +15,8 @@ import org.slf4j.LoggerFactory;
 
 import rx.functions.Action0;
 import rx.functions.Action1;
+import rx.functions.Action2;
+import rx.functions.Func1;
 
 /**
  * @author isdom
@@ -122,16 +123,16 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT>, MBean
     
     private final SimpleCache<INPUT, OUTPUT> _cache = new SimpleCache<INPUT, OUTPUT>(
             //  ifAbsent
-            new Function<INPUT, OUTPUT>() {
+            new Func1<INPUT, OUTPUT>() {
                 @Override
-                public OUTPUT apply(final INPUT input) {
+                public OUTPUT call(final INPUT input) {
                     return _impl.calculateRoute(input, _CTX.get());
                 }
             },
             //  ifAssociated
-            new Visitor2<INPUT, OUTPUT>() {
+            new Action2<INPUT, OUTPUT>() {
                 @Override
-                public void visit(final INPUT input, final OUTPUT output) throws Exception {
+                public void call(final INPUT input, final OUTPUT output) {
                     final OnRouted<INPUT, OUTPUT> onRouted = _onRouted;
                     try {
                         if ( null != onRouted ) {

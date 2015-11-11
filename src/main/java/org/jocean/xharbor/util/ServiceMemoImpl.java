@@ -9,9 +9,10 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.jocean.idiom.Function;
 import org.jocean.idiom.SimpleCache;
 import org.jocean.xharbor.api.ServiceMemo;
+
+import rx.functions.Func1;
 
 /**
  * @author isdom
@@ -46,9 +47,9 @@ public class ServiceMemoImpl implements ServiceMemo {
     
     private final SimpleCache<URI, AtomicBoolean> _statusCache = 
         new SimpleCache<URI, AtomicBoolean>(
-            new Function<URI, AtomicBoolean>() {
+            new Func1<URI, AtomicBoolean>() {
                 @Override
-                public AtomicBoolean apply(final URI input) {
+                public AtomicBoolean call(final URI input) {
                     return new AtomicBoolean(false);
                 }
             });

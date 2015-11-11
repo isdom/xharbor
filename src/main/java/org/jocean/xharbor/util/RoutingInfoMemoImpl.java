@@ -8,10 +8,11 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.jocean.idiom.Function;
 import org.jocean.idiom.SimpleCache;
 import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.api.RoutingInfoMemo;
+
+import rx.functions.Func1;
 
 /**
  * @author isdom
@@ -38,9 +39,9 @@ public class RoutingInfoMemoImpl implements RoutingInfoMemo {
 
     private final SimpleCache<RoutingInfo, AtomicInteger> _cache = 
             new SimpleCache<RoutingInfo, AtomicInteger>(
-                new Function<RoutingInfo, AtomicInteger>() {
+                new Func1<RoutingInfo, AtomicInteger>() {
                     @Override
-                    public AtomicInteger apply(final RoutingInfo input) {
+                    public AtomicInteger call(final RoutingInfo input) {
                         return new AtomicInteger(0);
                     }
                 });

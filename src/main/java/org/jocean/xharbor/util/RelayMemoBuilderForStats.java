@@ -6,11 +6,9 @@ package org.jocean.xharbor.util;
 import java.net.URI;
 
 import org.jocean.idiom.Emitter;
-import org.jocean.idiom.Function;
 import org.jocean.idiom.InterfaceUtils;
 import org.jocean.idiom.SimpleCache;
 import org.jocean.idiom.Tuple;
-import org.jocean.idiom.Visitor2;
 import org.jocean.idiom.stats.TimeIntervalMemo;
 import org.jocean.j2se.stats.BizMemoSupportMBean;
 import org.jocean.j2se.stats.TIMemos;
@@ -22,6 +20,8 @@ import org.jocean.xharbor.api.RelayMemo.STEP;
 import org.jocean.xharbor.api.RoutingInfo;
 
 import rx.functions.Action1;
+import rx.functions.Action2;
+import rx.functions.Func1;
 
 /**
  * @author isdom
@@ -29,15 +29,15 @@ import rx.functions.Action1;
  */
 public class RelayMemoBuilderForStats implements RelayMemo.Builder {
 
-    public RelayMemoBuilderForStats(final Visitor2<String, Emitter<String>> register) throws Exception {
+    public RelayMemoBuilderForStats(final Action2<String, Emitter<String>> register) throws Exception {
         this._register = register;
         this._level0Memo = new RelayMemoImpl()
-        .fillTimeIntervalMemoWith(new Function<Enum<?>, TimeIntervalMemo>() {
+        .fillTimeIntervalMemoWith(new Func1<Enum<?>, TimeIntervalMemo>() {
             @Override
-            public TimeIntervalMemo apply(final Enum<?> e) {
+            public TimeIntervalMemo call(final Enum<?> e) {
                 return _ttlMemos.get(Tuple.of(e));
             }});
-        this._register.visit("all", this._level0Memo);
+        this._register.call("all", this._level0Memo);
     }
     
     @Override
@@ -80,17 +80,17 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
         }
     }
     
-    private final Visitor2<String, Emitter<String>> _register;
+    private final Action2<String, Emitter<String>> _register;
     
-    private Function<Tuple, EmitableTIMemo> _ttlMemoMaker = new Function<Tuple, EmitableTIMemo>() {
+    private Func1<Tuple, EmitableTIMemo> _ttlMemoMaker = new Func1<Tuple, EmitableTIMemo>() {
         @Override
-        public EmitableTIMemo apply(final Tuple tuple) {
+        public EmitableTIMemo call(final Tuple tuple) {
             return TIMemos.memo_10ms_30S();
         }};
         
-    private Visitor2<Tuple, EmitableTIMemo> _ttlMemoRegister = new Visitor2<Tuple, EmitableTIMemo>() {
+    private Action2<Tuple, EmitableTIMemo> _ttlMemoRegister = new Action2<Tuple, EmitableTIMemo>() {
         @Override
-        public void visit(final Tuple tuple, final EmitableTIMemo newMemo) throws Exception {
+        public void call(final Tuple tuple, final EmitableTIMemo newMemo) {
             final StringBuilder sb = new StringBuilder();
             Character splitter = null;
             //                      for last Enum<?>
@@ -116,30 +116,29 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
             sb.append(ttl);
             
             if ( null!=_register) {
-                _register.visit(sb.toString(), newMemo);
+                _register.call(sb.toString(), newMemo);
             }
         }};
             
     private SimpleCache<Tuple, EmitableTIMemo> _ttlMemos  = 
             new SimpleCache<Tuple, EmitableTIMemo>(this._ttlMemoMaker, this._ttlMemoRegister);
     
-    private final Function<Tuple, RelayMemoImpl> _bizMemoMaker = 
-            new Function<Tuple, RelayMemoImpl>() {
+    private final Func1<Tuple, RelayMemoImpl> _bizMemoMaker = 
+            new Func1<Tuple, RelayMemoImpl>() {
         @Override
-        public RelayMemoImpl apply(final Tuple tuple) {
+        public RelayMemoImpl call(final Tuple tuple) {
             return new RelayMemoImpl()
-                .fillTimeIntervalMemoWith(new Function<Enum<?>, TimeIntervalMemo>() {
+                .fillTimeIntervalMemoWith(new Func1<Enum<?>, TimeIntervalMemo>() {
                     @Override
-                    public TimeIntervalMemo apply(final Enum<?> e) {
+                    public TimeIntervalMemo call(final Enum<?> e) {
                         return _ttlMemos.get(tuple.append(e));
                     }});
         }};
 
-    private final Visitor2<Tuple, RelayMemoImpl> _bizMemoRegister = 
-            new Visitor2<Tuple, RelayMemoImpl>() {
+    private final Action2<Tuple, RelayMemoImpl> _bizMemoRegister = 
+            new Action2<Tuple, RelayMemoImpl>() {
         @Override
-        public void visit(final Tuple tuple, final RelayMemoImpl newMemo)
-                throws Exception {
+        public void call(final Tuple tuple, final RelayMemoImpl newMemo) {
             final StringBuilder sb = new StringBuilder();
             Character splitter = null;
             for ( int idx = 0; idx < tuple.size(); idx++) {
@@ -152,7 +151,7 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
                 splitter = ',';
             }
             if ( null!=_register) {
-                _register.visit(sb.toString(), newMemo);
+                _register.call(sb.toString(), newMemo);
             }
         }};
         
