@@ -95,9 +95,14 @@ public class Request2RoutingInfo implements Router<HttpRequest, RoutingInfo> {
     public RoutingInfo calculateRoute(final HttpRequest request, final Context routectx) {
         final QueryStringDecoder decoder = new QueryStringDecoder(request.getUri());
 
+        String path = decoder.path();
+        final int p = path.indexOf(";");
+        if (p>-1) {
+            path = path.substring(0, p);
+        }
         final RoutingInfo info = new RoutingInfoImpl(
                 request.getMethod().name(), 
-                decoder.path(),
+                path,
                 request.headers().get(X_ROUTE_CODE));
         routectx.setProperty("path", info.getPath());
         routectx.setProperty("routingInfo", info);
