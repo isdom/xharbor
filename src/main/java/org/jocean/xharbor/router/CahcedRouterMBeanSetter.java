@@ -40,7 +40,7 @@ public class CahcedRouterMBeanSetter<I, O> implements MBeanRegisterAware {
         this._cachedRouter.setOnRouted(
                 new CachedRouter.OnRouted<I, O>() {
                     @Override
-                    public void visit(final I input, final O output) throws Exception {
+                    public void call(final I input, final O output) {
                         if (null!=_register) {
                             final String objname = _objectNameMaker.call(input, output);
                             if (null != objname && !_register.isRegistered(objname)) {
@@ -86,8 +86,7 @@ public class CahcedRouterMBeanSetter<I, O> implements MBeanRegisterAware {
         this._cachedRouter.setCacheVisitor(
             new CachedRouter.CacheVisitor<I, O>() {
                 @Override
-                public void visit(final SimpleCache<I, O> cache)
-                        throws Exception {
+                public void call(final SimpleCache<I, O> cache) {
                     _register.registerMBean("name=routes", new RoutesMXBean() {
                   @Override
                   public String[] getRoutes() {

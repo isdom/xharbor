@@ -5,8 +5,6 @@ package org.jocean.xharbor.router;
 
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.SimpleCache;
-import org.jocean.idiom.Visitor;
-import org.jocean.idiom.Visitor2;
 import org.jocean.j2se.jmx.MBeanRegister;
 import org.jocean.j2se.jmx.MBeanRegisterAware;
 import org.jocean.xharbor.api.Router;
@@ -34,11 +32,11 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT>, MBean
     private static final ThreadLocal<Context> _CTX = new ThreadLocal<Context>();
     
     public interface CacheVisitor<I, O> extends 
-        Visitor<SimpleCache<I, O>> {
+        Action1<SimpleCache<I, O>> {
     }
     
     public interface OnRouted<I, O> extends 
-        Visitor2<I, O> {
+        Action2<I, O> {
     }
     
     @Override
@@ -63,7 +61,7 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT>, MBean
     public void setCacheVisitor(final CacheVisitor<INPUT, OUTPUT> cacheVisitor) {
         if ( null != cacheVisitor ) {
             try {
-                cacheVisitor.visit(this._cache);
+                cacheVisitor.call(this._cache);
             } catch (Exception e) {
                 LOG.warn("exception when invoke cache visitor({}), detail:{}", 
                         cacheVisitor, ExceptionUtils.exception2detail(e));
@@ -136,7 +134,7 @@ public class CachedRouter<INPUT, OUTPUT> implements Router<INPUT, OUTPUT>, MBean
                     final OnRouted<INPUT, OUTPUT> onRouted = _onRouted;
                     try {
                         if ( null != onRouted ) {
-                            onRouted.visit(input, output);
+                            onRouted.call(input, output);
                         }
                     } catch (Exception e) {
                         LOG.warn("exception when call onRouted({}) with ctx({}), detail: {}",
