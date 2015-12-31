@@ -10,7 +10,7 @@ TODO:
 
   2、~~增加JMX MBean 监控项，包括BytesPool、HttpStack 等~~
 
-  3、考虑增加HTTP自定义头域，例如"X-Client-Type: Test"确定转发地址
+  3、~~考虑增加HTTP自定义头域，例如"X-Client-Type: Test"确定转发地址~~ 已经添加，为 X-Route-Code 自定义头域
 
   4、根据是否存在有效的转发规则，启动或停止 HttpGatewayServer 实例
 
@@ -52,7 +52,7 @@ TODO:
   17、尽可能将应用的配置项迁移到ZooKeeper中，可以采用实例ID在ZK上区分全局配置项 和 实例特定配置项，每个配置项一个条目，方便独立修改，参考
      RulesZKUpdater的实现方式
      
-  18、从 netty 接收到 http request 即开始计时(StopWatch)，逼近 ROUTING 耗时统计的起始时间点
+  18、~~从 netty 接收到 http request 即开始计时(StopWatch)，逼近 ROUTING 耗时统计的起始时间点~~
   
   19、从 xharbor 通过 REST API的方式下载各类统计信息的 Excel(CSV)，统计内容可以包括：接口调用时长、次数、noRouting URI，流量大小 等
   
