@@ -3,9 +3,6 @@
  */
 package org.jocean.xharbor.relay;
 
-import io.netty.handler.codec.http.HttpObject;
-import io.netty.handler.codec.http.HttpRequest;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -22,9 +19,10 @@ import org.jocean.xharbor.api.RoutingInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.netty.handler.codec.http.HttpObject;
+import io.netty.handler.codec.http.HttpRequest;
 import rx.Observable;
 import rx.Subscriber;
-import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.functions.Func1;
 
@@ -137,7 +135,6 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
         public void onError(final Throwable e) {
             LOG.warn("trade({}).request().onError ({}).", 
                 this._trade, ExceptionUtils.exception2detail(e));
-            this._cached.destroy();
         }
         
         @Override
@@ -151,11 +148,6 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                 routectx.clear();
                 
                 buildHttpResponse(dispatcher, _trade.transport(), req, _cached.request(), info, new AtomicBoolean(true))
-                    .doOnTerminate(new Action0() {
-                        @Override
-                        public void call() {
-                            _cached.destroy();
-                        }})
                     .subscribe(_trade.responseObserver());
             }
         }
