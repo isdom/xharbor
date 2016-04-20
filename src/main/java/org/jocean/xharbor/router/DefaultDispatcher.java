@@ -221,7 +221,7 @@ public class DefaultDispatcher implements Dispatcher {
             final ResponseCtx ctx,
             final RoutingInfo info,
             final HttpRequest request, 
-            final Observable<HttpObject> fullRequest) {
+            final Observable<? extends HttpObject> fullRequest) {
         
         final MarkableTarget target = dispatch();
         if (null==target) {

@@ -53,7 +53,7 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
                 final ResponseCtx ctx,
                 final RoutingInfo info,
                 final HttpRequest request, 
-                final Observable<HttpObject> fullRequest) {
+                final Observable<? extends HttpObject> fullRequest) {
             LOG.warn("can't found matched target service for http inbound ({})\nrequest:[{}]\njust return 200 OK.", 
                     ctx.transport, request);
             _noRoutingMemo.incRoutingInfo(info);

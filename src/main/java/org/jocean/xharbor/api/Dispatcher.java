@@ -29,5 +29,5 @@ public interface Dispatcher {
             final ResponseCtx ctx,
             final RoutingInfo info,
             final HttpRequest request, 
-            final Observable<HttpObject> fullRequest);
+            final Observable<? extends HttpObject> fullRequest);
 }

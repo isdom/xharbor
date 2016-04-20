@@ -7,8 +7,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.jocean.http.server.CachedRequest;
 import org.jocean.http.server.HttpServer;
+import org.jocean.http.server.HttpServer.CachedHttpTrade;
 import org.jocean.http.server.HttpServer.HttpTrade;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.xharbor.api.Dispatcher;
@@ -85,7 +85,7 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
             final Dispatcher dispatcher, 
             final Object transport,
             final HttpRequest request,
-            final Observable<HttpObject> fullRequest,
+            final Observable<? extends HttpObject> fullRequest,
             final RoutingInfo info,
             final AtomicBoolean canRetry) {
         final ResponseCtx ctx = new ResponseCtx(transport);
@@ -119,12 +119,10 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
     }
 
     class RequestSubscriber extends Subscriber<HttpObject> {
-        private final HttpTrade _trade;
-        private final CachedRequest _cached;
+        private final CachedHttpTrade _trade;
       
         RequestSubscriber(final HttpTrade trade) {
-            this._trade = trade;
-            this._cached = new CachedRequest(trade);
+            this._trade = trade.cached(-1);
         }
         
         @Override
@@ -147,7 +145,7 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                 final RoutingInfo info = routectx.getProperty("routingInfo");
                 routectx.clear();
                 
-                buildHttpResponse(dispatcher, _trade.transport(), req, _cached.request(), info, new AtomicBoolean(true))
+                buildHttpResponse(dispatcher, _trade.transport(), req, _trade.request(), info, new AtomicBoolean(true))
                     .subscribe(_trade.responseObserver());
             }
         }
