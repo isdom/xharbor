@@ -77,7 +77,7 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
 
     @Override
     public void onNext(final HttpTrade trade) {
-        trade.request().serialize().subscribe(
+        trade.inboundRequest().serialize().subscribe(
             new RequestSubscriber(trade));
     }
     
@@ -145,8 +145,8 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                 final RoutingInfo info = routectx.getProperty("routingInfo");
                 routectx.clear();
                 
-                buildHttpResponse(dispatcher, _trade.transport(), req, _trade.request(), info, new AtomicBoolean(true))
-                    .subscribe(_trade.responseObserver());
+                _trade.outboundResponse(
+                    buildHttpResponse(dispatcher, _trade.transport(), req, _trade.inboundRequest(), info, new AtomicBoolean(true)));
             }
         }
     };
