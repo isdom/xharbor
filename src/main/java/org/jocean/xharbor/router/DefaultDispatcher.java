@@ -216,6 +216,7 @@ public class DefaultDispatcher implements Dispatcher {
         _rewriteResponse.call(response);
     }
     
+    @SuppressWarnings("unchecked")
     @Override
     public Observable<HttpObject> response(
             final ResponseCtx ctx,
@@ -272,7 +273,7 @@ public class DefaultDispatcher implements Dispatcher {
             }
             final ChannelGetter channelGetter = new ChannelGetter();
             
-            return _httpClient.defineInteraction(
+            return (Observable<HttpObject>) _httpClient.defineInteraction(
                     new InetSocketAddress(
                         target.serviceUri().getHost(), 
                         target.serviceUri().getPort()), 
@@ -299,7 +300,6 @@ public class DefaultDispatcher implements Dispatcher {
                         }}),
                     JOArrays.addFirst(Feature[].class, target.features().call(),
                             channelGetter))
-                    .compose(RxNettys.objects2httpobjs())
                     .doOnNext(new Action1<HttpObject>() {
                         @Override
                         public void call(final HttpObject httpObj) {
