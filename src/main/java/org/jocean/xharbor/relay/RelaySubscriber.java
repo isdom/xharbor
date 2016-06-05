@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jocean.http.server.HttpServer;
-import org.jocean.http.server.HttpServer.CachedHttpTrade;
 import org.jocean.http.server.HttpServer.HttpTrade;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.xharbor.api.Dispatcher;
@@ -119,10 +118,10 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
     }
 
     class RequestSubscriber extends Subscriber<HttpObject> {
-        private final CachedHttpTrade _trade;
+        private final HttpTrade _trade;
       
         RequestSubscriber(final HttpTrade trade) {
-            this._trade = trade.cached(-1);
+            this._trade = trade;
         }
         
         @Override
