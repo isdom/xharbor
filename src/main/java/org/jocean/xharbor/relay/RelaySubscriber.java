@@ -9,7 +9,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jocean.http.server.HttpServer;
 import org.jocean.http.server.HttpServer.HttpTrade;
+import org.jocean.http.util.HttpObjectHolder;
 import org.jocean.idiom.ExceptionUtils;
+import org.jocean.idiom.rx.RxActions;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.Dispatcher.ResponseCtx;
 import org.jocean.xharbor.api.RelayMemo.RESULT;
@@ -76,8 +78,13 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
 
     @Override
     public void onNext(final HttpTrade trade) {
-        trade.inboundRequest().serialize().subscribe(
-            new RequestSubscriber(trade));
+        final HttpObjectHolder holder = new HttpObjectHolder(0);
+        final Observable<HttpObject> cached = trade.doOnClosed(RxActions.<HttpTrade>toAction1(holder.release()))
+            .inboundRequest()
+            .compose(holder.assembleAndHold())
+            .cache();
+            
+        cached.subscribe(new RequestSubscriber(trade, cached));
     }
     
     private static Observable<HttpObject> buildHttpResponse(
@@ -119,9 +126,11 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
 
     class RequestSubscriber extends Subscriber<HttpObject> {
         private final HttpTrade _trade;
+        private final Observable<HttpObject> _request;
       
-        RequestSubscriber(final HttpTrade trade) {
+        RequestSubscriber(final HttpTrade trade, final Observable<HttpObject> request) {
             this._trade = trade;
+            this._request = request;
         }
         
         @Override
@@ -145,7 +154,7 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                 routectx.clear();
                 
                 _trade.outboundResponse(
-                    buildHttpResponse(dispatcher, _trade.transport(), req, _trade.inboundRequest(), info, new AtomicBoolean(true)));
+                    buildHttpResponse(dispatcher, _trade.transport(), req, this._request, info, new AtomicBoolean(true)));
             }
         }
     };
