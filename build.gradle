@@ -26,7 +26,7 @@ dependencies {
     compile 'org.apache.commons:commons-lang3:3.3.2'
     compile 'commons-io:commons-io:2.4'
     compile 'org.apache.commons:commons-pool2:2.2'
-    compile 'com.google.guava:guava:18.0'
+    compile 'com.google.guava:guava:19.0'
 
     compile 'com.alibaba:fastjson:1.2.7'
 

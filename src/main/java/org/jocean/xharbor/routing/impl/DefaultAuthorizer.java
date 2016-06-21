@@ -1,13 +1,8 @@
 package org.jocean.xharbor.routing.impl;
 
-import io.netty.handler.codec.http.HttpHeaders;
-import io.netty.handler.codec.http.HttpRequest;
-
-import java.io.UnsupportedEncodingException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.Pair;
 import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.routing.AuthorizationRule;
@@ -15,9 +10,12 @@ import org.jocean.xharbor.routing.RuleSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import rx.functions.Func1;
-
+import com.google.common.base.Charsets;
 import com.google.common.io.BaseEncoding;
+
+import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpRequest;
+import rx.functions.Func1;
 
 public class DefaultAuthorizer implements AuthorizationRule {
     
@@ -97,16 +95,10 @@ public class DefaultAuthorizer implements AuthorizationRule {
     
     private static Pair<String, String> getUserAndPassForBasicAuth(
             final String userAndPassBase64Encoded) {
-        try {
-            final String userAndPass = new String(BaseEncoding.base64().decode(userAndPassBase64Encoded), 
-                    "UTF-8");
-            final String[] fields = userAndPass.split(":");
-            return fields.length == 2 ? Pair.of(fields[0], fields[1]) : null;
-        } catch (UnsupportedEncodingException e) {
-            LOG.warn("exception when getUserAndPassForBasicAuth({}), detail:{}", 
-                    userAndPassBase64Encoded, ExceptionUtils.exception2detail(e));
-            return null;
-        }
+        final String userAndPass = new String(BaseEncoding.base64().decode(userAndPassBase64Encoded), 
+                Charsets.UTF_8);
+        final String[] fields = userAndPass.split(":");
+        return fields.length == 2 ? Pair.of(fields[0], fields[1]) : null;
     }
     
     private static Pattern safeCompilePattern(final String regex) {
