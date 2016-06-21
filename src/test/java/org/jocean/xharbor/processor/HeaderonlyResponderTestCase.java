@@ -45,4 +45,31 @@ public class HeaderonlyResponderTestCase {
                 ((HttpResponse)respSubscriber.getOnNextEvents().get(0)).getProtocolVersion());
     }
 
+    @Test
+    public final void testHeaderonlyResponder2() {
+        final HeaderonlyResponder responder = new HeaderonlyResponder(200, null);
+        
+        final DefaultFullHttpRequest request = 
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, 
+                "/yjy_psm/fetchMetadata");
+        
+        final TestSubscriber<HttpObject> respSubscriber = new TestSubscriber<>();
+        
+        final ConnectableObservable<HttpObject> reqObservable = 
+                Observable.<HttpObject>just(request).publish();
+        
+        reqObservable.flatMap(RxNettys.splitFullHttpMessage())
+            .compose(responder)
+            .flatMap(RxNettys.splitFullHttpMessage())
+            .subscribe(respSubscriber);
+        
+        respSubscriber.assertNoValues();
+        reqObservable.connect();
+        
+        respSubscriber.assertValueCount(2);
+        assertEquals(HttpResponseStatus.OK, 
+                ((HttpResponse)respSubscriber.getOnNextEvents().get(0)).getStatus());
+        assertEquals(HttpVersion.HTTP_1_1, 
+                ((HttpResponse)respSubscriber.getOnNextEvents().get(0)).getProtocolVersion());
+    }
 }
