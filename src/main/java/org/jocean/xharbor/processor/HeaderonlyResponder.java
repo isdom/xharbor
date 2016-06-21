@@ -36,11 +36,7 @@ public class HeaderonlyResponder implements HttpMessageTransformer {
                 }
                 return Observable.empty();
             }}, 
-            new Func1<Throwable, Observable<HttpObject>>() {
-            @Override
-            public Observable<HttpObject> call(Throwable e) {
-                return Observable.error(e);
-            }}, 
+            _FORWARD_ERROR, 
             new Func0<Observable<HttpObject>>() {
             @Override
             public Observable<HttpObject> call() {
@@ -61,6 +57,13 @@ public class HeaderonlyResponder implements HttpMessageTransformer {
         return response;
     }
 
+    private final Func1<Throwable, Observable<HttpObject>> _FORWARD_ERROR = 
+        new Func1<Throwable, Observable<HttpObject>>() {
+            @Override
+            public Observable<HttpObject> call(final Throwable e) {
+                return Observable.error(e);
+        }};
+        
     private final int _responseStatus;
     private final Map<String, String> _extraHeaders;
 }
