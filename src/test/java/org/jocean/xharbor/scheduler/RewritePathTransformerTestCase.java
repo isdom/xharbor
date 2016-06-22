@@ -1,8 +1,9 @@
-package org.jocean.xharbor.processor;
+package org.jocean.xharbor.scheduler;
 
 import static org.junit.Assert.assertEquals;
 
 import org.jocean.http.util.RxNettys;
+import org.jocean.xharbor.scheduler.RewritePathTransformer;
 import org.junit.Test;
 
 import io.netty.handler.codec.http.DefaultFullHttpRequest;

@@ -1,8 +1,9 @@
-package org.jocean.xharbor.processor;
+package org.jocean.xharbor.scheduler;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 
 import org.jocean.http.util.RxNettys;
+import org.jocean.xharbor.scheduler.BasicAuthorizer;
 import org.junit.Test;
 
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
@@ -15,11 +16,11 @@ import rx.Observable;
 import rx.observables.ConnectableObservable;
 import rx.observers.TestSubscriber;
 
-public class HeaderonlyResponderTestCase {
+public class BasicAuthorizerTestCase {
 
     @Test
-    public final void testHeaderonlyResponder() {
-        final HeaderonlyResponder responder = new HeaderonlyResponder(200, null);
+    public final void testBasicAuthorizer() {
+        final BasicAuthorizer authorizer = new BasicAuthorizer("demo");
         
         final DefaultFullHttpRequest request = 
                 new DefaultFullHttpRequest(HttpVersion.HTTP_1_0, HttpMethod.POST, 
@@ -31,7 +32,7 @@ public class HeaderonlyResponderTestCase {
                 Observable.<HttpObject>just(request).publish();
         
         reqObservable.flatMap(RxNettys.splitFullHttpMessage())
-            .compose(responder)
+            .compose(authorizer)
             .flatMap(RxNettys.splitFullHttpMessage())
             .subscribe(respSubscriber);
         
@@ -39,15 +40,15 @@ public class HeaderonlyResponderTestCase {
         reqObservable.connect();
         
         respSubscriber.assertValueCount(2);
-        assertEquals(HttpResponseStatus.OK, 
+        assertEquals(HttpResponseStatus.UNAUTHORIZED, 
                 ((HttpResponse)respSubscriber.getOnNextEvents().get(0)).getStatus());
         assertEquals(HttpVersion.HTTP_1_0, 
                 ((HttpResponse)respSubscriber.getOnNextEvents().get(0)).getProtocolVersion());
     }
 
     @Test
-    public final void testHeaderonlyResponder2() {
-        final HeaderonlyResponder responder = new HeaderonlyResponder(200, null);
+    public final void testBasicAuthorizer2() {
+        final BasicAuthorizer authorizer = new BasicAuthorizer("demo");
         
         final DefaultFullHttpRequest request = 
                 new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, 
@@ -59,7 +60,7 @@ public class HeaderonlyResponderTestCase {
                 Observable.<HttpObject>just(request).publish();
         
         reqObservable.flatMap(RxNettys.splitFullHttpMessage())
-            .compose(responder)
+            .compose(authorizer)
             .flatMap(RxNettys.splitFullHttpMessage())
             .subscribe(respSubscriber);
         
@@ -67,7 +68,7 @@ public class HeaderonlyResponderTestCase {
         reqObservable.connect();
         
         respSubscriber.assertValueCount(2);
-        assertEquals(HttpResponseStatus.OK, 
+        assertEquals(HttpResponseStatus.UNAUTHORIZED, 
                 ((HttpResponse)respSubscriber.getOnNextEvents().get(0)).getStatus());
         assertEquals(HttpVersion.HTTP_1_1, 
                 ((HttpResponse)respSubscriber.getOnNextEvents().get(0)).getProtocolVersion());
