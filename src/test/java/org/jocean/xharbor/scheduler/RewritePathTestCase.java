@@ -5,7 +5,6 @@ import static org.junit.Assert.assertEquals;
 import org.jocean.http.util.RxNettys;
 import org.jocean.xharbor.api.HttpMessageTransformer;
 import org.jocean.xharbor.api.SessionContext;
-import org.jocean.xharbor.scheduler.RewritePathTransformer;
 import org.junit.Test;
 
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
@@ -21,8 +20,8 @@ public class RewritePathTestCase {
 
     @Test
     public final void testRewritePathTransformerSuccess() {
-        final RewritePathTransformer transformer = 
-                new RewritePathTransformer("/yjy_psm/fetchMetadata", "/yjy_common/fetchMetadata");
+        final HttpMessageTransformer transformer = 
+                new RewritePathScheduler("/yjy_psm/fetchMetadata", "/yjy_common/fetchMetadata");
         
         final DefaultFullHttpRequest request = 
                 new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/yjy_psm/fetchMetadata");
