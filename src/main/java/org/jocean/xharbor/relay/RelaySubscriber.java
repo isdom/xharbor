@@ -9,7 +9,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jocean.http.server.HttpServer;
 import org.jocean.http.server.HttpServer.HttpTrade;
-import org.jocean.http.util.HttpObjectHolder;
+import org.jocean.http.util.HttpMessageHolder;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.rx.RxActions;
 import org.jocean.xharbor.api.Dispatcher;
@@ -78,7 +78,7 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
 
     @Override
     public void onNext(final HttpTrade trade) {
-        final HttpObjectHolder holder = new HttpObjectHolder(0);
+        final HttpMessageHolder holder = new HttpMessageHolder(0);
         final Observable<HttpObject> cached = trade.doOnClosed(RxActions.<HttpTrade>toAction1(holder.release()))
             .inboundRequest()
             .compose(holder.assembleAndHold())
