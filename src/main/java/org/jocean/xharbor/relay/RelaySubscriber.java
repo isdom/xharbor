@@ -7,8 +7,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.jocean.http.server.HttpServer;
-import org.jocean.http.server.HttpServer.HttpTrade;
+import org.jocean.http.server.HttpServerBuilder;
+import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.HttpMessageHolder;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.rx.RxActions;
@@ -115,7 +115,7 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
     }
     
     private static boolean isInboundCanceled(final Throwable e) {
-        return e instanceof HttpServer.TransportException;
+        return e instanceof HttpServerBuilder.TransportException;
     }
 
     private static void assignResult(final ResponseCtx ctx, final RESULT result) {

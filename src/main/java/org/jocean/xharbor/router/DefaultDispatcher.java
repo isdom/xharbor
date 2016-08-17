@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.http.Feature;
 import org.jocean.http.client.HttpClient;
-import org.jocean.http.server.HttpServer;
+import org.jocean.http.server.HttpServerBuilder;
 import org.jocean.http.util.Nettys.ChannelAware;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.ExceptionUtils;
@@ -324,7 +324,7 @@ public class DefaultDispatcher implements Dispatcher {
                                         channelGetter._channel,
                                         request, 
                                         target.serviceUri());
-                            } else if (e instanceof HttpServer.TransportException) {
+                            } else if (e instanceof HttpServerBuilder.TransportException) {
                                 memo.incBizResult(RESULT.INBOUND_CANCELED, ttl);
                                 LOG.warn("INBOUND_CANCELED\ncost:[{}]s for http inbound ({})\nand outbound ({})\nrequest:[{}]\ndispatch to:[{}]",
                                         ttl / (float)1000.0,
