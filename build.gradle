@@ -11,9 +11,9 @@ dependencies {
     /* log */
     compile 'org.slf4j:slf4j-api:1.7.7'
 
-    compile 'io.reactivex:rxjava:1.1.6'
+    compile 'io.reactivex:rxjava:1.1.9'
     
-    compile 'io.netty:netty-all:4.0.37.Final'
+    compile 'io.netty:netty-all:4.0.40.Final'
     compile 'javax.inject:javax.inject:1'
 
     /* jocean */
