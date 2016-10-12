@@ -12,7 +12,8 @@ import org.jocean.idiom.Tuple;
 import org.jocean.idiom.stats.TimeIntervalMemo;
 import org.jocean.j2se.stats.BizMemoSupportMBean;
 import org.jocean.j2se.stats.TIMemos;
-import org.jocean.j2se.stats.TIMemos.EmitableTIMemo;
+import org.jocean.j2se.stats.TIMemos.CounterableTIMemo;
+import org.jocean.j2se.stats.TIMemos.OnCounter;
 import org.jocean.xharbor.api.MarkableTarget;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.RelayMemo.RESULT;
@@ -82,15 +83,15 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
     
     private final Action2<String, Emitter<String>> _register;
     
-    private Func1<Tuple, EmitableTIMemo> _ttlMemoMaker = new Func1<Tuple, EmitableTIMemo>() {
+    private Func1<Tuple, CounterableTIMemo> _ttlMemoMaker = new Func1<Tuple, CounterableTIMemo>() {
         @Override
-        public EmitableTIMemo call(final Tuple tuple) {
+        public CounterableTIMemo call(final Tuple tuple) {
             return TIMemos.memo_10ms_30S();
         }};
         
-    private Action2<Tuple, EmitableTIMemo> _ttlMemoRegister = new Action2<Tuple, EmitableTIMemo>() {
+    private Action2<Tuple, CounterableTIMemo> _ttlMemoRegister = new Action2<Tuple, CounterableTIMemo>() {
         @Override
-        public void call(final Tuple tuple, final EmitableTIMemo newMemo) {
+        public void call(final Tuple tuple, final CounterableTIMemo newMemo) {
             final StringBuilder sb = new StringBuilder();
             Character splitter = null;
             //                      for last Enum<?>
@@ -116,12 +117,21 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
             sb.append(ttl);
             
             if ( null!=_register) {
-                _register.call(sb.toString(), newMemo);
+                _register.call(sb.toString(), new Emitter<String>() {
+                    @Override
+                    public void emit(final Action1<String> receptor) {
+                        newMemo.call(new OnCounter() {
+                            @Override
+                            public void call(final String name, final Integer counter) {
+                                receptor.call(name + ":" + counter);
+                            }});
+                        
+                    }});
             }
         }};
             
-    private SimpleCache<Tuple, EmitableTIMemo> _ttlMemos  = 
-            new SimpleCache<Tuple, EmitableTIMemo>(this._ttlMemoMaker, this._ttlMemoRegister);
+    private SimpleCache<Tuple, CounterableTIMemo> _ttlMemos  = 
+            new SimpleCache<Tuple, CounterableTIMemo>(this._ttlMemoMaker, this._ttlMemoRegister);
     
     private final Func1<Tuple, RelayMemoImpl> _bizMemoMaker = 
             new Func1<Tuple, RelayMemoImpl>() {

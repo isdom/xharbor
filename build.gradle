@@ -1,4 +1,5 @@
-apply from: 'http://dev.jocean.org:8080/devconf/build-app.gradle'
+
+apply from: 'http://git.medtap.cn/jocean/devconf/raw/master/devconf/build-app.gradle'
 
 configurations {
     all*.exclude group: 'org.slf4j', module: 'slf4j-log4j12'
@@ -11,15 +12,12 @@ dependencies {
     /* log */
     compile 'org.slf4j:slf4j-api:1.7.7'
 
-    compile 'io.reactivex:rxjava:1.1.9'
-    
-    compile 'io.netty:netty-all:4.0.41.Final'
     compile 'javax.inject:javax.inject:1'
 
     /* jocean */
-    compile('org.jocean:jocean-idiom:0.1.4-SNAPSHOT') { transitive = false }
+    compile('org.jocean:jocean-idiom:0.1.4-SNAPSHOT')
     compile('org.jocean:jocean-j2se:0.0.4-SNAPSHOT') { transitive = false }
-    compile('org.jocean:jocean-http:0.0.2-SNAPSHOT') { transitive = false }
+    compile('org.jocean:jocean-http:0.0.2-SNAPSHOT')
     compile('org.jocean:jocean-jdmk:0.0.2') { transitive = false }
 
     compile 'commons-beanutils:commons-beanutils:1.9.1'
@@ -28,7 +26,7 @@ dependencies {
     compile 'org.apache.commons:commons-pool2:2.2'
     compile 'com.google.guava:guava:19.0'
 
-    compile 'com.alibaba:fastjson:1.2.7'
+    compile 'com.alibaba:fastjson:1.2.17'
 
     compile 'javax.ws.rs:javax.ws.rs-api:2.0'
     
