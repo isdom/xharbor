@@ -3,16 +3,6 @@
  */
 package org.jocean.xharbor.router;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufInputStream;
-import io.netty.channel.Channel;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.HttpHeaders;
-import io.netty.handler.codec.http.HttpObject;
-import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponse;
-
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -23,8 +13,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.http.Feature;
+import org.jocean.http.TransportException;
 import org.jocean.http.client.HttpClient;
-import org.jocean.http.server.HttpServerBuilder;
 import org.jocean.http.util.Nettys.ChannelAware;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.ExceptionUtils;
@@ -48,6 +38,15 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Charsets;
 import com.google.common.io.ByteStreams;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufInputStream;
+import io.netty.channel.Channel;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpObject;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponse;
 import rx.Observable;
 import rx.functions.Action0;
 import rx.functions.Action1;
@@ -324,7 +323,7 @@ public class DefaultDispatcher implements Dispatcher {
                                         channelGetter._channel,
                                         request, 
                                         target.serviceUri());
-                            } else if (e instanceof HttpServerBuilder.TransportException) {
+                            } else if (e instanceof TransportException) {
                                 memo.incBizResult(RESULT.INBOUND_CANCELED, ttl);
                                 LOG.warn("INBOUND_CANCELED\ncost:[{}]s for http inbound ({})\nand outbound ({})\nrequest:[{}]\ndispatch to:[{}]",
                                         ttl / (float)1000.0,
