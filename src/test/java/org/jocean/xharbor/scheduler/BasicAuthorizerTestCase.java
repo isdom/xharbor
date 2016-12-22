@@ -1,76 +1,50 @@
 package org.jocean.xharbor.scheduler;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
+import org.jocean.http.util.HttpMessageHolder;
 import org.jocean.http.util.RxNettys;
-import org.jocean.xharbor.scheduler.BasicAuthorizer;
+import org.jocean.xharbor.api.TradeReactor.InOut;
 import org.junit.Test;
 
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObject;
-import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import rx.Observable;
-import rx.observables.ConnectableObservable;
-import rx.observers.TestSubscriber;
 
 public class BasicAuthorizerTestCase {
 
     @Test
     public final void testBasicAuthorizer() {
-        final BasicAuthorizer authorizer = new BasicAuthorizer("demo");
+        final BasicAuthorizer authorizer = new BasicAuthorizer("/needauth(\\w)*", "hello", "world", "demo");
         
-        final DefaultFullHttpRequest request = 
+        final DefaultFullHttpRequest orgreq = 
                 new DefaultFullHttpRequest(HttpVersion.HTTP_1_0, HttpMethod.POST, 
-                "/yjy_psm/fetchMetadata");
+                "/needauth/xxx");
         
-        final TestSubscriber<HttpObject> respSubscriber = new TestSubscriber<>();
+        final InOut io = 
+            authorizer.react(null, new InOut() {
+                @Override
+                public Observable<? extends HttpObject> inbound() {
+                    return Observable.<HttpObject>just(orgreq);
+                }
+                @Override
+                public Observable<? extends HttpObject> outbound() {
+                    return null;
+                }})
+            .toBlocking().value();
         
-        final ConnectableObservable<HttpObject> reqObservable = 
-                Observable.<HttpObject>just(request).publish();
+        final HttpMessageHolder holder = new HttpMessageHolder(0);
+        io.outbound().compose(holder.assembleAndHold()).subscribe();
         
-        reqObservable.flatMap(RxNettys.splitFullHttpMessage())
-            .compose(authorizer)
-            .flatMap(RxNettys.splitFullHttpMessage())
-            .subscribe(respSubscriber);
+        final FullHttpResponse response = holder.httpMessageBuilder(RxNettys.BUILD_FULL_RESPONSE).call();
         
-        respSubscriber.assertNoValues();
-        reqObservable.connect();
-        
-        respSubscriber.assertValueCount(2);
-        assertEquals(HttpResponseStatus.UNAUTHORIZED, 
-                ((HttpResponse)respSubscriber.getOnNextEvents().get(0)).status());
-        assertEquals(HttpVersion.HTTP_1_0, 
-                ((HttpResponse)respSubscriber.getOnNextEvents().get(0)).protocolVersion());
-    }
-
-    @Test
-    public final void testBasicAuthorizer2() {
-        final BasicAuthorizer authorizer = new BasicAuthorizer("demo");
-        
-        final DefaultFullHttpRequest request = 
-                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, 
-                "/yjy_psm/fetchMetadata");
-        
-        final TestSubscriber<HttpObject> respSubscriber = new TestSubscriber<>();
-        
-        final ConnectableObservable<HttpObject> reqObservable = 
-                Observable.<HttpObject>just(request).publish();
-        
-        reqObservable.flatMap(RxNettys.splitFullHttpMessage())
-            .compose(authorizer)
-            .flatMap(RxNettys.splitFullHttpMessage())
-            .subscribe(respSubscriber);
-        
-        respSubscriber.assertNoValues();
-        reqObservable.connect();
-        
-        respSubscriber.assertValueCount(2);
-        assertEquals(HttpResponseStatus.UNAUTHORIZED, 
-                ((HttpResponse)respSubscriber.getOnNextEvents().get(0)).status());
-        assertEquals(HttpVersion.HTTP_1_1, 
-                ((HttpResponse)respSubscriber.getOnNextEvents().get(0)).protocolVersion());
+        assertEquals(HttpResponseStatus.UNAUTHORIZED, response.status());
+        assertEquals(HttpVersion.HTTP_1_0, response.protocolVersion());
+        assertEquals("demo", response.headers().get(HttpHeaderNames.WWW_AUTHENTICATE));
     }
 }
