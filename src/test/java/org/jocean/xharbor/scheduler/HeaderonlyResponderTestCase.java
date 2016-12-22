@@ -41,9 +41,9 @@ public class HeaderonlyResponderTestCase {
         
         respSubscriber.assertValueCount(2);
         assertEquals(HttpResponseStatus.OK, 
-                ((HttpResponse)respSubscriber.getOnNextEvents().get(0)).getStatus());
+                ((HttpResponse)respSubscriber.getOnNextEvents().get(0)).status());
         assertEquals(HttpVersion.HTTP_1_0, 
-                ((HttpResponse)respSubscriber.getOnNextEvents().get(0)).getProtocolVersion());
+                ((HttpResponse)respSubscriber.getOnNextEvents().get(0)).protocolVersion());
     }
 
     @Test
@@ -69,8 +69,8 @@ public class HeaderonlyResponderTestCase {
         
         respSubscriber.assertValueCount(2);
         assertEquals(HttpResponseStatus.OK, 
-                ((HttpResponse)respSubscriber.getOnNextEvents().get(0)).getStatus());
+                ((HttpResponse)respSubscriber.getOnNextEvents().get(0)).status());
         assertEquals(HttpVersion.HTTP_1_1, 
-                ((HttpResponse)respSubscriber.getOnNextEvents().get(0)).getProtocolVersion());
+                ((HttpResponse)respSubscriber.getOnNextEvents().get(0)).protocolVersion());
     }
 }

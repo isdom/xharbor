@@ -35,8 +35,8 @@ public class RewritePathTestCase {
         
         reqSubscriber.assertValueCount(2);
         assertEquals("/yjy_common/fetchMetadata", 
-                ((HttpRequest)reqSubscriber.getOnNextEvents().get(0)).getUri());
-        assertEquals("/yjy_psm/fetchMetadata", request.getUri());
+                ((HttpRequest)reqSubscriber.getOnNextEvents().get(0)).uri());
+        assertEquals("/yjy_psm/fetchMetadata", request.uri());
     }
 
     @Test
@@ -68,7 +68,7 @@ public class RewritePathTestCase {
         
         reqSubscriber.assertValueCount(2);
         assertEquals("/yjy_common/fetchMetadata", 
-                ((HttpRequest)reqSubscriber.getOnNextEvents().get(0)).getUri());
-        assertEquals("/yjy_psm/fetchMetadata", request.getUri());
+                ((HttpRequest)reqSubscriber.getOnNextEvents().get(0)).uri());
+        assertEquals("/yjy_psm/fetchMetadata", request.uri());
     }
 }
