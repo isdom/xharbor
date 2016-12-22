@@ -1,4 +1,4 @@
-package org.jocean.xharbor.scheduler;
+package org.jocean.xharbor.reactor;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -12,6 +12,7 @@ import org.jocean.http.util.Nettys;
 import org.jocean.http.util.RxNettys;
 import org.jocean.xharbor.api.TradeReactor;
 import org.jocean.xharbor.api.TradeReactor.InOut;
+import org.jocean.xharbor.reactor.RewritePath;
 import org.junit.Test;
 
 import io.netty.buffer.Unpooled;
