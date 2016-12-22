@@ -229,7 +229,7 @@ public class DefaultDispatcher implements Dispatcher {
                     ctx.transport, request);
             _noRoutingMemo.incRoutingInfo(info);
             return RxObservables.delaySubscriptionUntilCompleted(
-                    RxNettys.response200OK(request.getProtocolVersion()),
+                    RxNettys.response200OK(request.protocolVersion()),
                     fullRequest);
         }
         
@@ -245,7 +245,7 @@ public class DefaultDispatcher implements Dispatcher {
         } else if (isNeedAuthorization(request)) {
             return RxObservables.delaySubscriptionUntilCompleted(
                     RxNettys.response401Unauthorized(
-                            request.getProtocolVersion(), 
+                            request.protocolVersion(), 
                             "Basic realm=\"iplusmed\"")
                         .doOnCompleted(new Action0() {
                             @Override
