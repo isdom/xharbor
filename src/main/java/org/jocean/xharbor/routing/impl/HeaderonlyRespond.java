@@ -2,6 +2,7 @@ package org.jocean.xharbor.routing.impl;
 
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -58,8 +59,8 @@ public class HeaderonlyRespond implements RespondRule {
         @Override
         public FullHttpResponse call(final HttpRequest request) {
             final FullHttpResponse response = new DefaultFullHttpResponse(
-                    request.getProtocolVersion(), HttpResponseStatus.valueOf(_responseStatus));
-            HttpHeaders.setHeader(response, HttpHeaders.Names.CONTENT_LENGTH, 0);
+                    request.protocolVersion(), HttpResponseStatus.valueOf(_responseStatus));
+            response.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
             if (null!=_extraHeaders) {
                 for (Map.Entry<String, String> entry : _extraHeaders.entrySet()) {
                     response.headers().set(entry.getKey(), entry.getValue());

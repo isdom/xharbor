@@ -76,7 +76,8 @@ public class BasicAuthorizer implements TradeReactor {
             public Observable<? extends HttpObject> outbound() {
                 return RxNettys.response401Unauthorized(
                         originalreq.protocolVersion(), 
-                        _strWWWAuthenticate);
+                        _strWWWAuthenticate)
+                    .delaySubscription(originalio.inbound().ignoreElements());
             }};
     }
     
