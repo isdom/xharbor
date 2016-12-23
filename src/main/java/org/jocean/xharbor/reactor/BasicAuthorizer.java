@@ -5,7 +5,9 @@ import java.util.regex.Pattern;
 
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.RxNettys;
+import org.jocean.idiom.Ordered;
 import org.jocean.idiom.Pair;
+import org.jocean.idiom.Regexs;
 import org.jocean.xharbor.api.TradeReactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,25 +22,26 @@ import rx.Observable;
 import rx.Single;
 import rx.functions.Func1;
 
-public class BasicAuthorizer implements TradeReactor {
+public class BasicAuthorizer implements TradeReactor, Ordered {
     private static final Logger LOG = LoggerFactory
             .getLogger(BasicAuthorizer.class);
 
+    @Override
+    public int ordinal() {
+        return 0;
+    }
+    
     public BasicAuthorizer(
             final String pathPattern, 
             final String user, 
             final String password,
             final String strWWWAuthenticate) {
-        this._pathPattern = safeCompilePattern(pathPattern);
+        this._pathPattern = Regexs.safeCompilePattern(pathPattern);
         this._user = user;
         this._password = password;
         this._strWWWAuthenticate = strWWWAuthenticate;
     }
 
-    private static Pattern safeCompilePattern(final String regex) {
-        return null != regex && !"".equals(regex) ? Pattern.compile(regex) : null;
-    }
-    
     @Override
     public Single<? extends InOut> react(final HttpTrade trade, final InOut io) {
         return io.inbound().compose(RxNettys.asHttpRequest())

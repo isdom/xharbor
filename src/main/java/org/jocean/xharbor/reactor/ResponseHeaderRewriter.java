@@ -6,6 +6,8 @@ import java.util.regex.Pattern;
 
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.RxNettys;
+import org.jocean.idiom.Ordered;
+import org.jocean.idiom.Regexs;
 import org.jocean.xharbor.api.TradeReactor;
 
 import io.netty.handler.codec.http.HttpObject;
@@ -16,16 +18,18 @@ import rx.Single;
 import rx.functions.Action1;
 import rx.functions.Func1;
 
-public class ResponseHeaderRewriter implements TradeReactor {
+public class ResponseHeaderRewriter implements TradeReactor, Ordered {
+    
+    @Override
+    public int ordinal() {
+        return 0;
+    }
+    
     public ResponseHeaderRewriter(
             final String pathPattern,
             final Map<String, String> extraHeaders) {
-        this._pathPattern = safeCompilePattern(pathPattern);
+        this._pathPattern = Regexs.safeCompilePattern(pathPattern);
         this._extraHeaders = extraHeaders;
-    }
-    
-    private static Pattern safeCompilePattern(final String regex) {
-        return null != regex && !"".equals(regex) ? Pattern.compile(regex) : null;
     }
     
     @Override

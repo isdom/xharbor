@@ -5,6 +5,8 @@ import java.util.regex.Pattern;
 
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.RxNettys;
+import org.jocean.idiom.Ordered;
+import org.jocean.idiom.Regexs;
 import org.jocean.xharbor.api.TradeReactor;
 
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
@@ -17,23 +19,24 @@ import rx.Observable;
 import rx.Single;
 import rx.functions.Func1;
 
-public class HeaderonlyResponder implements TradeReactor {
+public class HeaderonlyResponder implements TradeReactor, Ordered {
 
+    @Override
+    public int ordinal() {
+        return 0;
+    }
+    
     public HeaderonlyResponder(
             final String methodPattern, 
             final String pathPattern, 
             final int responseStatus, 
             final Map<String, String> extraHeaders) {
-        this._pathPattern = safeCompilePattern(pathPattern);
-        this._methodPattern = safeCompilePattern(methodPattern);
+        this._pathPattern = Regexs.safeCompilePattern(pathPattern);
+        this._methodPattern = Regexs.safeCompilePattern(methodPattern);
         this._responseStatus = responseStatus;
         this._extraHeaders = extraHeaders;
     }
     
-    private static Pattern safeCompilePattern(final String regex) {
-        return null != regex && !"".equals(regex) ? Pattern.compile(regex) : null;
-    }
-        
     @Override
     public Single<? extends InOut> react(final HttpTrade trade, final InOut io) {
         return io.inbound().compose(RxNettys.asHttpRequest())
