@@ -32,6 +32,9 @@ public class RewritePath implements TradeReactor, Ordered {
     
     @Override
     public Single<? extends InOut> react(final HttpTrade trade, final InOut io) {
+        if (null != io.outbound()) {
+            return Single.<InOut>just(null);
+        }
         return io.inbound().compose(RxNettys.asHttpRequest())
             .map(new Func1<HttpRequest, InOut>() {
                 @Override
