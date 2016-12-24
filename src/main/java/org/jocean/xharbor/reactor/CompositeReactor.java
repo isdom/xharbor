@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
 
 import rx.Single;
 
-public class CompositeReactor implements TradeReactor {
+public class CompositeReactor implements TradeReactor, Ordered {
     
     private static final TradeReactor[] EMPTY_REACTOR = new TradeReactor[0];
     private static final Comparator<TradeReactor> ORDER_REACTOR_DESC = new Comparator<TradeReactor>() {
@@ -37,6 +37,10 @@ public class CompositeReactor implements TradeReactor {
     
     private static final Logger LOG = LoggerFactory
             .getLogger(CompositeReactor.class);
+    
+    public void setOrdinal(final int ordinal) {
+        this._ordinal = ordinal;
+    }
     
     public void addReactor(final TradeReactor reactor) {
         this._reactors.add(reactor);
@@ -83,6 +87,11 @@ public class CompositeReactor implements TradeReactor {
         }
     }
 
+    @Override
+    public int ordinal() {
+        return this._ordinal;
+    }
+    
     private final AtomicInteger _stampProvider = new AtomicInteger(0);
     
     private final List<TradeReactor> _reactors = 
@@ -90,4 +99,6 @@ public class CompositeReactor implements TradeReactor {
     
     private final AtomicStampedReference<TradeReactor[]> _descReactorsRef = 
             new AtomicStampedReference<>(null, 0);
+    
+    private int _ordinal = 0;
 }
