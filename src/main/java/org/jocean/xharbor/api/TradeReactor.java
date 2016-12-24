@@ -27,6 +27,16 @@ public interface TradeReactor {
                     reactByFirst(trade, io, Iterable.iterator(), subscriber);
                 }});
         }
+        
+        public static Single<? extends InOut> all(final Iterable<? extends TradeReactor> Iterable,
+                final HttpTrade trade, final InOut io) {
+            return Single.create(new Single.OnSubscribe<InOut>() {
+                @Override
+                public void call(final SingleSubscriber<? super InOut> subscriber) {
+                    reactAll(trade, io, Iterable.iterator(), subscriber, false);
+                }});
+        }
+        
         private static void reactByFirst(final HttpTrade trade, final InOut io,
                 final Iterator<? extends TradeReactor> iter,
                 final SingleSubscriber<? super InOut> subscriber) {
@@ -52,6 +62,37 @@ public interface TradeReactor {
                             }});
                 } else {
                     subscriber.onSuccess(null);
+                }
+            }
+        }
+        
+        private static void reactAll(final HttpTrade trade, final InOut io,
+                final Iterator<? extends TradeReactor> iter,
+                final SingleSubscriber<? super InOut> subscriber,
+                final boolean handled) {
+            if (!subscriber.isUnsubscribed()) {
+                if (iter.hasNext()) {
+                    final TradeReactor reactor = iter.next();
+                    reactor.react(trade, io).subscribe(new Action1<InOut>() {
+                        @Override
+                        public void call(final InOut newio) {
+                            if (!subscriber.isUnsubscribed()) {
+                                if (null != newio) {
+                                    //  trade handled
+                                    reactAll(trade, newio, iter, subscriber, true);
+                                } else {
+                                    reactAll(trade, io, iter, subscriber, handled);
+                                }
+                            }
+                        }}, new Action1<Throwable>() {
+                            @Override
+                            public void call(final Throwable error) {
+                                if (!subscriber.isUnsubscribed()) {
+                                    subscriber.onError(error);
+                                }
+                            }});
+                } else {
+                    subscriber.onSuccess(handled ? io : null);
                 }
             }
         }
