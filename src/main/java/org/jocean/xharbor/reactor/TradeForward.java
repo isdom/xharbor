@@ -32,12 +32,10 @@ public class TradeForward implements TradeReactor {
     
     public TradeForward(
             final HttpClient httpclient,
-            final MatchRule  rule,
-            final Target    target
+            final MatchRule  rule
             ) {
         this._httpclient = httpclient;
         this._matchRule = rule;
-        addTarget(target);
     }
     
     public void addTarget(final Target target) {
