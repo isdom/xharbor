@@ -9,7 +9,7 @@
     <bean id="inboundIndicator" class="org.jocean.xharbor.mbean.RelayInboundIndicator"/>
     
     <bean id="agentServer" 
-        factory-bean="httpServer" 
+        factory-bean="httpServerBuilder" 
         factory-method="defineServer">
         <constructor-arg>
             <bean class="java.net.InetSocketAddress">
@@ -34,7 +34,7 @@
         factory-method="subscribe"
         destroy-method="unsubscribe">
         <constructor-arg>
-            <bean class="org.jocean.xharbor.relay.RelaySubscriber">
+            <bean class="org.jocean.xharbor.relay.TradeRelay">
                 <constructor-arg ref="router" />
             </bean>
         </constructor-arg>

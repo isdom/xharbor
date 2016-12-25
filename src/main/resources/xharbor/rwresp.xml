@@ -6,11 +6,16 @@
     
     <bean id="extraHeaders" class="java.util.concurrent.ConcurrentHashMap"/>
     
-    <bean class="org.jocean.xharbor.routing.impl.ResponseHeaderRewriter" 
-        destroy-method="stop">
-        <constructor-arg ref="ruleSet"/>
-        <constructor-arg value="${rewrite.path}"/>
-        <constructor-arg ref="extraHeaders"/>
+    <bean class="org.jocean.idiom.rx.RxActions"
+        factory-method="doCall"
+        destroy-method="call">
+        <constructor-arg ref="rwresps"/>
+        <constructor-arg>
+            <bean class="org.jocean.xharbor.reactor.RewriteResponseHeader">
+		        <constructor-arg value="${rewrite.path}"/>
+		        <constructor-arg ref="extraHeaders"/>
+            </bean>
+        </constructor-arg>
     </bean>
     
 </beans>

@@ -4,11 +4,70 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
     
-    <bean id="ruleSet" class="org.jocean.xharbor.routing.impl.DefaultRuleSet" 
-        destroy-method="stop">
-        <constructor-arg value="${priority}"/>
-        <constructor-arg ref="defaultRouter"/>
-        <property name="resetAction" ref="resetAction"/>
+    <bean id="rules" class="org.jocean.xharbor.reactor.CompositeReactor">
+        <property name="ordinal" value="${priority}"/>
+    </bean>
+    
+    <bean class="org.jocean.idiom.rx.RxActions"
+        factory-method="doCall"
+        destroy-method="call">
+        <constructor-arg ref="router"/>
+        <constructor-arg ref="rules"/>
+    </bean>
+    
+    <bean id="rwpaths" class="org.jocean.xharbor.reactor.CompositeReactor">
+        <property name="ordinal" value="100"/>
+    </bean>
+    
+    <bean class="org.jocean.idiom.rx.RxActions"
+        factory-method="doCall"
+        destroy-method="call">
+        <constructor-arg ref="rules"/>
+        <constructor-arg ref="rwpaths"/>
+    </bean>
+    
+    <bean id="auths" class="org.jocean.xharbor.reactor.CompositeReactor">
+        <property name="ordinal" value="90"/>
+    </bean>
+    
+    <bean class="org.jocean.idiom.rx.RxActions"
+        factory-method="doCall"
+        destroy-method="call">
+        <constructor-arg ref="rules"/>
+        <constructor-arg ref="auths"/>
+    </bean>
+    
+    <bean id="responds" class="org.jocean.xharbor.reactor.CompositeReactor">
+        <property name="ordinal" value="80"/>
+    </bean>
+    
+    <bean class="org.jocean.idiom.rx.RxActions"
+        factory-method="doCall"
+        destroy-method="call">
+        <constructor-arg ref="rules"/>
+        <constructor-arg ref="responds"/>
+    </bean>
+    
+    <bean id="forwards" class="org.jocean.xharbor.reactor.CompositeForward">
+        <property name="ordinal" value="70"/>
+    </bean>
+    
+    <bean class="org.jocean.idiom.rx.RxActions"
+        factory-method="doCall"
+        destroy-method="call">
+        <constructor-arg ref="rules"/>
+        <constructor-arg ref="forwards"/>
+    </bean>
+    
+    <bean id="rwresps" class="org.jocean.xharbor.reactor.CompositeReactor">
+        <property name="ordinal" value="60"/>
+    </bean>
+    
+    <bean class="org.jocean.idiom.rx.RxActions"
+        factory-method="doCall"
+        destroy-method="call">
+        <constructor-arg ref="rules"/>
+        <constructor-arg ref="rwresps"/>
     </bean>
     
 </beans>

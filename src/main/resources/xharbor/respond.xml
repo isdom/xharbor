@@ -6,13 +6,18 @@
     
     <bean id="extraHeaders" class="java.util.concurrent.ConcurrentHashMap"/>
     
-    <bean class="org.jocean.xharbor.routing.impl.HeaderonlyRespond" 
-        destroy-method="stop">
-        <constructor-arg ref="ruleSet"/>
-        <constructor-arg value="${request.method}"/>
-        <constructor-arg value="${request.path}"/>
-        <constructor-arg value="${response.status}"/>
-        <constructor-arg ref="extraHeaders"/>
+    <bean class="org.jocean.idiom.rx.RxActions"
+        factory-method="doCall"
+        destroy-method="call">
+        <constructor-arg ref="responds"/>
+        <constructor-arg>
+            <bean class="org.jocean.xharbor.reactor.ResponseWithHeaderonly">
+		        <constructor-arg value="${request.method}"/>
+		        <constructor-arg value="${request.path}"/>
+		        <constructor-arg value="${response.status}"/>
+		        <constructor-arg ref="extraHeaders"/>
+            </bean>
+        </constructor-arg>
     </bean>
     
 </beans>

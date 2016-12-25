@@ -4,7 +4,7 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
     
-    <bean id="defaultRouter" class="org.jocean.xharbor.router.DefaultRouter">
+    <!-- bean id="defaultRouter" class="org.jocean.xharbor.router.DefaultRouter">
         <constructor-arg ref="serviceMemo"/>
         <constructor-arg ref="httpClient"/>
         <constructor-arg ref="noRoutingMemo" />
@@ -38,6 +38,8 @@
                 <ref bean="cachedRouter"/>
             </array>
         </constructor-arg>
-    </bean>
+    </bean -->
+    
+    <bean id="router" class="org.jocean.xharbor.reactor.CompositeReactor"/>
     
 </beans>

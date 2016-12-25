@@ -4,11 +4,16 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
     
-    <bean class="org.jocean.xharbor.routing.impl.RequestPathRewriter" 
-        destroy-method="stop">
-        <constructor-arg ref="ruleSet"/>
-        <constructor-arg value="${rewrite.path}"/>
-        <constructor-arg value="${rewrite.to}"/>
+    <bean class="org.jocean.idiom.rx.RxActions"
+        factory-method="doCall"
+        destroy-method="call">
+        <constructor-arg ref="rwpaths"/>
+        <constructor-arg>
+            <bean class="org.jocean.xharbor.reactor.RewriteRequestPath">
+		        <constructor-arg value="${rewrite.path}"/>
+		        <constructor-arg value="${rewrite.to}"/>
+            </bean>
+        </constructor-arg>
     </bean>
     
 </beans>
