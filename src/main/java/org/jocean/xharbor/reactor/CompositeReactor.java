@@ -14,8 +14,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import rx.Single;
+import rx.functions.Action0;
+import rx.functions.Func1;
 
-public class CompositeReactor implements TradeReactor, Ordered {
+public class CompositeReactor implements TradeReactor, Ordered, Func1<TradeReactor, Action0> {
     
     private static final TradeReactor[] EMPTY_REACTOR = new TradeReactor[0];
     private static final Comparator<TradeReactor> ORDER_REACTOR_DESC = new Comparator<TradeReactor>() {
@@ -40,6 +42,16 @@ public class CompositeReactor implements TradeReactor, Ordered {
     
     public void setOrdinal(final int ordinal) {
         this._ordinal = ordinal;
+    }
+    
+    @Override
+    public Action0 call(final TradeReactor reactor) {
+        addReactor(reactor);
+        return new Action0() {
+            @Override
+            public void call() {
+                removeReactor(reactor);
+            }};
     }
     
     public void addReactor(final TradeReactor reactor) {

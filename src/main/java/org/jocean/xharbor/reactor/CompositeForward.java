@@ -19,14 +19,26 @@ import org.slf4j.LoggerFactory;
 import com.google.common.collect.Maps;
 
 import rx.Single;
+import rx.functions.Action0;
+import rx.functions.Func1;
 
-public class CompositeForward implements TradeReactor, Ordered {
+public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardData, Action0> {
     
     private static final TradeForward[] EMPTY_FORWARD = new TradeForward[0];
     private static final ForwardData[] EMPTY_DATA = new ForwardData[0];
     
     private static final Logger LOG = LoggerFactory
             .getLogger(CompositeForward.class);
+    
+    @Override
+    public Action0 call(final ForwardData data) {
+        addForward(data);
+        return new Action0() {
+            @Override
+            public void call() {
+                removeForward(data);
+            }};
+    }
     
     public void setOrdinal(final int ordinal) {
         this._ordinal = ordinal;
