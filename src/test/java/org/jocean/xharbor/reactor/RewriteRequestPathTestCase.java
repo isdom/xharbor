@@ -23,7 +23,7 @@ import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpVersion;
 import rx.Observable;
 
-public class RewritePathTestCase {
+public class RewriteRequestPathTestCase {
 
     public static final byte[] CONTENT = { 'H', 'e', 'l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd' };
     

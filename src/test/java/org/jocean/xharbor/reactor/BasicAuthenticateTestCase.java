@@ -17,7 +17,7 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import rx.Observable;
 
-public class BasicAuthorizerTestCase {
+public class BasicAuthenticateTestCase {
 
     @Test
     public final void testBasicAuthorizer() {

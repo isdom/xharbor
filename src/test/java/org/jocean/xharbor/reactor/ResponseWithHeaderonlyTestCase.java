@@ -16,7 +16,7 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import rx.Observable;
 
-public class HeaderonlyResponderTestCase {
+public class ResponseWithHeaderonlyTestCase {
 
     @Test
     public final void testHeaderonlyResponder() {
