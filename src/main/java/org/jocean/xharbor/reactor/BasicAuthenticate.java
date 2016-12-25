@@ -21,11 +21,11 @@ import rx.Observable;
 import rx.Single;
 import rx.functions.Func1;
 
-public class BasicAuthorizer implements TradeReactor {
+public class BasicAuthenticate implements TradeReactor {
     private static final Logger LOG = LoggerFactory
-            .getLogger(BasicAuthorizer.class);
+            .getLogger(BasicAuthenticate.class);
 
-    public BasicAuthorizer(
+    public BasicAuthenticate(
             final String pathPattern, 
             final String user, 
             final String password,

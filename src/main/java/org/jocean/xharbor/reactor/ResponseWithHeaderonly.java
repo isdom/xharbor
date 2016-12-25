@@ -18,9 +18,9 @@ import rx.Observable;
 import rx.Single;
 import rx.functions.Func1;
 
-public class HeaderonlyResponder implements TradeReactor {
+public class ResponseWithHeaderonly implements TradeReactor {
 
-    public HeaderonlyResponder(
+    public ResponseWithHeaderonly(
             final String methodPattern, 
             final String pathPattern, 
             final int responseStatus, 

@@ -24,7 +24,7 @@ import rx.functions.Func1;
 
 public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardData, Action0> {
     
-    private static final TradeForward[] EMPTY_FORWARD = new TradeForward[0];
+    private static final ForwardTrade[] EMPTY_FORWARD = new ForwardTrade[0];
     private static final ForwardData[] EMPTY_DATA = new ForwardData[0];
     
     private static final Logger LOG = LoggerFactory
@@ -69,16 +69,16 @@ public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardDat
         if (this._reactorsRef.getStamp() == newStamp) {
             // now this stamp is the newest
             final ForwardData[] data = this._forwards.toArray(EMPTY_DATA);
-            final Map<MatchRule, TradeForward> rule2reactor = Maps.newHashMap();
+            final Map<MatchRule, ForwardTrade> rule2reactor = Maps.newHashMap();
             for (ForwardData f : data) {
-                TradeForward reactor = rule2reactor.get(f.rule());
+                ForwardTrade reactor = rule2reactor.get(f.rule());
                 if (null == reactor) {
-                    reactor = new TradeForward(this._httpclient, f.rule());
+                    reactor = new ForwardTrade(this._httpclient, f.rule());
                     rule2reactor.put(f.rule(), reactor);
                 }
                 reactor.addTarget(f.target());
             }
-            final TradeForward[] newReactors = rule2reactor.values().toArray(EMPTY_FORWARD);
+            final ForwardTrade[] newReactors = rule2reactor.values().toArray(EMPTY_FORWARD);
             if (this._reactorsRef.compareAndSet(this._reactorsRef.getReference(), newReactors, 
                     newStamp, newStamp)) {
                 LOG.info("CompositeForward's rule has update to stamp({}) success.", newStamp);
@@ -94,7 +94,7 @@ public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardDat
 
     @Override
     public Single<? extends InOut> react(final HttpTrade trade, final InOut io) {
-        final TradeForward[] reactors = this._reactorsRef.getReference();
+        final ForwardTrade[] reactors = this._reactorsRef.getReference();
         if (null == reactors ||
             (null != reactors && reactors.length == 0)) {
             return Single.<InOut>just(null);
@@ -108,7 +108,7 @@ public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardDat
     private final List<ForwardData> _forwards = 
             new CopyOnWriteArrayList<>();
     
-    private final AtomicStampedReference<TradeForward[]> _reactorsRef = 
+    private final AtomicStampedReference<ForwardTrade[]> _reactorsRef = 
             new AtomicStampedReference<>(null, 0);
     
     @Inject

@@ -25,12 +25,12 @@ import rx.Single;
 import rx.functions.Func0;
 import rx.functions.Func1;
 
-public class TradeForward implements TradeReactor {
+public class ForwardTrade implements TradeReactor {
     
     private static final Logger LOG = LoggerFactory
-            .getLogger(TradeForward.class);
+            .getLogger(ForwardTrade.class);
     
-    public TradeForward(
+    public ForwardTrade(
             final HttpClient httpclient,
             final MatchRule  rule
             ) {

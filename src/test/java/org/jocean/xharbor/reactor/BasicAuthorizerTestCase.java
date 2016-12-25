@@ -5,7 +5,7 @@ import static org.junit.Assert.assertEquals;
 import org.jocean.http.util.HttpMessageHolder;
 import org.jocean.http.util.RxNettys;
 import org.jocean.xharbor.api.TradeReactor.InOut;
-import org.jocean.xharbor.reactor.BasicAuthorizer;
+import org.jocean.xharbor.reactor.BasicAuthenticate;
 import org.junit.Test;
 
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
@@ -21,7 +21,7 @@ public class BasicAuthorizerTestCase {
 
     @Test
     public final void testBasicAuthorizer() {
-        final BasicAuthorizer authorizer = new BasicAuthorizer("/needauth(\\w)*", "hello", "world", "demo");
+        final BasicAuthenticate authorizer = new BasicAuthenticate("/needauth(\\w)*", "hello", "world", "demo");
         
         final DefaultFullHttpRequest orgreq = 
                 new DefaultFullHttpRequest(HttpVersion.HTTP_1_0, HttpMethod.POST, 

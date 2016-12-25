@@ -17,9 +17,9 @@ import rx.Single;
 import rx.functions.Action1;
 import rx.functions.Func1;
 
-public class ResponseHeaderRewriter implements TradeReactor {
+public class RewriteResponseHeader implements TradeReactor {
     
-    public ResponseHeaderRewriter(
+    public RewriteResponseHeader(
             final String pathPattern,
             final Map<String, String> extraHeaders) {
         this._pathPattern = Regexs.safeCompilePattern(pathPattern);

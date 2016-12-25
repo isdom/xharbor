@@ -15,9 +15,9 @@ import rx.Observable;
 import rx.Single;
 import rx.functions.Func1;
 
-public class RewritePath implements TradeReactor {
+public class RewriteRequestPath implements TradeReactor {
 
-    public RewritePath(
+    public RewriteRequestPath(
             final String pathPattern, 
             final String replaceTo) {
         this._pathPattern = Regexs.safeCompilePattern(pathPattern);

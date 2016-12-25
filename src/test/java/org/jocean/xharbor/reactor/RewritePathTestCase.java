@@ -12,7 +12,7 @@ import org.jocean.http.util.Nettys;
 import org.jocean.http.util.RxNettys;
 import org.jocean.xharbor.api.TradeReactor;
 import org.jocean.xharbor.api.TradeReactor.InOut;
-import org.jocean.xharbor.reactor.RewritePath;
+import org.jocean.xharbor.reactor.RewriteRequestPath;
 import org.junit.Test;
 
 import io.netty.buffer.Unpooled;
@@ -30,7 +30,7 @@ public class RewritePathTestCase {
     @Test
     public final void testRewritePathSuccess() {
         final TradeReactor reactor = 
-                new RewritePath("/yjy_psm/fetchMetadata", "/yjy_common/fetchMetadata");
+                new RewriteRequestPath("/yjy_psm/fetchMetadata", "/yjy_common/fetchMetadata");
         
         final DefaultFullHttpRequest orgreq = 
                 new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/yjy_psm/fetchMetadata");
@@ -59,7 +59,7 @@ public class RewritePathTestCase {
     @Test
     public final void testNoNeedRewritePath() {
         final TradeReactor reactor = 
-                new RewritePath("/yjy_psm/fetchMetadata", "/yjy_common/fetchMetadata");
+                new RewriteRequestPath("/yjy_psm/fetchMetadata", "/yjy_common/fetchMetadata");
         
         final DefaultFullHttpRequest orgreq = 
                 new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/noNeedRewrite");
@@ -82,7 +82,7 @@ public class RewritePathTestCase {
     @Test
     public final void testRewritePathAndKeepRequestBody() throws IOException {
         final TradeReactor reactor = 
-                new RewritePath("/yjy_psm/fetchMetadata", "/yjy_common/fetchMetadata");
+                new RewriteRequestPath("/yjy_psm/fetchMetadata", "/yjy_common/fetchMetadata");
         
         final DefaultFullHttpRequest orgreq = 
                 new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/yjy_psm/fetchMetadata",
