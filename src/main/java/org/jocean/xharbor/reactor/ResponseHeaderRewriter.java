@@ -6,7 +6,6 @@ import java.util.regex.Pattern;
 
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.RxNettys;
-import org.jocean.idiom.Ordered;
 import org.jocean.idiom.Regexs;
 import org.jocean.xharbor.api.TradeReactor;
 
@@ -18,12 +17,7 @@ import rx.Single;
 import rx.functions.Action1;
 import rx.functions.Func1;
 
-public class ResponseHeaderRewriter implements TradeReactor, Ordered {
-    
-    @Override
-    public int ordinal() {
-        return 0;
-    }
+public class ResponseHeaderRewriter implements TradeReactor {
     
     public ResponseHeaderRewriter(
             final String pathPattern,

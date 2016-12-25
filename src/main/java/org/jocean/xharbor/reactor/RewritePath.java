@@ -5,7 +5,6 @@ import java.util.regex.Pattern;
 
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.RxNettys;
-import org.jocean.idiom.Ordered;
 import org.jocean.idiom.Regexs;
 import org.jocean.xharbor.api.TradeReactor;
 
@@ -16,13 +15,8 @@ import rx.Observable;
 import rx.Single;
 import rx.functions.Func1;
 
-public class RewritePath implements TradeReactor, Ordered {
+public class RewritePath implements TradeReactor {
 
-    @Override
-    public int ordinal() {
-        return 0;
-    }
-    
     public RewritePath(
             final String pathPattern, 
             final String replaceTo) {

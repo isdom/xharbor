@@ -5,7 +5,6 @@ import java.util.regex.Pattern;
 
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.RxNettys;
-import org.jocean.idiom.Ordered;
 import org.jocean.idiom.Regexs;
 import org.jocean.xharbor.api.TradeReactor;
 
@@ -19,13 +18,8 @@ import rx.Observable;
 import rx.Single;
 import rx.functions.Func1;
 
-public class HeaderonlyResponder implements TradeReactor, Ordered {
+public class HeaderonlyResponder implements TradeReactor {
 
-    @Override
-    public int ordinal() {
-        return 0;
-    }
-    
     public HeaderonlyResponder(
             final String methodPattern, 
             final String pathPattern, 

@@ -11,6 +11,7 @@ import javax.inject.Inject;
 
 import org.jocean.http.client.HttpClient;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
+import org.jocean.idiom.Ordered;
 import org.jocean.xharbor.api.TradeReactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,13 +20,22 @@ import com.google.common.collect.Maps;
 
 import rx.Single;
 
-public class CompositeForward implements TradeReactor {
+public class CompositeForward implements TradeReactor, Ordered {
     
     private static final TradeForward[] EMPTY_FORWARD = new TradeForward[0];
     private static final ForwardData[] EMPTY_DATA = new ForwardData[0];
     
     private static final Logger LOG = LoggerFactory
             .getLogger(CompositeForward.class);
+    
+    public void setOrdinal(final int ordinal) {
+        this._ordinal = ordinal;
+    }
+    
+    @Override
+    public int ordinal() {
+        return this._ordinal;
+    }
     
     public void addForward(final ForwardData data) {
         this._forwards.add(data);
@@ -91,4 +101,6 @@ public class CompositeForward implements TradeReactor {
     
     @Inject
     private HttpClient _httpclient;
+    
+    private int _ordinal = 0;
 }
