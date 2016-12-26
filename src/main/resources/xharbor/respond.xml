@@ -21,6 +21,7 @@
 		        </constructor-arg>
 		        <constructor-arg value="${response.status}"/>
 		        <constructor-arg ref="extraHeaders"/>
+                <constructor-arg value="${response.log:true}"/>
             </bean>
         </constructor-arg>
     </bean>

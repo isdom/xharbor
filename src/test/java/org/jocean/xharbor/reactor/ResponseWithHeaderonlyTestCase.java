@@ -22,7 +22,7 @@ public class ResponseWithHeaderonlyTestCase {
     public final void testHeaderonlyResponder() {
         final ResponseWithHeaderonly responder = new ResponseWithHeaderonly(
                 new MatchRule(null, "/yourname/(\\w)*", null), 
-                200, null);
+                200, null, true);
         
         final DefaultFullHttpRequest request = 
                 new DefaultFullHttpRequest(HttpVersion.HTTP_1_0, HttpMethod.POST, 
