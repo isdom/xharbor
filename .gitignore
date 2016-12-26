@@ -1,5 +1,13 @@
-bin/
-build/
-logs/
-.gradle
+/bin/
+/bin/*
+/build/
+/build/*
+/logs/
+/logs/*
+/.settings/
+/.settings/*
+/.gradle/
+/.gradle/*
 .DS_Store
+.classpath
+.project
