@@ -18,17 +18,17 @@ public class ForwardData implements BeanHolderAware {
             .getLogger(ForwardData.class);
     
     public ForwardData(
-            final MatchRule rule,
+            final MatchRule matcher,
             final String uri,
             final String featuresName
             ) throws Exception {
-        this._matchRule = rule;
+        this._matcher = matcher;
         this._uri = new URI(uri);
         this._featuresName = featuresName;
     }
     
-    MatchRule rule() {
-        return this._matchRule;
+    MatchRule matcher() {
+        return this._matcher;
     }
     
     Target target() {
@@ -59,7 +59,7 @@ public class ForwardData implements BeanHolderAware {
     
     private BeanHolder _beanHolder;
     
-    private final MatchRule _matchRule;
+    private final MatchRule _matcher;
     private final URI _uri;
     private final String _featuresName;
 }

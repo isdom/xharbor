@@ -21,7 +21,9 @@ public class BasicAuthenticateTestCase {
 
     @Test
     public final void testBasicAuthorizer() {
-        final BasicAuthenticate authorizer = new BasicAuthenticate("/needauth(\\w)*", "hello", "world", "demo");
+        final BasicAuthenticate authorizer = new BasicAuthenticate(
+                new MatchRule(null, "/needauth(\\w)*", null), 
+                "hello", "world", "demo");
         
         final DefaultFullHttpRequest orgreq = 
                 new DefaultFullHttpRequest(HttpVersion.HTTP_1_0, HttpMethod.POST, 

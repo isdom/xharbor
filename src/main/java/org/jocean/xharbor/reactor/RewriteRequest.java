@@ -15,13 +15,18 @@ import rx.Observable;
 import rx.Single;
 import rx.functions.Func1;
 
-public class RewriteRequestPath implements TradeReactor {
+public class RewriteRequest implements TradeReactor {
 
-    public RewriteRequestPath(
+    public RewriteRequest(
             final String pathPattern, 
-            final String replaceTo) {
+            final String replacePathTo,
+            final String replaceHeaderName, 
+            final String replaceHeaderValue
+            ) {
         this._pathPattern = Regexs.safeCompilePattern(pathPattern);
-        this._replaceTo = replaceTo;
+        this._replacePathTo = replacePathTo;
+        this._replaceHeaderName = replaceHeaderName;
+        this._replaceHeaderValue = replaceHeaderValue;
     }
     
     @Override
@@ -54,7 +59,12 @@ public class RewriteRequestPath implements TradeReactor {
         final DefaultHttpRequest newreq = new DefaultHttpRequest(req.protocolVersion(), 
                 req.method(), req.uri(), true);
         newreq.headers().set(req.headers());
-        return newreq.setUri(matcher.replaceFirst(_replaceTo));
+        newreq.setUri(matcher.replaceFirst(_replacePathTo));
+        if (null != this._replaceHeaderName
+            && !this._replaceHeaderName.isEmpty()) {
+            newreq.headers().set(this._replaceHeaderName, _replaceHeaderValue);
+        }
+        return newreq;
     }
 
     private InOut io4rewritePath(final InOut originalio, 
@@ -76,5 +86,7 @@ public class RewriteRequestPath implements TradeReactor {
     }
 
     private final Pattern _pathPattern;
-    private final String _replaceTo;
+    private final String _replacePathTo;
+    private final String _replaceHeaderName;
+    private final String _replaceHeaderValue;
 }

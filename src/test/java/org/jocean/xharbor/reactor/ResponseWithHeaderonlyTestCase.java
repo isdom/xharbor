@@ -20,7 +20,9 @@ public class ResponseWithHeaderonlyTestCase {
 
     @Test
     public final void testHeaderonlyResponder() {
-        final ResponseWithHeaderonly responder = new ResponseWithHeaderonly(null, "/yourname/(\\w)*", 200, null);
+        final ResponseWithHeaderonly responder = new ResponseWithHeaderonly(
+                new MatchRule(null, "/yourname/(\\w)*", null), 
+                200, null);
         
         final DefaultFullHttpRequest request = 
                 new DefaultFullHttpRequest(HttpVersion.HTTP_1_0, HttpMethod.POST, 

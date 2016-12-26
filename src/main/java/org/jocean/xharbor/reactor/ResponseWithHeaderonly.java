@@ -1,11 +1,9 @@
 package org.jocean.xharbor.reactor;
 
 import java.util.Map;
-import java.util.regex.Pattern;
 
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.RxNettys;
-import org.jocean.idiom.Regexs;
 import org.jocean.xharbor.api.TradeReactor;
 
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
@@ -21,12 +19,10 @@ import rx.functions.Func1;
 public class ResponseWithHeaderonly implements TradeReactor {
 
     public ResponseWithHeaderonly(
-            final String methodPattern, 
-            final String pathPattern, 
+            final MatchRule matcher,
             final int responseStatus, 
             final Map<String, String> extraHeaders) {
-        this._pathPattern = Regexs.safeCompilePattern(pathPattern);
-        this._methodPattern = Regexs.safeCompilePattern(methodPattern);
+        this._matcher = matcher;
         this._responseStatus = responseStatus;
         this._extraHeaders = extraHeaders;
     }
@@ -43,8 +39,7 @@ public class ResponseWithHeaderonly implements TradeReactor {
                         if (null == req) {
                             return null;
                         } else {
-                            if (isMatch(_pathPattern, req.uri())
-                                && isMatch(_methodPattern, req.method().name())) {
+                            if (_matcher.match(req)) {
                                 return io4Response(io, req);
                             } else {
                                 //  not handle this trade
@@ -53,10 +48,6 @@ public class ResponseWithHeaderonly implements TradeReactor {
                         }
                     }})
                 .toSingle();
-    }
-
-    private static boolean isMatch(final Pattern pattern, final String str) {
-        return (null==pattern) || (null!=pattern && pattern.matcher(str).find());
     }
 
     private InOut io4Response(final InOut originalio, 
@@ -81,8 +72,7 @@ public class ResponseWithHeaderonly implements TradeReactor {
             }};
     }
     
-    private final Pattern _pathPattern;
-    private final Pattern _methodPattern;
+    private final MatchRule _matcher;
     private final int _responseStatus;
     private final Map<String, String> _extraHeaders;
 }

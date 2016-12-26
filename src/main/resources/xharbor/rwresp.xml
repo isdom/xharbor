@@ -11,8 +11,14 @@
         destroy-method="call">
         <constructor-arg ref="rwresps"/>
         <constructor-arg>
-            <bean class="org.jocean.xharbor.reactor.RewriteResponseHeader">
-		        <constructor-arg value="${rewrite.path}"/>
+            <bean class="org.jocean.xharbor.reactor.RewriteResponse">
+		        <constructor-arg>
+                    <bean class="org.jocean.xharbor.reactor.MatchRule">
+                        <constructor-arg value="${rewrite.method:}"/>
+                        <constructor-arg value="${rewrite.path:}"/>
+                        <constructor-arg value="${rewrite.xroute:}"/>
+                    </bean>
+		        </constructor-arg>
 		        <constructor-arg ref="extraHeaders"/>
             </bean>
         </constructor-arg>

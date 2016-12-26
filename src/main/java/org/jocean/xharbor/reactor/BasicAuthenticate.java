@@ -1,12 +1,8 @@
 package org.jocean.xharbor.reactor;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.Pair;
-import org.jocean.idiom.Regexs;
 import org.jocean.xharbor.api.TradeReactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,11 +22,11 @@ public class BasicAuthenticate implements TradeReactor {
             .getLogger(BasicAuthenticate.class);
 
     public BasicAuthenticate(
-            final String pathPattern, 
+            final MatchRule matcher,
             final String user, 
             final String password,
             final String strWWWAuthenticate) {
-        this._pathPattern = Regexs.safeCompilePattern(pathPattern);
+        this._matcher = matcher;
         this._user = user;
         this._password = password;
         this._strWWWAuthenticate = strWWWAuthenticate;
@@ -48,8 +44,7 @@ public class BasicAuthenticate implements TradeReactor {
                         if (null == req) {
                             return null;
                         } else {
-                            final Matcher matcher = _pathPattern.matcher(req.uri());
-                            if ( matcher.find() ) {
+                            if ( _matcher.match(req) ) {
                                 if (isAuthorizeSuccess(req, _user, _password)) {
                                     return null;
                                 } else {
@@ -76,7 +71,7 @@ public class BasicAuthenticate implements TradeReactor {
             public Observable<? extends HttpObject> outbound() {
                 return RxNettys.response401Unauthorized(
                         originalreq.protocolVersion(), 
-                        _strWWWAuthenticate)
+                        "Basic realm=\"" + _strWWWAuthenticate + "\"")
                     .delaySubscription(originalio.inbound().ignoreElements());
             }};
     }
@@ -124,7 +119,7 @@ public class BasicAuthenticate implements TradeReactor {
         return fields.length == 2 ? Pair.of(fields[0], fields[1]) : null;
     }
 
-    private final Pattern _pathPattern;
+    private final MatchRule _matcher;
     private final String _user;
     private final String _password;
     private final String _strWWWAuthenticate;

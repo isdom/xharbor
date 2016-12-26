@@ -9,9 +9,11 @@
         destroy-method="call">
         <constructor-arg ref="rwpaths"/>
         <constructor-arg>
-            <bean class="org.jocean.xharbor.reactor.RewriteRequestPath">
+            <bean class="org.jocean.xharbor.reactor.RewriteRequest">
 		        <constructor-arg value="${rewrite.path}"/>
 		        <constructor-arg value="${rewrite.to}"/>
+                <constructor-arg value="${rewrite.header.name:}"/>
+                <constructor-arg value="${rewrite.header.value:}"/>
             </bean>
         </constructor-arg>
     </bean>

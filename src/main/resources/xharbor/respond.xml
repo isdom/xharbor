@@ -12,8 +12,13 @@
         <constructor-arg ref="responds"/>
         <constructor-arg>
             <bean class="org.jocean.xharbor.reactor.ResponseWithHeaderonly">
-		        <constructor-arg value="${request.method}"/>
-		        <constructor-arg value="${request.path}"/>
+		        <constructor-arg>
+                    <bean class="org.jocean.xharbor.reactor.MatchRule">
+                        <constructor-arg value="${request.method:}"/>
+                        <constructor-arg value="${request.path:}"/>
+                        <constructor-arg value="${request.xroute:}"/>
+                    </bean>
+		        </constructor-arg>
 		        <constructor-arg value="${response.status}"/>
 		        <constructor-arg ref="extraHeaders"/>
             </bean>

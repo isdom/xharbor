@@ -1,12 +1,9 @@
 package org.jocean.xharbor.reactor;
 
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.RxNettys;
-import org.jocean.idiom.Regexs;
 import org.jocean.xharbor.api.TradeReactor;
 
 import io.netty.handler.codec.http.HttpObject;
@@ -17,12 +14,12 @@ import rx.Single;
 import rx.functions.Action1;
 import rx.functions.Func1;
 
-public class RewriteResponseHeader implements TradeReactor {
+public class RewriteResponse implements TradeReactor {
     
-    public RewriteResponseHeader(
-            final String pathPattern,
+    public RewriteResponse(
+            final MatchRule matcher,
             final Map<String, String> extraHeaders) {
-        this._pathPattern = Regexs.safeCompilePattern(pathPattern);
+        this._matcher = matcher;
         this._extraHeaders = extraHeaders;
     }
     
@@ -38,8 +35,7 @@ public class RewriteResponseHeader implements TradeReactor {
                         if (null == req) {
                             return null;
                         } else {
-                            final Matcher matcher = _pathPattern.matcher(req.uri());
-                            if ( matcher.find() ) {
+                            if (_matcher.match(req)) {
                                 return io4rewriteResponse(io, req);
                             } else {
                                 //  not handle this trade
@@ -72,6 +68,6 @@ public class RewriteResponseHeader implements TradeReactor {
             }};
     }
     
-    private final Pattern _pathPattern;
+    private final MatchRule _matcher;
     private final Map<String, String> _extraHeaders;
 }

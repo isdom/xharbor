@@ -12,7 +12,7 @@ import org.jocean.http.util.Nettys;
 import org.jocean.http.util.RxNettys;
 import org.jocean.xharbor.api.TradeReactor;
 import org.jocean.xharbor.api.TradeReactor.InOut;
-import org.jocean.xharbor.reactor.RewriteRequestPath;
+import org.jocean.xharbor.reactor.RewriteRequest;
 import org.junit.Test;
 
 import io.netty.buffer.Unpooled;
@@ -23,14 +23,14 @@ import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpVersion;
 import rx.Observable;
 
-public class RewriteRequestPathTestCase {
+public class RewriteRequestTestCase {
 
     public static final byte[] CONTENT = { 'H', 'e', 'l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd' };
     
     @Test
     public final void testRewritePathSuccess() {
         final TradeReactor reactor = 
-                new RewriteRequestPath("/yjy_psm/fetchMetadata", "/yjy_common/fetchMetadata");
+                new RewriteRequest("/yjy_psm/fetchMetadata", "/yjy_common/fetchMetadata", null, null);
         
         final DefaultFullHttpRequest orgreq = 
                 new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/yjy_psm/fetchMetadata");
@@ -59,7 +59,7 @@ public class RewriteRequestPathTestCase {
     @Test
     public final void testNoNeedRewritePath() {
         final TradeReactor reactor = 
-                new RewriteRequestPath("/yjy_psm/fetchMetadata", "/yjy_common/fetchMetadata");
+                new RewriteRequest("/yjy_psm/fetchMetadata", "/yjy_common/fetchMetadata", null, null);
         
         final DefaultFullHttpRequest orgreq = 
                 new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/noNeedRewrite");
@@ -82,7 +82,7 @@ public class RewriteRequestPathTestCase {
     @Test
     public final void testRewritePathAndKeepRequestBody() throws IOException {
         final TradeReactor reactor = 
-                new RewriteRequestPath("/yjy_psm/fetchMetadata", "/yjy_common/fetchMetadata");
+                new RewriteRequest("/yjy_psm/fetchMetadata", "/yjy_common/fetchMetadata", null, null);
         
         final DefaultFullHttpRequest orgreq = 
                 new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/yjy_psm/fetchMetadata",

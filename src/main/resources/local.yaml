@@ -63,7 +63,7 @@ children:
                   header.value=*
   - name: router.console
     children:
-      - name: httpsvr.8889
+      - name: httpin.8889
         parameters: |
           http.port=8889
       - name: rules.100
@@ -72,15 +72,17 @@ children:
         children:
           - name: forward.jmxhtml.self
             parameters: |
-              forward.path=/jmxhtml\\.self/[/|\\w]*
+              forward.xroute=jmxhtml.self
               forward.to=http://127.0.0.1:8082
           - name: rwreq.jmxhtml
             parameters: |
               rewrite.path=/jmxhtml[\\w|\\.]*
               rewrite.to=
+              rewrite.header.name=x-route-code
+              rewrite.header.value=jmxhtml.self
           - name: auth.jmxhtml
             parameters: |
-              auth.path=/jmxhtml(\\w)*
+              auth.xroute=jmxhtml(\\w)*
               auth.user=test
               auth.password=test
               

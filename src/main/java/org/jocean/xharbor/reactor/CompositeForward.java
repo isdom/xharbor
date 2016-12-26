@@ -69,16 +69,16 @@ public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardDat
         if (this._reactorsRef.getStamp() == newStamp) {
             // now this stamp is the newest
             final ForwardData[] data = this._forwards.toArray(EMPTY_DATA);
-            final Map<MatchRule, ForwardTrade> rule2reactor = Maps.newHashMap();
+            final Map<MatchRule, ForwardTrade> matcher2reactor = Maps.newHashMap();
             for (ForwardData f : data) {
-                ForwardTrade reactor = rule2reactor.get(f.rule());
+                ForwardTrade reactor = matcher2reactor.get(f.matcher());
                 if (null == reactor) {
-                    reactor = new ForwardTrade(this._httpclient, f.rule());
-                    rule2reactor.put(f.rule(), reactor);
+                    reactor = new ForwardTrade(f.matcher(), this._httpclient);
+                    matcher2reactor.put(f.matcher(), reactor);
                 }
                 reactor.addTarget(f.target());
             }
-            final ForwardTrade[] newReactors = rule2reactor.values().toArray(EMPTY_FORWARD);
+            final ForwardTrade[] newReactors = matcher2reactor.values().toArray(EMPTY_FORWARD);
             if (this._reactorsRef.compareAndSet(this._reactorsRef.getReference(), newReactors, 
                     newStamp, newStamp)) {
                 LOG.info("CompositeForward's rule has update to stamp({}) success.", newStamp);

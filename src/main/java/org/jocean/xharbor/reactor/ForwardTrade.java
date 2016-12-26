@@ -31,11 +31,11 @@ public class ForwardTrade implements TradeReactor {
             .getLogger(ForwardTrade.class);
     
     public ForwardTrade(
-            final HttpClient httpclient,
-            final MatchRule  rule
+            final MatchRule  matcher,
+            final HttpClient httpclient
             ) {
+        this._matcher = matcher;
         this._httpclient = httpclient;
-        this._matchRule = rule;
     }
     
     public void addTarget(final Target target) {
@@ -54,7 +54,7 @@ public class ForwardTrade implements TradeReactor {
                         if (null == req) {
                             return null;
                         } else {
-                            if ( _matchRule.match(req) ) {
+                            if ( _matcher.match(req) ) {
                                 final Target target = selectTarget();
                                 if (null == target) {
                                     //  no target
@@ -167,7 +167,7 @@ public class ForwardTrade implements TradeReactor {
     }
     
     private final HttpClient    _httpclient;
-    private final MatchRule     _matchRule;
+    private final MatchRule     _matcher;
     private final List<MarkableTargetImpl>  _targets = 
             Lists.newCopyOnWriteArrayList();
 }

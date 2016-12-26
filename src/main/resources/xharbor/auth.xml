@@ -10,7 +10,13 @@
         <constructor-arg ref="auths"/>
         <constructor-arg>
 		    <bean class="org.jocean.xharbor.reactor.BasicAuthenticate">
-		        <constructor-arg value="${auth.path}"/>
+		        <constructor-arg>
+                    <bean class="org.jocean.xharbor.reactor.MatchRule">
+                        <constructor-arg value="${auth.method:}"/>
+                        <constructor-arg value="${auth.path:}"/>
+                        <constructor-arg value="${auth.xroute:}"/>
+                    </bean>
+		        </constructor-arg>
 		        <constructor-arg value="${auth.user}"/>
 		        <constructor-arg value="${auth.password}"/>
 		        <constructor-arg value="${auth.authenticate:jocean}"/>
