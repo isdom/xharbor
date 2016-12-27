@@ -5,6 +5,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.http.Feature;
 import org.jocean.http.client.HttpClient;
@@ -20,8 +21,10 @@ import com.google.common.collect.Lists;
 
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponse;
 import rx.Observable;
 import rx.Single;
+import rx.functions.Action1;
 import rx.functions.Func0;
 import rx.functions.Func1;
 
@@ -80,12 +83,28 @@ public class ForwardTrade implements TradeReactor {
             }
             @Override
             public Observable<? extends HttpObject> outbound() {
+                final AtomicReference<HttpRequest> ref = new AtomicReference<>();
                 return _httpclient.defineInteraction(
                             new InetSocketAddress(
                                 target.serviceUri().getHost(), 
                                 target.serviceUri().getPort()), 
-                            originalio.inbound(),
-                            target.features().call());
+                            originalio.inbound().doOnNext(new Action1<HttpObject>() {
+                                @Override
+                                public void call(final HttpObject httpobj) {
+                                    if (httpobj instanceof HttpRequest) {
+                                        ref.set((HttpRequest)httpobj);
+                                    }
+                                }}),
+                            target.features().call())
+                        .doOnNext(new Action1<HttpObject>() {
+                            @Override
+                            public void call(final HttpObject httpobj) {
+                                if (httpobj instanceof HttpResponse) {
+                                    final HttpResponse resp = (HttpResponse)httpobj;
+                                    LOG.info("FORWARD relay \nREQ\n[{}]\n and sendback \nRESP\n[{}]", 
+                                            ref.get(), resp);
+                                }
+                            }});
             }};
     }
     
