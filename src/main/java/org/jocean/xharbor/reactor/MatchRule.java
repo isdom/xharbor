@@ -8,7 +8,7 @@ import io.netty.handler.codec.http.HttpRequest;
 
 public class MatchRule implements Comparable<MatchRule> {
     
-    private static final String X_ROUTE_CODE = "X-Route-Code";
+    public static final String X_ROUTE_CODE = "X-Route-Code";
     
     public MatchRule(
             final String methodPattern, 

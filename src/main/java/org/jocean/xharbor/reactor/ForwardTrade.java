@@ -11,8 +11,11 @@ import org.jocean.http.Feature;
 import org.jocean.http.client.HttpClient;
 import org.jocean.http.util.RxNettys;
 import org.jocean.xharbor.api.MarkableTarget;
+import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.Target;
 import org.jocean.xharbor.api.TradeReactor;
+import org.jocean.xharbor.api.RelayMemo.RESULT;
+import org.jocean.xharbor.api.RoutingInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,6 +26,7 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import rx.Observable;
 import rx.Single;
+import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.functions.Func0;
 import rx.functions.Func1;
@@ -34,10 +38,12 @@ public class ForwardTrade implements TradeReactor {
     
     public ForwardTrade(
             final MatchRule  matcher,
-            final HttpClient httpclient
+            final HttpClient httpclient,
+            final RelayMemo.Builder memoBuilder
             ) {
         this._matcher = matcher;
         this._httpclient = httpclient;
+        this._memoBuilder = memoBuilder;
     }
     
     public void addTarget(final Target target) {
@@ -57,13 +63,13 @@ public class ForwardTrade implements TradeReactor {
                             return null;
                         } else {
                             if ( _matcher.match(req) ) {
-                                final Target target = selectTarget();
+                                final MarkableTarget target = selectTarget();
                                 if (null == target) {
                                     //  no target
                                     LOG.warn("no target to forward for trade {}", ctx.trade());
                                     return null;
                                 } else {
-                                    return io4forward(io, target);
+                                    return io4forward(ctx, io, target);
                                 }
                             } else {
                                 //  not handle this trade
@@ -74,7 +80,7 @@ public class ForwardTrade implements TradeReactor {
                 .toSingle();
     }
     
-    private InOut io4forward(final InOut originalio, final Target target) {
+    private InOut io4forward(final TradeContext ctx, final InOut originalio, final MarkableTarget target) {
         return new InOut() {
             @Override
             public Observable<? extends HttpObject> inbound() {
@@ -82,7 +88,8 @@ public class ForwardTrade implements TradeReactor {
             }
             @Override
             public Observable<? extends HttpObject> outbound() {
-                final AtomicReference<HttpRequest> ref = new AtomicReference<>();
+                final AtomicReference<HttpRequest> refReq = new AtomicReference<>();
+                final AtomicReference<HttpResponse> refResp = new AtomicReference<>();
                 return _httpclient.defineInteraction(
                             new InetSocketAddress(
                                 target.serviceUri().getHost(), 
@@ -91,7 +98,7 @@ public class ForwardTrade implements TradeReactor {
                                 @Override
                                 public void call(final HttpObject httpobj) {
                                     if (httpobj instanceof HttpRequest) {
-                                        ref.set((HttpRequest)httpobj);
+                                        refReq.set((HttpRequest)httpobj);
                                     }
                                 }}),
                             target.features().call())
@@ -100,9 +107,20 @@ public class ForwardTrade implements TradeReactor {
                             public void call(final HttpObject httpobj) {
                                 if (httpobj instanceof HttpResponse) {
                                     final HttpResponse resp = (HttpResponse)httpobj;
-                                    LOG.info("FORWARD relay \nREQ\n[{}]\n and sendback \nRESP\n[{}]", 
-                                            ref.get(), resp);
+                                    refResp.set(resp);
                                 }
+                            }})
+                        .doOnCompleted(new Action0() {
+                            @Override
+                            public void call() {
+                                final long ttl = ctx.watch().stopAndRestart();
+                                final RelayMemo memo = _memoBuilder.build(target, buildRoutingInfo(refReq.get()));
+                                memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
+                                LOG.info("FORWARD_SUCCESS\ncost:[{}]s for \nREQ\n[{}]\n dispatch to:[{}]\nand sendback\nRESP\n[{}]",
+                                        ttl / (float)1000.0, 
+                                        refReq.get(), 
+                                        target.serviceUri(), 
+                                        refResp.get());
                             }});
             }};
     }
@@ -141,6 +159,24 @@ public class ForwardTrade implements TradeReactor {
         return !peer._down.get();
     }
     
+    private RoutingInfo buildRoutingInfo(final HttpRequest req) {
+        return new RoutingInfo() {
+            @Override
+            public String getXRouteCode() {
+                return req.headers().get(MatchRule.X_ROUTE_CODE, "");
+            }
+
+            @Override
+            public String getMethod() {
+                return req.method().name();
+            }
+
+            @Override
+            public String getPath() {
+                return req.uri();
+            }};
+    }
+
     private class MarkableTargetImpl implements MarkableTarget {
         
         private static final int MAX_EFFECTIVEWEIGHT = 1000;
@@ -185,6 +221,7 @@ public class ForwardTrade implements TradeReactor {
     }
     
     private final HttpClient    _httpclient;
+    private final RelayMemo.Builder _memoBuilder;
     private final MatchRule     _matcher;
     private final List<MarkableTargetImpl>  _targets = 
             Lists.newCopyOnWriteArrayList();
