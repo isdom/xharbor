@@ -2,7 +2,6 @@ package org.jocean.xharbor.reactor;
 
 import java.util.Map;
 
-import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.RxNettys;
 import org.jocean.xharbor.api.TradeReactor;
 import org.slf4j.Logger;
@@ -36,7 +35,7 @@ public class ResponseWithHeaderonly implements TradeReactor {
     }
     
     @Override
-    public Single<? extends InOut> react(final HttpTrade trade, final InOut io) {
+    public Single<? extends InOut> react(final TradeContext ctx, final InOut io) {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
@@ -45,7 +44,7 @@ public class ResponseWithHeaderonly implements TradeReactor {
                     @Override
                     public InOut call(final HttpRequest req) {
                         if (null == req) {
-                            LOG.warn("request is null, ignore trade {}", trade);
+                            LOG.warn("request is null, ignore trade {}", ctx.trade());
                             return null;
                         } else {
                             if (_matcher.match(req)) {

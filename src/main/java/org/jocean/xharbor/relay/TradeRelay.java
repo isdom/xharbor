@@ -7,9 +7,11 @@ import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.HttpMessageHolder;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.ExceptionUtils;
+import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxActions;
 import org.jocean.xharbor.api.TradeReactor;
 import org.jocean.xharbor.api.TradeReactor.InOut;
+import org.jocean.xharbor.api.TradeReactor.TradeContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,8 +57,19 @@ public class TradeRelay extends Subscriber<HttpTrade> {
             .cache()
             .compose(RxNettys.duplicateHttpContent())
             ;
-            
-        this._tradeReactor.react(trade, new InOut() {
+
+        final StopWatch watch4Result = new StopWatch();
+        final TradeContext ctx = new TradeContext() {
+            @Override
+            public HttpTrade trade() {
+                return trade;
+            }
+            @Override
+            public StopWatch watch() {
+                return watch4Result;
+            }};
+        
+        this._tradeReactor.react(ctx, new InOut() {
             @Override
             public Observable<? extends HttpObject> inbound() {
                 return cachedInbound;

@@ -7,7 +7,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicStampedReference;
 
-import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.idiom.Ordered;
 import org.jocean.xharbor.api.TradeReactor;
 import org.slf4j.Logger;
@@ -89,13 +88,13 @@ public class CompositeReactor implements TradeReactor, Ordered, Func1<TradeReact
     }
 
     @Override
-    public Single<? extends InOut> react(final HttpTrade trade, final InOut io) {
+    public Single<? extends InOut> react(final TradeContext ctx, final InOut io) {
         final TradeReactor[] reactors = this._descReactorsRef.getReference();
         if (null == reactors ||
             (null != reactors && reactors.length == 0)) {
             return Single.<InOut>just(null);
         } else {
-            return TradeReactor.OP.all(Arrays.asList(reactors), trade, io);
+            return TradeReactor.OP.all(Arrays.asList(reactors), ctx, io);
         }
     }
 

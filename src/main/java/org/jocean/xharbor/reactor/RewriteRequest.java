@@ -3,7 +3,6 @@ package org.jocean.xharbor.reactor;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.Regexs;
 import org.jocean.xharbor.api.TradeReactor;
@@ -30,7 +29,7 @@ public class RewriteRequest implements TradeReactor {
     }
     
     @Override
-    public Single<? extends InOut> react(final HttpTrade trade, final InOut io) {
+    public Single<? extends InOut> react(final TradeContext ctx, final InOut io) {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }

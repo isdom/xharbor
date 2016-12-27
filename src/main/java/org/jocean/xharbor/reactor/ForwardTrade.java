@@ -9,7 +9,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.http.Feature;
 import org.jocean.http.client.HttpClient;
-import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.RxNettys;
 import org.jocean.xharbor.api.MarkableTarget;
 import org.jocean.xharbor.api.Target;
@@ -46,7 +45,7 @@ public class ForwardTrade implements TradeReactor {
     }
     
     @Override
-    public Single<? extends InOut> react(final HttpTrade trade, final InOut io) {
+    public Single<? extends InOut> react(final TradeContext ctx, final InOut io) {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
@@ -61,7 +60,7 @@ public class ForwardTrade implements TradeReactor {
                                 final Target target = selectTarget();
                                 if (null == target) {
                                     //  no target
-                                    LOG.warn("no target to forward for trade {}", trade);
+                                    LOG.warn("no target to forward for trade {}", ctx.trade());
                                     return null;
                                 } else {
                                     return io4forward(io, target);

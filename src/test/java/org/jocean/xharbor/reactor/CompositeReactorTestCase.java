@@ -6,10 +6,10 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.idiom.Ordered;
 import org.jocean.xharbor.api.TradeReactor;
 import org.jocean.xharbor.api.TradeReactor.InOut;
+import org.jocean.xharbor.api.TradeReactor.TradeContext;
 import org.junit.Test;
 
 import io.netty.handler.codec.http.HttpObject;
@@ -21,7 +21,7 @@ public class CompositeReactorTestCase {
     
     class OrderedTradeReactor implements TradeReactor, Ordered {
 
-        OrderedTradeReactor(final int ordinal, final Func2<HttpTrade, InOut, Single<? extends InOut>> doReact) {
+        OrderedTradeReactor(final int ordinal, final Func2<TradeContext, InOut, Single<? extends InOut>> doReact) {
             this._ordinal = ordinal;
             this._doReact = doReact;
         }
@@ -30,12 +30,12 @@ public class CompositeReactorTestCase {
             return this._ordinal;
         }
         @Override
-        public Single<? extends InOut> react(final HttpTrade trade, final InOut io) {
-            return this._doReact.call(trade, io);
+        public Single<? extends InOut> react(final TradeContext ctx, final InOut io) {
+            return this._doReact.call(ctx, io);
         }
         
         private final int _ordinal;
-        private final Func2< HttpTrade, InOut, Single<? extends InOut>> _doReact;
+        private final Func2<TradeContext, InOut, Single<? extends InOut>> _doReact;
     }
 
     @Test
@@ -44,17 +44,17 @@ public class CompositeReactorTestCase {
         final AtomicBoolean tr1Reacted = new AtomicBoolean(false);
         final AtomicBoolean tr2Reacted = new AtomicBoolean(false);
         
-        cr.addReactor(new OrderedTradeReactor(1, new Func2<HttpTrade, InOut, Single<? extends InOut>>() {
+        cr.addReactor(new OrderedTradeReactor(1, new Func2<TradeContext, InOut, Single<? extends InOut>>() {
             @Override
-            public Single<? extends InOut> call(HttpTrade t1, InOut t2) {
+            public Single<? extends InOut> call(TradeContext ctx, InOut t2) {
                 tr1Reacted.set(true);
                 assertTrue(tr2Reacted.get());
                 return Single.just(null);
             }}));
         
-        cr.addReactor(new OrderedTradeReactor(2, new Func2<HttpTrade, InOut, Single<? extends InOut>>() {
+        cr.addReactor(new OrderedTradeReactor(2, new Func2<TradeContext, InOut, Single<? extends InOut>>() {
             @Override
-            public Single<? extends InOut> call(HttpTrade t1, InOut t2) {
+            public Single<? extends InOut> call(TradeContext ctx, InOut t2) {
                 tr2Reacted.set(true);
                 assertFalse(tr1Reacted.get());
                 return Single.just(null);

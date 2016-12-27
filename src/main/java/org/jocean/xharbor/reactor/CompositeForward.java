@@ -10,7 +10,6 @@ import java.util.concurrent.atomic.AtomicStampedReference;
 import javax.inject.Inject;
 
 import org.jocean.http.client.HttpClient;
-import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.idiom.Ordered;
 import org.jocean.xharbor.api.TradeReactor;
 import org.slf4j.Logger;
@@ -93,13 +92,13 @@ public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardDat
     }
 
     @Override
-    public Single<? extends InOut> react(final HttpTrade trade, final InOut io) {
+    public Single<? extends InOut> react(final TradeContext ctx, final InOut io) {
         final ForwardTrade[] reactors = this._reactorsRef.getReference();
         if (null == reactors ||
             (null != reactors && reactors.length == 0)) {
             return Single.<InOut>just(null);
         } else {
-            return TradeReactor.OP.first(Arrays.asList(reactors), trade, io);
+            return TradeReactor.OP.first(Arrays.asList(reactors), ctx, io);
         }
     }
 
