@@ -74,15 +74,19 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
         
         @Override
         public Map<String, Object> call() {
-            final Map<String, Object> counter = Maps.newHashMap();
-            for (STEP step : this._steps) {
-                counter.put(step.name(), this._stepCounters[step.ordinal()].get());
+            if (isRecorded()) {
+                final Map<String, Object> counter = Maps.newHashMap();
+                for (STEP step : this._steps) {
+                    counter.put(step.name(), this._stepCounters[step.ordinal()].get());
+                }
+                for (RESULT result : this._results) {
+                    counter.put(result.name(), this._resultCounters[result.ordinal()].get());
+                }
+                
+                return counter;
+            } else {
+                return null;
             }
-            for (RESULT result : this._results) {
-                counter.put(result.name(), this._resultCounters[result.ordinal()].get());
-            }
-            
-            return counter;
         }
     }
     
@@ -125,13 +129,15 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
                 _register.call(sb.toString(), new Func0<Map<String, Object>>() {
                     @Override
                     public Map<String, Object> call() {
-                        final Map<String, Object> counters = Maps.newHashMap();
+                        final Map<String, Object> indicator = Maps.newHashMap();
                         newMemo.call(new OnCounter() {
                             @Override
                             public void call(final String name, final Integer counter) {
-                                counters.put(name, counter);
+                                if (null != counter && counter.intValue() > 0) {
+                                    indicator.put(name, counter);
+                                }
                             }});
-                        return counters;
+                        return indicator;
                     }});
             }
         }};

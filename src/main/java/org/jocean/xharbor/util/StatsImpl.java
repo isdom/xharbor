@@ -22,7 +22,10 @@ public class StatsImpl implements RulesMBean, Action2<String, Func0<Map<String, 
             private static final long serialVersionUID = 1L;
         {
             for (Map.Entry<String, Func0<Map<String, Object>>> entry : _register.entrySet()) {
-                this.put(entry.getKey(), entry.getValue().call());
+                final Map<String, Object> content = entry.getValue().call();
+                if (null != content && !content.isEmpty()) {
+                    this.put(entry.getKey(), content);
+                }
             }
         }};
     }
