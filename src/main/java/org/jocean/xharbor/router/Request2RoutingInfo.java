@@ -93,7 +93,7 @@ public class Request2RoutingInfo implements Router<HttpRequest, RoutingInfo> {
     
     @Override
     public RoutingInfo calculateRoute(final HttpRequest request, final Context routectx) {
-        final QueryStringDecoder decoder = new QueryStringDecoder(request.getUri());
+        final QueryStringDecoder decoder = new QueryStringDecoder(request.uri());
 
         String path = decoder.path();
         final int p = path.indexOf(";");
@@ -101,7 +101,7 @@ public class Request2RoutingInfo implements Router<HttpRequest, RoutingInfo> {
             path = path.substring(0, p);
         }
         final RoutingInfo info = new RoutingInfoImpl(
-                request.getMethod().name(), 
+                request.method().name(), 
                 path,
                 request.headers().get(X_ROUTE_CODE));
         routectx.setProperty("path", info.getPath());

@@ -24,6 +24,7 @@ import com.google.common.collect.Lists;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.QueryStringDecoder;
 import rx.Observable;
 import rx.Single;
 import rx.functions.Action0;
@@ -160,10 +161,12 @@ public class ForwardTrade implements TradeReactor {
     }
     
     private RoutingInfo buildRoutingInfo(final HttpRequest req) {
+        final String xroutecode = req.headers().get(MatchRule.X_ROUTE_CODE, "");
+        final String path = pathOf(req);
         return new RoutingInfo() {
             @Override
             public String getXRouteCode() {
-                return req.headers().get(MatchRule.X_ROUTE_CODE, "");
+                return xroutecode;
             }
 
             @Override
@@ -173,8 +176,19 @@ public class ForwardTrade implements TradeReactor {
 
             @Override
             public String getPath() {
-                return req.uri();
+                return path;
             }};
+    }
+
+    private String pathOf(final HttpRequest req) {
+        final QueryStringDecoder decoder = new QueryStringDecoder(req.uri());
+
+        String path = decoder.path();
+        final int p = path.indexOf(";");
+        if (p>-1) {
+            path = path.substring(0, p);
+        }
+        return path;
     }
 
     private class MarkableTargetImpl implements MarkableTarget {
