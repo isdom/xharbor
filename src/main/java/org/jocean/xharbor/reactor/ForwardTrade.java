@@ -116,7 +116,7 @@ public class ForwardTrade implements TradeReactor {
                                 final long ttl = ctx.watch().stopAndRestart();
                                 final RelayMemo memo = _memoBuilder.build(target, buildRoutingInfo(refReq.get()));
                                 memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
-                                LOG.info("FORWARD_SUCCESS\ncost:[{}]s for \nREQ\n[{}]\n dispatch to:[{}]\nand sendback\nRESP\n[{}]",
+                                LOG.info("FORWARD_SUCCESS\ncost:[{}]s, forward_to:[{}]\nREQ\n[{}]\nsendback\nRESP\n[{}]",
                                         ttl / (float)1000.0, 
                                         refReq.get(), 
                                         target.serviceUri(), 
