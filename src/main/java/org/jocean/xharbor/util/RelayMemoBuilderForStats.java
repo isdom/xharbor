@@ -77,10 +77,16 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
             if (isRecorded()) {
                 final Map<String, Object> counter = Maps.newHashMap();
                 for (STEP step : this._steps) {
-                    counter.put(step.name(), this._stepCounters[step.ordinal()].get());
+                    final int cnt = this._stepCounters[step.ordinal()].get();
+                    if (cnt > 0) {
+                        counter.put(step.name(), cnt);
+                    }
                 }
                 for (RESULT result : this._results) {
-                    counter.put(result.name(), this._resultCounters[result.ordinal()].get());
+                    final int cnt = this._resultCounters[result.ordinal()].get();
+                    if (cnt > 0) {
+                        counter.put(result.name(), cnt);
+                    }
                 }
                 
                 return counter;
