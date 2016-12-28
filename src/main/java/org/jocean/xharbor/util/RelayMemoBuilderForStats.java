@@ -79,7 +79,7 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
                 counter.put(step.name(), this._stepCounters[step.ordinal()].get());
             }
             for (RESULT result : this._results) {
-                counter.put(result.name(), this._stepCounters[result.ordinal()].get());
+                counter.put(result.name(), this._resultCounters[result.ordinal()].get());
             }
             
             return counter;
