@@ -4,8 +4,8 @@
 package org.jocean.xharbor.util;
 
 import java.net.URI;
+import java.util.Map;
 
-import org.jocean.idiom.Emitter;
 import org.jocean.idiom.InterfaceUtils;
 import org.jocean.idiom.SimpleCache;
 import org.jocean.idiom.Tuple;
@@ -20,8 +20,10 @@ import org.jocean.xharbor.api.RelayMemo.RESULT;
 import org.jocean.xharbor.api.RelayMemo.STEP;
 import org.jocean.xharbor.api.RoutingInfo;
 
-import rx.functions.Action1;
+import com.google.common.collect.Maps;
+
 import rx.functions.Action2;
+import rx.functions.Func0;
 import rx.functions.Func1;
 
 /**
@@ -30,7 +32,7 @@ import rx.functions.Func1;
  */
 public class RelayMemoBuilderForStats implements RelayMemo.Builder {
 
-    public RelayMemoBuilderForStats(final Action2<String, Emitter<String>> register) throws Exception {
+    public RelayMemoBuilderForStats(final Action2<String, Func0<Map<String, Object>>> register) throws Exception {
         this._register = register;
         this._level0Memo = new RelayMemoImpl()
         .fillTimeIntervalMemoWith(new Func1<Enum<?>, TimeIntervalMemo>() {
@@ -64,24 +66,27 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
     }
     
     private static class RelayMemoImpl extends BizMemoSupportMBean<RelayMemoImpl, STEP, RESULT> 
-        implements RelayMemo, Emitter<String> {
+        implements RelayMemo, Func0<Map<String, Object>> {
         
         public RelayMemoImpl() {
             super(STEP.class, RESULT.class);
         }
         
         @Override
-        public void emit(final Action1<String> receptor) {
+        public Map<String, Object> call() {
+            final Map<String, Object> counter = Maps.newHashMap();
             for (STEP step : this._steps) {
-                receptor.call("STEP:" + step.name() +":"+ this._stepCounters[step.ordinal()].get());
+                counter.put(step.name(), this._stepCounters[step.ordinal()].get());
             }
             for (RESULT result : this._results) {
-                receptor.call("RESULT:" + result.name() +":"+ this._resultCounters[result.ordinal()].get());
+                counter.put(result.name(), this._stepCounters[result.ordinal()].get());
             }
+            
+            return counter;
         }
     }
     
-    private final Action2<String, Emitter<String>> _register;
+    private final Action2<String, Func0<Map<String, Object>>> _register;
     
     private Func1<Tuple, CounterableTIMemo> _ttlMemoMaker = new Func1<Tuple, CounterableTIMemo>() {
         @Override
@@ -117,15 +122,16 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
             sb.append(ttl);
             
             if ( null!=_register) {
-                _register.call(sb.toString(), new Emitter<String>() {
+                _register.call(sb.toString(), new Func0<Map<String, Object>>() {
                     @Override
-                    public void emit(final Action1<String> receptor) {
+                    public Map<String, Object> call() {
+                        final Map<String, Object> counters = Maps.newHashMap();
                         newMemo.call(new OnCounter() {
                             @Override
                             public void call(final String name, final Integer counter) {
-                                receptor.call(name + ":" + counter);
+                                counters.put(name, counter);
                             }});
-                        
+                        return counters;
                     }});
             }
         }};

@@ -3,11 +3,8 @@
  */
 package org.jocean.xharbor.router;
 
-import io.netty.handler.codec.http.HttpObject;
-import io.netty.handler.codec.http.HttpRequest;
-
-import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.SortedSet;
 import java.util.concurrent.ConcurrentSkipListSet;
 
@@ -22,17 +19,21 @@ import org.jocean.xharbor.api.RoutingInfoMemo;
 import org.jocean.xharbor.api.ServiceMemo;
 import org.jocean.xharbor.routing.RuleSet;
 import org.jocean.xharbor.routing.RuleSet.MatchResult;
-import org.jocean.xharbor.util.RulesMXBean;
+import org.jocean.xharbor.util.RulesMBean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.Maps;
+
+import io.netty.handler.codec.http.HttpObject;
+import io.netty.handler.codec.http.HttpRequest;
 import rx.Observable;
 
 /**
  * @author isdom
  *
  */
-public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBean {
+public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMBean {
     
     private static final Logger LOG = LoggerFactory
             .getLogger(DefaultRouter.class);
@@ -76,15 +77,16 @@ public class DefaultRouter implements Router<RoutingInfo, Dispatcher>, RulesMXBe
     }
     
     @Override
-    public String[] getRoutingRules() {
-        return new ArrayList<String>() {
-            private static final long serialVersionUID = 1L;
-        {
-            final Iterator<RuleSet> itr = _allruleset.iterator();
-            while (itr.hasNext()) {
-                this.addAll(itr.next().getRules());
-            }
-        }}.toArray(new String[0]);
+    public Map<String, Map<String, Object>> getRoutingRules() {
+        return Maps.newHashMap();
+//        return new ArrayList<String>() {
+//            private static final long serialVersionUID = 1L;
+//        {
+//            final Iterator<RuleSet> itr = _allruleset.iterator();
+//            while (itr.hasNext()) {
+//                this.addAll(itr.next().getRules());
+//            }
+//        }}.toArray(new String[0]);
     }
     
     @Override
