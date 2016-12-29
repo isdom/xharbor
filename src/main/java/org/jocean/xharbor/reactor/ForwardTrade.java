@@ -161,14 +161,8 @@ public class ForwardTrade implements TradeReactor {
     }
     
     private RoutingInfo buildRoutingInfo(final HttpRequest req) {
-        final String xroutecode = req.headers().get(MatchRule.X_ROUTE_CODE, "");
         final String path = pathOf(req);
         return new RoutingInfo() {
-            @Override
-            public String getXRouteCode() {
-                return xroutecode;
-            }
-
             @Override
             public String getMethod() {
                 return req.method().name();

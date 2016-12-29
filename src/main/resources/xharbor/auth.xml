@@ -14,7 +14,7 @@
                     <bean class="org.jocean.xharbor.reactor.MatchRule">
                         <constructor-arg value="${auth.method:}"/>
                         <constructor-arg value="${auth.path:}"/>
-                        <constructor-arg value="${auth.xroute:}"/>
+                        <constructor-arg value="${auth.headers:}"/>
                     </bean>
 		        </constructor-arg>
 		        <constructor-arg value="${auth.user}"/>

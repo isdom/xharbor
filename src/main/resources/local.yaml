@@ -72,17 +72,17 @@ children:
         children:
           - name: forward.jmxhtml.self
             parameters: |
-              forward.xroute=jmxhtml.self
+              forward.headers=x-jmx,jmxhtml.self
               forward.to=http://127.0.0.1:8082
           - name: rwreq.jmxhtml
             parameters: |
               rewrite.path=/jmxhtml[\\w|\\.]*
               rewrite.to=
-              rewrite.header.name=x-route-code
+              rewrite.header.name=x-jmx
               rewrite.header.value=jmxhtml.self
           - name: auth.jmxhtml
             parameters: |
-              auth.xroute=jmxhtml(\\w)*
+              auth.headers=x-jmx,jmxhtml(\\w)*
               auth.user=test
               auth.password=test
               

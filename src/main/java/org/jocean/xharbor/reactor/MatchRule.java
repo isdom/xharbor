@@ -1,33 +1,64 @@
 package org.jocean.xharbor.reactor;
 
+import java.util.Iterator;
+import java.util.List;
 import java.util.regex.Pattern;
 
+import org.jocean.idiom.Pair;
 import org.jocean.idiom.Regexs;
+
+import com.google.common.base.Splitter;
+import com.google.common.collect.Lists;
 
 import io.netty.handler.codec.http.HttpRequest;
 
 public class MatchRule implements Comparable<MatchRule> {
     
-    public static final String X_ROUTE_CODE = "X-Route-Code";
-    
     public MatchRule(
             final String methodPattern, 
             final String pathPattern,
-            final String xroutePattern
+            final String headersPattern
             ) {
         this._methodPatternAsString = methodPattern;
         this._pathPatternAsString   = pathPattern;
-        this._xroutePatternAsString = xroutePattern;
+        this._headersPatternAsString = headersPattern;
+        
         this._methodPattern = Regexs.safeCompilePattern(this._methodPatternAsString);
         this._pathPattern = Regexs.safeCompilePattern(this._pathPatternAsString);
-        this._xroutePattern = Regexs.safeCompilePattern(this._xroutePatternAsString);
+        
+        if (null != headersPattern && !headersPattern.isEmpty()) {
+            final Iterator<String> iter = Splitter.on(',')
+                    .trimResults()
+                    .split(headersPattern)
+                    .iterator();
+            
+            while (iter.hasNext()) {
+                final String name = iter.next();
+                if (!iter.hasNext()) {
+                    break;
+                }
+                final String pattern = iter.next();
+                this._headersPatterns.add(
+                    Pair.of(name, Regexs.safeCompilePattern(pattern)));
+            }
+        }
     }
     
     public boolean match(final HttpRequest req) {
-        return Regexs.isMatched(this._methodPattern, req.method().name())
-            && Regexs.isMatched(this._pathPattern, req.uri()) 
-            && Regexs.isMatched(this._xroutePattern, req.headers().get(X_ROUTE_CODE))
-            ;
+        final boolean matched = Regexs.isMatched(this._methodPattern, req.method().name())
+            && Regexs.isMatched(this._pathPattern, req.uri());
+        if (!matched) {
+            return false;
+        } else if (this._headersPatterns.isEmpty()) {
+            return true;
+        } else {
+            for (Pair<String, Pattern> pair : this._headersPatterns) {
+                if (!Regexs.isMatched(pair.getSecond(), req.headers().get(pair.getFirst()))) {
+                    return false;
+                }
+            }
+            return true;
+        }
     }
     
     @Override
@@ -35,7 +66,7 @@ public class MatchRule implements Comparable<MatchRule> {
         final StringBuilder builder = new StringBuilder();
         builder.append("MatchRule [METHOD=").append(_methodPatternAsString)
                 .append(", PATH=").append(_pathPatternAsString)
-                .append(", XROUTE=").append(_xroutePatternAsString)
+                .append(", HEADERS=").append(_headersPatternAsString)
                 .append("]");
         return builder.toString();
     }
@@ -51,8 +82,8 @@ public class MatchRule implements Comparable<MatchRule> {
                 : _methodPatternAsString.hashCode());
         result = prime * result + ((_pathPatternAsString == null) ? 0
                 : _pathPatternAsString.hashCode());
-        result = prime * result + ((_xroutePatternAsString == null) ? 0
-                : _xroutePatternAsString.hashCode());
+        result = prime * result + ((_headersPatternAsString == null) ? 0
+                : _headersPatternAsString.hashCode());
         return result;
     }
 
@@ -78,10 +109,10 @@ public class MatchRule implements Comparable<MatchRule> {
                 return false;
         } else if (!_pathPatternAsString.equals(other._pathPatternAsString))
             return false;
-        if (_xroutePatternAsString == null) {
-            if (other._xroutePatternAsString != null)
+        if (_headersPatternAsString == null) {
+            if (other._headersPatternAsString != null)
                 return false;
-        } else if (!_xroutePatternAsString.equals(other._xroutePatternAsString))
+        } else if (!_headersPatternAsString.equals(other._headersPatternAsString))
             return false;
         return true;
     }
@@ -103,7 +134,7 @@ public class MatchRule implements Comparable<MatchRule> {
             return order;
         }
         
-        return compareTwoString(_xroutePatternAsString, o._xroutePatternAsString);
+        return compareTwoString(_headersPatternAsString, o._headersPatternAsString);
     }
 
     private static int compareTwoString(final String str1, final String str2) {
@@ -118,9 +149,9 @@ public class MatchRule implements Comparable<MatchRule> {
     
     private final String _methodPatternAsString;
     private final String _pathPatternAsString;
-    private final String _xroutePatternAsString;
+    private final String _headersPatternAsString;
     
     private final Pattern _methodPattern;
     private final Pattern _pathPattern;
-    private final Pattern _xroutePattern;
+    private final List<Pair<String,Pattern>> _headersPatterns = Lists.newArrayList();
 }

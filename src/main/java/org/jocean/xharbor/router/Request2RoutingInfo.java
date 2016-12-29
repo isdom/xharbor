@@ -76,10 +76,10 @@ public class Request2RoutingInfo implements Router<HttpRequest, RoutingInfo> {
             return this._path;
         }
 
-        @Override
-        public String getXRouteCode() {
-            return this._xroutecode;
-        }
+//        @Override
+//        public String getXRouteCode() {
+//            return this._xroutecode;
+//        }
         
         @Override
         public String toString() {

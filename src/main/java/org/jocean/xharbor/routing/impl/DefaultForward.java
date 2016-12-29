@@ -50,7 +50,8 @@ public class DefaultForward implements ForwardRule, BeanHolderAware {
     public Target match(final RoutingInfo info) {
         return ( Regexs.isMatched(this._methodPattern, info.getMethod()) 
                 && Regexs.isMatched(this._pathPattern, info.getPath()) 
-                && Regexs.isMatched(this._xroutePattern, info.getXRouteCode()) ) 
+//                && Regexs.isMatched(this._xroutePattern, info.getXRouteCode()) 
+                ) 
              ? new Target() {
                 @Override
                 public URI serviceUri() {

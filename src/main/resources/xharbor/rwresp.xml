@@ -16,7 +16,7 @@
                     <bean class="org.jocean.xharbor.reactor.MatchRule">
                         <constructor-arg value="${rewrite.method:}"/>
                         <constructor-arg value="${rewrite.path:}"/>
-                        <constructor-arg value="${rewrite.xroute:}"/>
+                        <constructor-arg value="${rewrite.headers:}"/>
                     </bean>
 		        </constructor-arg>
 		        <constructor-arg ref="extraHeaders"/>
