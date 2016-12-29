@@ -88,7 +88,7 @@ public class CompositeReactor implements TradeReactor, Ordered, Func1<TradeReact
     }
 
     @Override
-    public Single<? extends InOut> react(final TradeContext ctx, final InOut io) {
+    public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
         final TradeReactor[] reactors = this._descReactorsRef.getReference();
         if (null == reactors ||
             (null != reactors && reactors.length == 0)) {

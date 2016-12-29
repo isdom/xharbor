@@ -93,7 +93,7 @@ public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardDat
     }
 
     @Override
-    public Single<? extends InOut> react(final TradeContext ctx, final InOut io) {
+    public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
         final ForwardTrade[] reactors = this._reactorsRef.getReference();
         if (null == reactors ||
             (null != reactors && reactors.length == 0)) {

@@ -12,7 +12,7 @@ import rx.SingleSubscriber;
 import rx.functions.Action1;
 
 public interface TradeReactor {
-    public interface TradeContext {
+    public interface ReactContext {
         public HttpTrade trade();
         public StopWatch watch();
     }
@@ -22,11 +22,11 @@ public interface TradeReactor {
         public Observable<? extends HttpObject> outbound();
     }
     
-    public Single<? extends InOut> react(final TradeContext ctx, final InOut io);
+    public Single<? extends InOut> react(final ReactContext ctx, final InOut io);
     
     public static class OP {
         public static Single<? extends InOut> first(final Iterable<? extends TradeReactor> Iterable,
-                final TradeContext ctx, final InOut io) {
+                final ReactContext ctx, final InOut io) {
             return Single.create(new Single.OnSubscribe<InOut>() {
                 @Override
                 public void call(final SingleSubscriber<? super InOut> subscriber) {
@@ -35,7 +35,7 @@ public interface TradeReactor {
         }
         
         public static Single<? extends InOut> all(final Iterable<? extends TradeReactor> Iterable,
-                final TradeContext ctx, final InOut io) {
+                final ReactContext ctx, final InOut io) {
             return Single.create(new Single.OnSubscribe<InOut>() {
                 @Override
                 public void call(final SingleSubscriber<? super InOut> subscriber) {
@@ -43,7 +43,7 @@ public interface TradeReactor {
                 }});
         }
         
-        private static void reactByFirst(final TradeContext ctx, final InOut io,
+        private static void reactByFirst(final ReactContext ctx, final InOut io,
                 final Iterator<? extends TradeReactor> iter,
                 final SingleSubscriber<? super InOut> subscriber) {
             if (!subscriber.isUnsubscribed()) {
@@ -72,7 +72,7 @@ public interface TradeReactor {
             }
         }
         
-        private static void reactAll(final TradeContext ctx, final InOut io,
+        private static void reactAll(final ReactContext ctx, final InOut io,
                 final Iterator<? extends TradeReactor> iter,
                 final SingleSubscriber<? super InOut> subscriber,
                 final boolean handled) {

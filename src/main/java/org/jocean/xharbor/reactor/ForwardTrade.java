@@ -52,7 +52,7 @@ public class ForwardTrade implements TradeReactor {
     }
     
     @Override
-    public Single<? extends InOut> react(final TradeContext ctx, final InOut io) {
+    public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
@@ -81,7 +81,7 @@ public class ForwardTrade implements TradeReactor {
                 .toSingle();
     }
     
-    private InOut io4forward(final TradeContext ctx, final InOut originalio, final MarkableTarget target) {
+    private InOut io4forward(final ReactContext ctx, final InOut originalio, final MarkableTarget target) {
         return new InOut() {
             @Override
             public Observable<? extends HttpObject> inbound() {
@@ -119,8 +119,8 @@ public class ForwardTrade implements TradeReactor {
                                 memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
                                 LOG.info("FORWARD_SUCCESS\ncost:[{}]s, forward_to:[{}]\nREQ\n[{}]\nsendback\nRESP\n[{}]",
                                         ttl / (float)1000.0, 
-                                        refReq.get(), 
                                         target.serviceUri(), 
+                                        refReq.get(), 
                                         refResp.get());
                             }});
             }};

@@ -29,7 +29,7 @@ public class RewriteRequest implements TradeReactor {
     }
     
     @Override
-    public Single<? extends InOut> react(final TradeContext ctx, final InOut io) {
+    public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }

@@ -11,7 +11,7 @@ import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxActions;
 import org.jocean.xharbor.api.TradeReactor;
 import org.jocean.xharbor.api.TradeReactor.InOut;
-import org.jocean.xharbor.api.TradeReactor.TradeContext;
+import org.jocean.xharbor.api.TradeReactor.ReactContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,7 +59,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
             ;
 
         final StopWatch watch4Result = new StopWatch();
-        final TradeContext ctx = new TradeContext() {
+        final ReactContext ctx = new ReactContext() {
             @Override
             public HttpTrade trade() {
                 return trade;
