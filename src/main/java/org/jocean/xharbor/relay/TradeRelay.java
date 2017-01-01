@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
+import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -84,9 +85,10 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                     @Override
                     public HttpObject call(final HttpObject httpobj) {
                         if (httpobj instanceof HttpRequest) {
+                            final HttpRequest req = (HttpRequest)httpobj;
                             //  only check first time, bcs inbound could be process many times
-                            if (isKeepAliveFromClient.get()) {
-                                final HttpRequest req = (HttpRequest)httpobj;
+                            if (!req.method().equals(HttpMethod.HEAD) 
+                                    && isKeepAliveFromClient.get()) {
                                 isKeepAliveFromClient.set(HttpUtil.isKeepAlive(req));
                                 if (!isKeepAliveFromClient.get()) {
                                     // if NOT keep alive, force it
