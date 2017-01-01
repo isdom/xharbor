@@ -75,7 +75,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                 return watch4Result;
             }};
         
-        final AtomicBoolean isKeepAliveFromClient = new AtomicBoolean(false);
+        final AtomicBoolean isKeepAliveFromClient = new AtomicBoolean(true);
         
         this._tradeReactor.react(ctx, new InOut() {
             @Override
@@ -84,13 +84,16 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                     @Override
                     public HttpObject call(final HttpObject httpobj) {
                         if (httpobj instanceof HttpRequest) {
-                            final HttpRequest req = (HttpRequest)httpobj;
-                            isKeepAliveFromClient.set(HttpUtil.isKeepAlive(req));
-                            if (!isKeepAliveFromClient.get()) {
-                                // if NOT keep alive, force it
-                                //  TODO, need to duplicate req?
-                                req.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
-                                LOG.info("FORCE-KeepAlive: add Connection header with KeepAlive for incoming req:\n[{}]", req);
+                            //  only check first time, bcs inbound could be process many times
+                            if (isKeepAliveFromClient.get()) {
+                                final HttpRequest req = (HttpRequest)httpobj;
+                                isKeepAliveFromClient.set(HttpUtil.isKeepAlive(req));
+                                if (!isKeepAliveFromClient.get()) {
+                                    // if NOT keep alive, force it
+                                    //  TODO, need to duplicate req?
+                                    req.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                                    LOG.info("FORCE-KeepAlive: add Connection header with KeepAlive for incoming req:\n[{}]", req);
+                                }
                             }
                         }
                         return httpobj;
