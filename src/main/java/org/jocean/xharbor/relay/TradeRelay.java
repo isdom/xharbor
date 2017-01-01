@@ -3,6 +3,8 @@
  */
 package org.jocean.xharbor.relay;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.HttpMessageHolder;
 import org.jocean.http.util.RxNettys;
@@ -15,8 +17,12 @@ import org.jocean.xharbor.api.TradeReactor.ReactContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import rx.Observable;
 import rx.Subscriber;
@@ -69,10 +75,26 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                 return watch4Result;
             }};
         
+        final AtomicBoolean isKeepAliveFromClient = new AtomicBoolean(false);
+        
         this._tradeReactor.react(ctx, new InOut() {
             @Override
             public Observable<? extends HttpObject> inbound() {
-                return cachedInbound;
+                return cachedInbound.map(new Func1<HttpObject, HttpObject>() {
+                    @Override
+                    public HttpObject call(final HttpObject httpobj) {
+                        if (httpobj instanceof HttpRequest) {
+                            final HttpRequest req = (HttpRequest)httpobj;
+                            isKeepAliveFromClient.set(HttpUtil.isKeepAlive(req));
+                            if (!isKeepAliveFromClient.get()) {
+                                // if NOT keep alive, force it
+                                //  TODO, need to duplicate req?
+                                req.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                                LOG.info("FORCE-KeepAlive: add Connection header with KeepAlive for incoming req:\n[{}]", req);
+                            }
+                        }
+                        return httpobj;
+                    }});
             }
             @Override
             public Observable<? extends HttpObject> outbound() {
@@ -84,7 +106,21 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                 if (null == io.outbound()) {
                     LOG.warn("TradeRelay can't relay trade({}), NO Target.", trade);
                 }
-                trade.outboundResponse(buildResponse(cachedInbound, io));
+                trade.outboundResponse(buildResponse(cachedInbound, io).map(
+                new Func1<HttpObject, HttpObject>() {
+                    @Override
+                    public HttpObject call(final HttpObject httpobj) {
+                        if (httpobj instanceof HttpResponse) {
+                            final HttpResponse resp = (HttpResponse)httpobj;
+                            if (!isKeepAliveFromClient.get()) {
+                                // if NOT keep alive from client, remove keepalive header
+                                //  TODO, need to duplicate resp?
+                                resp.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+                                LOG.info("FORCE-KeepAlive: set Connection header with Close for sendback resp:\n[{}]", resp);
+                            }
+                        }
+                        return httpobj;
+                    }}));
             }}, new Action1<Throwable>() {
             @Override
             public void call(final Throwable error) {
