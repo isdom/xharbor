@@ -10,6 +10,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.jocean.http.Feature;
 import org.jocean.http.client.HttpClient;
 import org.jocean.http.util.RxNettys;
+import org.jocean.http.util.Nettys.ChannelAware;
+import org.jocean.idiom.JOArrays;
 import org.jocean.xharbor.api.MarkableTarget;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.Target;
@@ -21,6 +23,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Lists;
 
+import io.netty.channel.Channel;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -91,6 +94,17 @@ public class ForwardTrade implements TradeReactor {
             public Observable<? extends HttpObject> outbound() {
                 final AtomicReference<HttpRequest> refReq = new AtomicReference<>();
                 final AtomicReference<HttpResponse> refResp = new AtomicReference<>();
+                
+                final class ChannelHolder extends Feature.AbstractFeature0 
+                    implements ChannelAware {
+                    @Override
+                    public void setChannel(final Channel channel) {
+                        _channel = channel;
+                    }
+                    private Channel _channel;
+                }
+                final ChannelHolder channelHolder = new ChannelHolder();
+                
                 return _httpclient.defineInteraction(
                             new InetSocketAddress(
                                 target.serviceUri().getHost(), 
@@ -102,7 +116,8 @@ public class ForwardTrade implements TradeReactor {
                                         refReq.set((HttpRequest)httpobj);
                                     }
                                 }}),
-                            target.features().call())
+                            JOArrays.addFirst(Feature[].class, target.features().call(),
+                                    channelHolder))
                         .doOnNext(new Action1<HttpObject>() {
                             @Override
                             public void call(final HttpObject httpobj) {
@@ -117,9 +132,10 @@ public class ForwardTrade implements TradeReactor {
                                 final long ttl = ctx.watch().stopAndRestart();
                                 final RelayMemo memo = _memoBuilder.build(target, buildRoutingInfo(refReq.get()));
                                 memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
-                                LOG.info("FORWARD_SUCCESS\ncost:[{}]s, forward_to:[{}]\nREQ\n[{}]\nsendback\nRESP\n[{}]",
+                                LOG.info("FORWARD_SUCCESS\ncost:[{}]s, forward_to:[{}]\noutbound:[{}]\nREQ\n[{}]\nsendback\nRESP\n[{}]",
                                         ttl / (float)1000.0, 
                                         target.serviceUri(), 
+                                        channelHolder._channel,
                                         refReq.get(), 
                                         refResp.get());
                             }});
