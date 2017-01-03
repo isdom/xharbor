@@ -9,9 +9,13 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.http.Feature;
 import org.jocean.http.client.HttpClient;
+import org.jocean.http.server.HttpServerBuilder.HttpTrade;
+import org.jocean.http.util.HttpMessageHolder;
 import org.jocean.http.util.RxNettys;
 import org.jocean.http.util.Nettys.ChannelAware;
 import org.jocean.idiom.JOArrays;
+import org.jocean.idiom.rx.RxActions;
+import org.jocean.idiom.rx.RxSubscribers;
 import org.jocean.xharbor.api.MarkableTarget;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.Target;
@@ -105,7 +109,8 @@ public class ForwardTrade implements TradeReactor {
                 }
                 final ChannelHolder channelHolder = new ChannelHolder();
                 
-                return _httpclient.defineInteraction(
+                final Observable<? extends HttpObject> outbound = 
+                 _httpclient.defineInteraction(
                             new InetSocketAddress(
                                 target.serviceUri().getHost(), 
                                 target.serviceUri().getPort()), 
@@ -139,6 +144,22 @@ public class ForwardTrade implements TradeReactor {
                                         refReq.get(), 
                                         refResp.get());
                             }});
+                
+                //  -1 means disable assemble piece to a big block feature
+                final HttpMessageHolder holder = new HttpMessageHolder(-1);
+                ctx.trade().doOnClosed(RxActions.<HttpTrade>toAction1(holder.release()));
+                final Observable<? extends HttpObject> cachedOutbound = 
+                    outbound
+                    .compose(holder.assembleAndHold())
+                    .cache()
+                    .compose(RxNettys.duplicateHttpContent())
+                    ;
+                
+                //  启动转发 (forward)
+                cachedOutbound.subscribe(RxSubscribers.nopOnNext(), RxSubscribers.nopOnError());
+                
+                //  outbound 可被重复订阅
+                return cachedOutbound;
             }};
     }
     
