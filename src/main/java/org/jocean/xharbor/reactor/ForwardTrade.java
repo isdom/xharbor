@@ -137,7 +137,7 @@ public class ForwardTrade implements TradeReactor {
                                 final long ttl = ctx.watch().stopAndRestart();
                                 final RelayMemo memo = _memoBuilder.build(target, buildRoutingInfo(refReq.get()));
                                 memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
-                                LOG.info("FORWARD_SUCCESS\ncost:[{}]s, forward_to:[{}]\noutbound:[{}]\nREQ\n[{}]\nsendback\nRESP\n[{}]",
+                                LOG.info("FORWARD_SUCCESS\ncost:[{}]s, forward_to:{}\noutbound:[{}]\nREQ\n[{}]\nsendback\nRESP\n[{}]",
                                         ttl / (float)1000.0, 
                                         target.serviceUri(), 
                                         channelHolder._channel,
@@ -145,6 +145,8 @@ public class ForwardTrade implements TradeReactor {
                                         refResp.get());
                             }});
                 
+                return outbound;
+                /*
                 //  -1 means disable assemble piece to a big block feature
                 final HttpMessageHolder holder = new HttpMessageHolder(-1);
                 ctx.trade().doOnClosed(RxActions.<HttpTrade>toAction1(holder.release()));
@@ -160,6 +162,7 @@ public class ForwardTrade implements TradeReactor {
                 
                 //  outbound 可被重复订阅
                 return cachedOutbound;
+                */
             }};
     }
     
