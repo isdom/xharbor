@@ -2,6 +2,11 @@ name: units
 parameters: |
   __spring.xml=xharbor/xharbor.xml,http/httpclient.xml,http/httpserver.xml
 children:
+  - name: redisclient
+    parameters: |
+      redis.server.hostname=localhost
+      redis.server.passwd=passwd
+      redis.server.dbno=255
   - name: jmxsrv
     parameters: |
       jmxmp.port = 0
