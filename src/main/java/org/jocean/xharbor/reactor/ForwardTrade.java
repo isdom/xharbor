@@ -11,17 +11,19 @@ import org.jocean.http.Feature;
 import org.jocean.http.client.HttpClient;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.HttpMessageHolder;
-import org.jocean.http.util.RxNettys;
 import org.jocean.http.util.Nettys.ChannelAware;
+import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.JOArrays;
+import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxActions;
+import org.jocean.idiom.rx.RxObservables;
 import org.jocean.idiom.rx.RxSubscribers;
 import org.jocean.xharbor.api.MarkableTarget;
 import org.jocean.xharbor.api.RelayMemo;
-import org.jocean.xharbor.api.Target;
-import org.jocean.xharbor.api.TradeReactor;
 import org.jocean.xharbor.api.RelayMemo.RESULT;
 import org.jocean.xharbor.api.RoutingInfo;
+import org.jocean.xharbor.api.Target;
+import org.jocean.xharbor.api.TradeReactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,10 +87,27 @@ public class ForwardTrade implements TradeReactor {
                             }
                         }
                     }})
+                .compose(RxObservables.<InOut>ensureSubscribeAtmostOnce())
                 .toSingle();
     }
     
     private InOut io4forward(final ReactContext ctx, final InOut originalio, final MarkableTarget target) {
+        final Observable<? extends HttpObject> outbound = 
+                buildOutbound(originalio.inbound(), target, ctx.watch());
+        
+        //  -1 means disable assemble piece to a big block feature
+        final HttpMessageHolder holder = new HttpMessageHolder(-1);
+        ctx.trade().doOnClosed(RxActions.<HttpTrade>toAction1(holder.release()));
+        final Observable<? extends HttpObject> cachedOutbound = 
+            outbound
+            .compose(holder.assembleAndHold())
+            .cache()
+            .compose(RxNettys.duplicateHttpContent())
+            ;
+        
+        //  启动转发 (forward)
+        cachedOutbound.subscribe(RxSubscribers.nopOnNext(), RxSubscribers.nopOnError());
+        
         return new InOut() {
             @Override
             public Observable<? extends HttpObject> inbound() {
@@ -96,74 +115,64 @@ public class ForwardTrade implements TradeReactor {
             }
             @Override
             public Observable<? extends HttpObject> outbound() {
-                final AtomicReference<HttpRequest> refReq = new AtomicReference<>();
-                final AtomicReference<HttpResponse> refResp = new AtomicReference<>();
-                
-                final class ChannelHolder extends Feature.AbstractFeature0 
-                    implements ChannelAware {
-                    @Override
-                    public void setChannel(final Channel channel) {
-                        _channel = channel;
-                    }
-                    private Channel _channel;
-                }
-                final ChannelHolder channelHolder = new ChannelHolder();
-                
-                final Observable<? extends HttpObject> outbound = 
-                 _httpclient.defineInteraction(
-                            new InetSocketAddress(
-                                target.serviceUri().getHost(), 
-                                target.serviceUri().getPort()), 
-                            originalio.inbound().doOnNext(new Action1<HttpObject>() {
-                                @Override
-                                public void call(final HttpObject httpobj) {
-                                    if (httpobj instanceof HttpRequest) {
-                                        refReq.set((HttpRequest)httpobj);
-                                    }
-                                }}),
-                            JOArrays.addFirst(Feature[].class, target.features().call(),
-                                    channelHolder))
-                        .doOnNext(new Action1<HttpObject>() {
-                            @Override
-                            public void call(final HttpObject httpobj) {
-                                if (httpobj instanceof HttpResponse) {
-                                    final HttpResponse resp = (HttpResponse)httpobj;
-                                    refResp.set(resp);
-                                }
-                            }})
-                        .doOnCompleted(new Action0() {
-                            @Override
-                            public void call() {
-                                final long ttl = ctx.watch().stopAndRestart();
-                                final RelayMemo memo = _memoBuilder.build(target, buildRoutingInfo(refReq.get()));
-                                memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
-                                LOG.info("FORWARD_SUCCESS\ncost:[{}]s, forward_to:{}\noutbound:[{}]\nREQ\n[{}]\nsendback\nRESP\n[{}]",
-                                        ttl / (float)1000.0, 
-                                        target.serviceUri(), 
-                                        channelHolder._channel,
-                                        refReq.get(), 
-                                        refResp.get());
-                            }});
-                
-                return outbound;
-                /*
-                //  -1 means disable assemble piece to a big block feature
-                final HttpMessageHolder holder = new HttpMessageHolder(-1);
-                ctx.trade().doOnClosed(RxActions.<HttpTrade>toAction1(holder.release()));
-                final Observable<? extends HttpObject> cachedOutbound = 
-                    outbound
-                    .compose(holder.assembleAndHold())
-                    .cache()
-                    .compose(RxNettys.duplicateHttpContent())
-                    ;
-                
-                //  启动转发 (forward)
-                cachedOutbound.subscribe(RxSubscribers.nopOnNext(), RxSubscribers.nopOnError());
-                
                 //  outbound 可被重复订阅
                 return cachedOutbound;
-                */
             }};
+    }
+
+    private Observable<? extends HttpObject> buildOutbound(
+            final Observable<? extends HttpObject> inbound, 
+            final MarkableTarget target,
+            final StopWatch stopWatch) {
+        final AtomicReference<HttpRequest> refReq = new AtomicReference<>();
+        final AtomicReference<HttpResponse> refResp = new AtomicReference<>();
+        
+        final class ChannelHolder extends Feature.AbstractFeature0 
+            implements ChannelAware {
+            @Override
+            public void setChannel(final Channel channel) {
+                _channel = channel;
+            }
+            private Channel _channel;
+        }
+        final ChannelHolder channelHolder = new ChannelHolder();
+        
+        final Observable<? extends HttpObject> outbound = 
+            this._httpclient.defineInteraction(
+                    new InetSocketAddress(
+                        target.serviceUri().getHost(), 
+                        target.serviceUri().getPort()), 
+                    inbound.doOnNext(new Action1<HttpObject>() {
+                        @Override
+                        public void call(final HttpObject httpobj) {
+                            if (httpobj instanceof HttpRequest) {
+                                refReq.set((HttpRequest)httpobj);
+                            }
+                        }}),
+                    JOArrays.addFirst(Feature[].class, target.features().call(),
+                            channelHolder))
+                .doOnNext(new Action1<HttpObject>() {
+                    @Override
+                    public void call(final HttpObject httpobj) {
+                        if (httpobj instanceof HttpResponse) {
+                            final HttpResponse resp = (HttpResponse)httpobj;
+                            refResp.set(resp);
+                        }
+                    }})
+                .doOnCompleted(new Action0() {
+                    @Override
+                    public void call() {
+                        final long ttl = stopWatch.stopAndRestart();
+                        final RelayMemo memo = _memoBuilder.build(target, buildRoutingInfo(refReq.get()));
+                        memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
+                        LOG.info("FORWARD_SUCCESS\ncost:[{}]s, forward_to:[{}]\noutbound:{}\nREQ\n[{}]\nsendback\nRESP\n[{}]",
+                                ttl / (float)1000.0, 
+                                target.serviceUri(), 
+                                channelHolder._channel,
+                                refReq.get(), 
+                                refResp.get());
+                    }});
+        return outbound;
     }
     
     private MarkableTarget selectTarget() {
