@@ -60,7 +60,7 @@ public class RewriteResponse implements TradeReactor {
                         if (httpobj instanceof HttpResponse) {
                             final HttpResponse response = (HttpResponse)httpobj;
                             for (Map.Entry<String, String> entry : _extraHeaders.entrySet()) {
-                                response.headers().add(entry.getKey(), entry.getValue());
+                                response.headers().set(entry.getKey(), entry.getValue());
                             }
                         }
                     }});
