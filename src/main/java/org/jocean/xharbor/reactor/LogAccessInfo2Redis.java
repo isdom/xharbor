@@ -17,7 +17,6 @@ import com.alibaba.fastjson.JSON;
 import com.google.common.collect.Maps;
 
 import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.redis.RedisMessage;
@@ -39,15 +38,12 @@ public class LogAccessInfo2Redis implements TradeReactor, Ordered {
                 @Override
                 public Observable<Pair<HttpRequest, HttpResponse>> call(
                         final HttpRequest req) {
-                    return io.outbound().flatMap(new Func1<HttpObject, Observable<Pair<HttpRequest, HttpResponse>>>() {
+                    return io.outbound().compose(RxNettys.asHttpResponse())
+                        .flatMap(new Func1<HttpResponse, Observable<Pair<HttpRequest, HttpResponse>>>() {
                         @Override
                         public  Observable<Pair<HttpRequest, HttpResponse>> call(
-                                final HttpObject msg) {
-                            if (msg instanceof HttpResponse) {
-                                return Observable.<Pair<HttpRequest, HttpResponse>>just(Pair.of(req, (HttpResponse)msg));
-                            } else {
-                                return Observable.<Pair<HttpRequest, HttpResponse>>empty();
-                            }
+                                final HttpResponse resp) {
+                            return Observable.just(Pair.of(req, resp));
                         }});
                 }})
             .flatMap(new Func1<Pair<HttpRequest, HttpResponse>, Observable<RedisMessage>>() {
