@@ -3,7 +3,9 @@
  */
 package org.jocean.xharbor.relay;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.HttpMessageHolder;
@@ -17,6 +19,9 @@ import org.jocean.xharbor.api.TradeReactor.ReactContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.Lists;
+
+import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpMethod;
@@ -27,7 +32,9 @@ import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import rx.Observable;
 import rx.Subscriber;
+import rx.functions.Action0;
 import rx.functions.Action1;
+import rx.functions.Func0;
 import rx.functions.Func1;
 
 /**
@@ -56,10 +63,16 @@ public class TradeRelay extends Subscriber<HttpTrade> {
 
     @Override
     public void onNext(final HttpTrade trade) {
+        //  for ByteBuf Leak
+        final List<HttpContent> reqContents = Lists.newArrayList();
+        final AtomicReference<HttpRequest> reqRef = new AtomicReference<>();
+        final AtomicReference<HttpResponse> respRef = new AtomicReference<>();
+        
         final HttpMessageHolder holder = new HttpMessageHolder(0);
         final Observable<? extends HttpObject> cachedInbound = 
             trade.doOnClosed(RxActions.<HttpTrade>toAction1(holder.release()))
             .inboundRequest()
+            .doOnNext(holdRawRequestContents(reqContents, reqRef))
             .compose(holder.assembleAndHold())
             .cache()
             .compose(RxNettys.duplicateHttpContent())
@@ -117,6 +130,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                     public HttpObject call(final HttpObject httpobj) {
                         if (httpobj instanceof HttpResponse) {
                             final HttpResponse resp = (HttpResponse)httpobj;
+                            respRef.set((HttpResponse)resp);
                             if (!isKeepAliveFromClient.get()) {
                                 // if NOT keep alive from client, remove keepalive header
                                 //  TODO, need to duplicate resp?
@@ -125,14 +139,89 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                             }
                         }
                         return httpobj;
-                    }}));
+                    }})
+                    .doOnCompleted(touchAndFreeRawRequestContents(
+                            reqContents, 
+                            new Func0<Object> () {
+                                @Override
+                                public Object call() {
+                                    return tradeInfoOf(reqRef.get(), respRef.get());
+                                }}))
+                );
             }}, new Action1<Throwable>() {
             @Override
             public void call(final Throwable error) {
                 LOG.warn("Trade {} react with error, detail:{}", 
                         trade, ExceptionUtils.exception2detail(error));
                 trade.abort();
+                touchAndFreeRawRequestContents(
+                        reqContents, 
+                        new Func0<Object> () {
+                            @Override
+                            public Object call() {
+                                return tradeInfoOf(reqRef.get(), respRef.get()) + ", trade abort!";
+                            }}).call();
             }});
+    }
+
+    private Object tradeInfoOf(
+            final HttpRequest req,
+            final HttpResponse resp) {
+        final StringBuilder sb = new StringBuilder();
+        sb.append("ti[");
+        if (null != req) {
+            sb.append("in:");
+            sb.append(req.method());
+            sb.append('/');
+            sb.append(req.uri());
+            sb.append("/content-length:");
+            sb.append(req.headers().get(HttpHeaderNames.CONTENT_LENGTH, "0"));
+        }
+        if (null != resp) {
+            sb.append("|out:");
+            sb.append(resp.status());
+            sb.append("/content-length:");
+            sb.append(resp.headers().get(HttpHeaderNames.CONTENT_LENGTH, "0"));
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
+    private Action1<HttpObject> holdRawRequestContents(
+            final List<HttpContent> reqContents, 
+            final AtomicReference<HttpRequest> reqRef) {
+        return new Action1<HttpObject>() {
+            @Override
+            public void call(final HttpObject msg) {
+                if (msg instanceof HttpRequest) {
+                    reqRef.set((HttpRequest)msg);
+                }
+                if (msg instanceof HttpContent) {
+                    reqContents.add((HttpContent)msg);
+                }
+            }};
+    }
+    
+    private Action0 touchAndFreeRawRequestContents(
+            final List<HttpContent> reqContents,
+            final Func0<Object> tradeInfo) {
+        return new Action0() {
+            @Override
+            public void call() {
+                final Object hints = tradeInfo.call();
+                int cnt = 0;
+                for (HttpContent content : reqContents) {
+                    if (content.refCnt() > 0) {
+                        cnt++;
+                        content.touch(hints);
+                    }
+                }
+                reqContents.clear();
+                if (cnt > 0) {
+                    LOG.warn("touchAndFreeRawRequestContents: found {} refcnt > 0's content, detail:{}",
+                            cnt, hints);
+                }
+            }};
     }
     
     private Observable<? extends HttpObject> buildResponse(
