@@ -30,6 +30,7 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.LastHttpContent;
 import rx.Observable;
 import rx.Subscriber;
 import rx.functions.Action0;
@@ -211,7 +212,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                 final Object hints = tradeInfo.call();
                 int cnt = 0;
                 for (HttpContent content : reqContents) {
-                    if (content.refCnt() > 0) {
+                    if (content.refCnt() > 0 && content != LastHttpContent.EMPTY_LAST_CONTENT) {
                         cnt++;
                         content.touch(hints);
                     }
