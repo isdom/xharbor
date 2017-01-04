@@ -169,7 +169,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
             final HttpRequest req,
             final HttpResponse resp) {
         final StringBuilder sb = new StringBuilder();
-        sb.append("ti[");
+        sb.append("tradeinfo[");
         if (null != req) {
             sb.append("in:");
             sb.append(req.method());
