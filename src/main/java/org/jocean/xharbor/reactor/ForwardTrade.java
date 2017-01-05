@@ -93,7 +93,7 @@ public class ForwardTrade implements TradeReactor {
     
     private InOut io4forward(final ReactContext ctx, final InOut originalio, final MarkableTarget target) {
         final Observable<? extends HttpObject> outbound = 
-                buildOutbound(originalio.inbound(), target, ctx.watch());
+                buildOutbound(ctx.trade(), originalio.inbound(), target, ctx.watch());
         
         //  -1 means disable assemble piece to a big block feature
         final HttpMessageHolder holder = new HttpMessageHolder(-1);
@@ -121,6 +121,7 @@ public class ForwardTrade implements TradeReactor {
     }
 
     private Observable<? extends HttpObject> buildOutbound(
+            final HttpTrade trade, 
             final Observable<? extends HttpObject> inbound, 
             final MarkableTarget target,
             final StopWatch stopWatch) {
@@ -165,9 +166,10 @@ public class ForwardTrade implements TradeReactor {
                         final long ttl = stopWatch.stopAndRestart();
                         final RelayMemo memo = _memoBuilder.build(target, buildRoutingInfo(refReq.get()));
                         memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
-                        LOG.info("FORWARD_SUCCESS\ncost:[{}]s, forward_to:[{}]\noutbound:{}\nREQ\n[{}]\nsendback\nRESP\n[{}]",
+                        LOG.info("FORWARD_SUCCESS\ncost:[{}]s, forward_to:[{}]\ninbound:{}\noutbound:{}\nREQ\n[{}]\nsendback\nRESP\n[{}]",
                                 ttl / (float)1000.0, 
                                 target.serviceUri(), 
+                                trade.transport(),
                                 channelHolder._channel,
                                 refReq.get(), 
                                 refResp.get());
