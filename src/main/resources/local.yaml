@@ -10,7 +10,7 @@ children:
   - name: jmxsrv
     parameters: |
       jmxmp.port = 0
-      jmxhtml.port = 8082
+      jmxhtml.port = 8083
   - name: nop.httpout
     children:
       - name: httpfeatures.compress
@@ -78,7 +78,7 @@ children:
           - name: forward.jmxhtml.self
             parameters: |
               forward.headers=x-jmx,jmxhtml.self
-              forward.to=http://127.0.0.1:8082
+              forward.to=http://127.0.0.1:8083
           - name: rwreq.jmxhtml
             parameters: |
               rewrite.path=/jmxhtml[\\w|\\.]*
