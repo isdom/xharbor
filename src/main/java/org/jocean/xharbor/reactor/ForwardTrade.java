@@ -97,7 +97,7 @@ public class ForwardTrade implements TradeReactor {
         
         //  -1 means disable assemble piece to a big block feature
         final HttpMessageHolder holder = new HttpMessageHolder(-1);
-        ctx.trade().doOnClosed(RxActions.<HttpTrade>toAction1(holder.release()));
+        ctx.trade().addCloseHook(RxActions.<HttpTrade>toAction1(holder.release()));
         final Observable<? extends HttpObject> cachedOutbound = 
             outbound
             .compose(holder.assembleAndHold())

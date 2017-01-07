@@ -71,7 +71,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
         
         final HttpMessageHolder holder = new HttpMessageHolder(0);
         final Observable<? extends HttpObject> cachedInbound = 
-            trade.doOnClosed(RxActions.<HttpTrade>toAction1(holder.release()))
+            trade.addCloseHook(RxActions.<HttpTrade>toAction1(holder.release()))
             .inboundRequest()
             .doOnNext(holdRawRequestContents(reqContents, reqRef))
             .compose(holder.assembleAndHold())

@@ -79,7 +79,7 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
     @Override
     public void onNext(final HttpTrade trade) {
         final HttpMessageHolder holder = new HttpMessageHolder(0);
-        final Observable<HttpObject> cached = trade.doOnClosed(RxActions.<HttpTrade>toAction1(holder.release()))
+        final Observable<HttpObject> cached = trade.addCloseHook(RxActions.<HttpTrade>toAction1(holder.release()))
             .inboundRequest()
             .compose(holder.assembleAndHold())
             .cache();
