@@ -3,7 +3,6 @@
  */
 package org.jocean.xharbor.util;
 
-import java.net.URI;
 import java.util.Map;
 
 import org.jocean.idiom.InterfaceUtils;
@@ -48,10 +47,11 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
         return InterfaceUtils.combineImpls(
             RelayMemo.class, 
             this._level0Memo,
-            this._bizMemos.get(Tuple.of(normalizeString(info.getPath()))),
-            this._bizMemos.get(Tuple.of(normalizeString(info.getPath()), info.getMethod())),
-            this._bizMemos.get(Tuple.of(normalizeString(info.getPath()), info.getMethod(), 
-                    uri2value(target.serviceUri())))
+            this._bizMemos.get(Tuple.of(normalizeString(info.getPath())))
+//            ,
+//            this._bizMemos.get(Tuple.of(normalizeString(info.getPath()), info.getMethod())),
+//            this._bizMemos.get(Tuple.of(normalizeString(info.getPath()), info.getMethod(), 
+//                    normalizeString(target.serviceUri().toString())))
             );
     }
 
@@ -59,10 +59,6 @@ public class RelayMemoBuilderForStats implements RelayMemo.Builder {
 
     private static final String normalizeString(final String input) {
         return input.replaceAll(":", "-");
-    }
-    
-    private static final String uri2value(final URI uri) {
-        return normalizeString(uri.toString());
     }
     
     private static class RelayMemoImpl extends BizMemoSupportMBean<RelayMemoImpl, STEP, RESULT> 
