@@ -6,11 +6,9 @@ package org.jocean.xharbor.relay;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
-import org.jocean.http.util.HttpMessageHolder;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
-import org.jocean.idiom.rx.RxActions;
 import org.jocean.xharbor.api.TradeReactor;
 import org.jocean.xharbor.api.TradeReactor.InOut;
 import org.jocean.xharbor.api.TradeReactor.ReactContext;
@@ -56,16 +54,6 @@ public class TradeRelay extends Subscriber<HttpTrade> {
 
     @Override
     public void onNext(final HttpTrade trade) {
-        
-        final HttpMessageHolder holder = new HttpMessageHolder(0);
-        final Observable<? extends HttpObject> cachedInbound = 
-            trade.addCloseHook(RxActions.<HttpTrade>toAction1(holder.release()))
-            .inboundRequest()
-            .compose(holder.assembleAndHold())
-            .cache()
-            .compose(RxNettys.duplicateHttpContent())
-            ;
-
         final StopWatch watch4Result = new StopWatch();
         final ReactContext ctx = new ReactContext() {
             @Override
@@ -79,10 +67,8 @@ public class TradeRelay extends Subscriber<HttpTrade> {
         
         final AtomicBoolean isKeepAliveFromClient = new AtomicBoolean(true);
         
-        this._tradeReactor.react(ctx, new InOut() {
-            @Override
-            public Observable<? extends HttpObject> inbound() {
-                return cachedInbound.map(new Func1<HttpObject, HttpObject>() {
+        final Observable<? extends HttpObject> inbound = trade.inboundRequest()
+                .map(new Func1<HttpObject, HttpObject>() {
                     @Override
                     public HttpObject call(final HttpObject httpobj) {
                         if (httpobj instanceof HttpRequest) {
@@ -101,6 +87,11 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                         }
                         return httpobj;
                     }});
+            
+        this._tradeReactor.react(ctx, new InOut() {
+            @Override
+            public Observable<? extends HttpObject> inbound() {
+                return inbound;
             }
             @Override
             public Observable<? extends HttpObject> outbound() {
@@ -112,7 +103,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                 if (null == io.outbound()) {
                     LOG.warn("TradeRelay can't relay trade({}), NO Target.", trade);
                 }
-                trade.outboundResponse(buildResponse(cachedInbound, io).map(
+                trade.outboundResponse(buildResponse(trade.inboundRequest(), io).map(
                 new Func1<HttpObject, HttpObject>() {
                     @Override
                     public HttpObject call(final HttpObject httpobj) {
