@@ -100,7 +100,7 @@ public class ForwardTrade implements TradeReactor {
         ctx.trade().addCloseHook(RxActions.<HttpTrade>toAction1(holder.release()));
         final Observable<? extends HttpObject> cachedOutbound = 
             outbound
-            .compose(holder.assembleAndHold())
+            .compose(holder.<HttpObject>assembleAndHold())
             .cache()
             .compose(RxNettys.duplicateHttpContent())
             ;
