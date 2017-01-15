@@ -93,13 +93,9 @@ public class ForwardTrade implements TradeReactor {
     }
     
     private InOut io4forward(final ReactContext ctx, final InOut originalio, final MarkableTarget target) {
-        //  -1 means disable assemble piece to a big block feature
-        final HttpMessageHolder holder = new HttpMessageHolder(-1);
-        
         final Observable<? extends HttpObject> outbound = 
-                buildOutbound(ctx.trade(), originalio.inbound(), target, holder, ctx.watch());
+                buildOutbound(ctx.trade(), originalio.inbound(), target, ctx.watch());
         
-        ctx.trade().addCloseHook(RxActions.<HttpTrade>toAction1(holder.release()));
         final Observable<? extends HttpObject> cachedOutbound = outbound.cache()
             .compose(RxNettys.duplicateHttpContent())
             ;
@@ -123,7 +119,6 @@ public class ForwardTrade implements TradeReactor {
             final HttpTrade trade, 
             final Observable<? extends HttpObject> inbound, 
             final MarkableTarget target,
-            final HttpMessageHolder holder, 
             final StopWatch stopWatch) {
         final AtomicReference<HttpRequest> refReq = new AtomicReference<>();
         final AtomicReference<HttpResponse> refResp = new AtomicReference<>();
@@ -137,6 +132,14 @@ public class ForwardTrade implements TradeReactor {
             private Channel _channel;
         }
         final ChannelHolder channelHolder = new ChannelHolder();
+        final Func1<Channel, HttpMessageHolder> holderFactory = new Func1<Channel, HttpMessageHolder>() {
+            @Override
+            public HttpMessageHolder call(final Channel channel) {
+                //  -1 means disable assemble piece to a big block feature
+                final HttpMessageHolder holder = new HttpMessageHolder(-1);
+                trade.addCloseHook(RxActions.<HttpTrade>toAction1(holder.release()));
+                return holder;
+            }};
         
         final Observable<? extends HttpObject> outbound = 
             this._httpclient.defineInteraction(
@@ -152,7 +155,7 @@ public class ForwardTrade implements TradeReactor {
                         }}),
                     JOArrays.addFirst(Feature[].class, target.features().call(),
                             channelHolder, 
-                            HttpUtil.buildHoldMessageFeature(holder))
+                            HttpUtil.buildHoldMessageFeature(holderFactory))
                     )
                 .doOnNext(new Action1<HttpObject>() {
                     @Override
