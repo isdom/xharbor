@@ -117,6 +117,11 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                 return errors.compose(RxObservables.retryIfMatch(_RETRY_IF, 100))
                         .compose(RxObservables.retryMaxTimes(_maxRetryTimes))
                         .compose(RxObservables.retryDelayTo(_retryIntervalBase))
+                        .doOnNext(new Action1<Object>() {
+                            @Override
+                            public void call(final Object obj) {
+                                LOG.info("FORWARD_RETRY by push object {} for trade {}", obj, trade);
+                            }})
                         ;
             }};
         return new Func1<Observable<? extends Throwable>, Observable<?>>() {
@@ -137,7 +142,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
             if (matched) {
                 LOG.info("react with error {}, and retry", ExceptionUtils.exception2detail(e));
             } else {
-                LOG.warn("react with error {}, NOT in retry exception set response with internal error.", 
+                LOG.warn("react with error {}, NOT IN RETRY exception set response with internal error.", 
                     ExceptionUtils.exception2detail(e));
             }
             return matched;
