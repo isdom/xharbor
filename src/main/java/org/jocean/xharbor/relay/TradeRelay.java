@@ -5,7 +5,6 @@ package org.jocean.xharbor.relay;
 
 import java.net.ConnectException;
 import java.nio.channels.ClosedChannelException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jocean.http.TransportException;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
@@ -20,13 +19,8 @@ import org.jocean.xharbor.api.TradeReactor.ReactContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpHeaderValues;
-import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponse;
-import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import rx.Observable;
 import rx.Subscriber;
@@ -70,61 +64,23 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                 return watch4Result;
             }};
         
-        final AtomicBoolean isKeepAliveFromClient = new AtomicBoolean(true);
-        
-        //  TODO, move add keep-alive and remove keep-alive to ForwardTrade reactor
-        final Observable<? extends HttpObject> inbound = trade.inboundRequest()
-                .map(new Func1<HttpObject, HttpObject>() {
-                    @Override
-                    public HttpObject call(final HttpObject httpobj) {
-                        if (httpobj instanceof HttpRequest) {
-                            final HttpRequest req = (HttpRequest)httpobj;
-                            //  only check first time, bcs inbound could be process many times
-                            if (!req.method().equals(HttpMethod.HEAD) 
-                                    && isKeepAliveFromClient.get()) {
-                                isKeepAliveFromClient.set(HttpUtil.isKeepAlive(req));
-                                if (!isKeepAliveFromClient.get()) {
-                                    // if NOT keep alive, force it
-                                    //  TODO, need to duplicate req?
-                                    req.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
-                                    LOG.info("FORCE-KeepAlive: add Connection header with KeepAlive for incoming req:\n[{}]", req);
-                                }
-                            }
-                        }
-                        return httpobj;
-                    }});
-            
         this._tradeReactor.react(ctx, new InOut() {
             @Override
             public Observable<? extends HttpObject> inbound() {
-                return inbound;
+                return trade.inboundRequest();
             }
             @Override
             public Observable<? extends HttpObject> outbound() {
                 return null;
             }})
-        .retryWhen(retryPolicy())
+        .retryWhen(retryPolicy(trade))
         .subscribe(new Action1<InOut>() {
             @Override
             public void call(final InOut io) {
                 if (null == io.outbound()) {
                     LOG.warn("TradeRelay can't relay trade({}), NO Target.", trade);
                 }
-                trade.outboundResponse(buildResponse(trade.inboundRequest(), io).map(
-                new Func1<HttpObject, HttpObject>() {
-                    @Override
-                    public HttpObject call(final HttpObject httpobj) {
-                        if (httpobj instanceof HttpResponse) {
-                            final HttpResponse resp = (HttpResponse)httpobj;
-                            if (!isKeepAliveFromClient.get()) {
-                                // if NOT keep alive from client, remove keepalive header
-                                //  TODO, need to duplicate resp?
-                                resp.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-                                LOG.info("FORCE-KeepAlive: set Connection header with Close for sendback resp:\n[{}]", resp);
-                            }
-                        }
-                        return httpobj;
-                    }})
+                trade.outboundResponse(buildResponse(trade.inboundRequest(), io)
                 );
             }}, new Action1<Throwable>() {
             @Override
@@ -154,7 +110,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                 .delaySubscription(originalInbound.ignoreElements());// response when request send completed
     }
 
-    private Func1<Observable<? extends Throwable>, ? extends Observable<?>> retryPolicy() {
+    private Func1<Observable<? extends Throwable>, ? extends Observable<?>> retryPolicy(final HttpTrade trade) {
         final RetryPolicy<Object> policy = new RetryPolicy<Object>() {
             @Override
             public Observable<Object> call(final Observable<Throwable> errors) {

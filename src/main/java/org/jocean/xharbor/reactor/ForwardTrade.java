@@ -11,7 +11,6 @@ import org.jocean.http.Feature;
 import org.jocean.http.client.HttpClient;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.HttpMessageHolder;
-import org.jocean.http.util.HttpUtil;
 import org.jocean.http.util.Nettys.ChannelAware;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.JOArrays;
@@ -30,14 +29,17 @@ import org.slf4j.LoggerFactory;
 import com.google.common.collect.Lists;
 
 import io.netty.channel.Channel;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValues;
+import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import rx.Observable;
 import rx.Single;
 import rx.functions.Action0;
-import rx.functions.Action1;
 import rx.functions.Func0;
 import rx.functions.Func1;
 
@@ -152,31 +154,54 @@ public class ForwardTrade implements TradeReactor {
                 trade.addCloseHook(RxActions.<HttpTrade>toAction1(holder.release()));
                 return holder;
             }};
+            
+        final AtomicBoolean isKeepAliveFromClient = new AtomicBoolean(true);
         
         final Observable<? extends HttpObject> outbound = 
             this._httpclient.defineInteraction(
                     new InetSocketAddress(
                         target.serviceUri().getHost(), 
                         target.serviceUri().getPort()), 
-                    inbound.doOnNext(new Action1<HttpObject>() {
+                    inbound
+                    .map(new Func1<HttpObject, HttpObject>() {
                         @Override
-                        public void call(final HttpObject httpobj) {
+                        public HttpObject call(final HttpObject httpobj) {
                             if (httpobj instanceof HttpRequest) {
-                                refReq.set((HttpRequest)httpobj);
+                                final HttpRequest req = (HttpRequest)httpobj;
+                                refReq.set(req);
+                                //  only check first time, bcs inbound could be process many times
+                                if (!req.method().equals(HttpMethod.HEAD) 
+                                        && isKeepAliveFromClient.get()) {
+                                    isKeepAliveFromClient.set(HttpUtil.isKeepAlive(req));
+                                    if (!isKeepAliveFromClient.get()) {
+                                        // if NOT keep alive, force it
+                                        //  TODO, need to duplicate req?
+                                        req.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                                        LOG.info("FORCE-KeepAlive: add Connection header with KeepAlive for incoming req:\n[{}]", req);
+                                    }
+                                }
                             }
+                            return httpobj;
                         }}),
                     JOArrays.addFirst(Feature[].class, target.features().call(),
                             channelHolder, 
-                            HttpUtil.buildHoldMessageFeature(holderFactory))
+                            org.jocean.http.util.HttpUtil.buildHoldMessageFeature(holderFactory))
                     )
-                .doOnNext(new Action1<HttpObject>() {
-                    @Override
-                    public void call(final HttpObject httpobj) {
-                        if (httpobj instanceof HttpResponse) {
-                            final HttpResponse resp = (HttpResponse)httpobj;
-                            refResp.set(resp);
-                        }
-                    }})
+                .map(new Func1<HttpObject, HttpObject>() {
+                        @Override
+                        public HttpObject call(final HttpObject httpobj) {
+                            if (httpobj instanceof HttpResponse) {
+                                final HttpResponse resp = (HttpResponse)httpobj;
+                                refResp.set(resp);
+                                if (!isKeepAliveFromClient.get()) {
+                                    // if NOT keep alive from client, remove keepalive header
+                                    //  TODO, need to duplicate resp?
+                                    resp.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+                                    LOG.info("FORCE-KeepAlive: set Connection header with Close for sendback resp:\n[{}]", resp);
+                                }
+                            }
+                            return httpobj;
+                        }})
                 .doOnCompleted(new Action0() {
                     @Override
                     public void call() {
