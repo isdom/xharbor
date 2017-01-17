@@ -18,7 +18,6 @@ import org.jocean.idiom.JOArrays;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxActions;
 import org.jocean.idiom.rx.RxObservables;
-import org.jocean.idiom.rx.RxSubscribers;
 import org.jocean.xharbor.api.MarkableTarget;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.RelayMemo.RESULT;
@@ -67,9 +66,9 @@ public class ForwardTrade implements TradeReactor {
             return Single.<InOut>just(null);
         }
         return io.inbound().compose(RxNettys.asHttpRequest())
-                .map(new Func1<HttpRequest, InOut>() {
+                .flatMap(new Func1<HttpRequest, Observable<InOut>>() {
                     @Override
-                    public InOut call(final HttpRequest req) {
+                    public Observable<InOut> call(final HttpRequest req) {
                         if (null == req) {
                             return null;
                         } else {
@@ -78,13 +77,13 @@ public class ForwardTrade implements TradeReactor {
                                 if (null == target) {
                                     //  no target
                                     LOG.warn("no target to forward for trade {}", ctx.trade());
-                                    return null;
+                                    return Observable.just(null);
                                 } else {
                                     return io4forward(ctx, io, target);
                                 }
                             } else {
                                 //  not handle this trade
-                                return null;
+                                return Observable.just(null);
                             }
                         }
                     }})
@@ -92,27 +91,40 @@ public class ForwardTrade implements TradeReactor {
                 .toSingle();
     }
     
-    private InOut io4forward(final ReactContext ctx, final InOut originalio, final MarkableTarget target) {
+    private Observable<InOut> io4forward(final ReactContext ctx, final InOut originalio, final MarkableTarget target) {
         final Observable<? extends HttpObject> outbound = 
                 buildOutbound(ctx.trade(), originalio.inbound(), target, ctx.watch());
         
+        //  outbound 可被重复订阅
         final Observable<? extends HttpObject> cachedOutbound = outbound.cache()
             .compose(RxNettys.duplicateHttpContent())
             ;
         
         //  启动转发 (forward)
-        cachedOutbound.subscribe(RxSubscribers.nopOnNext(), RxSubscribers.nopOnError());
-        
-        return new InOut() {
+        return cachedOutbound.first().flatMap(new Func1<HttpObject, Observable<InOut>>() {
             @Override
-            public Observable<? extends HttpObject> inbound() {
-                return originalio.inbound();
-            }
-            @Override
-            public Observable<? extends HttpObject> outbound() {
-                //  outbound 可被重复订阅
-                return cachedOutbound;
-            }};
+            public Observable<InOut> call(final HttpObject httpobj) {
+                if (httpobj instanceof HttpResponse) {
+                    final HttpResponse resp = (HttpResponse)httpobj;
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("recv first response hear part {}, so push toNext valid io.", resp);
+                    }
+                    //  TODO, check if 4XX or 5XX response and push Throwable if need
+                    
+                    return Observable.<InOut>just(new InOut() {
+                        @Override
+                        public Observable<? extends HttpObject> inbound() {
+                            return originalio.inbound();
+                        }
+                        @Override
+                        public Observable<? extends HttpObject> outbound() {
+                            return cachedOutbound;
+                        }});
+                } else {
+                    LOG.warn("first httpobject {} is not HttpResponse, can't use as http response stream", httpobj);
+                    return Observable.error(new RuntimeException("invalid http response"));
+                }
+            }});
     }
 
     private Observable<? extends HttpObject> buildOutbound(
