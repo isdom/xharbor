@@ -1,26 +1,31 @@
 package org.jocean.xharbor.reactor;
 
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.nio.channels.ClosedChannelException;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.http.Feature;
+import org.jocean.http.TransportException;
 import org.jocean.http.client.HttpClient;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.HttpMessageHolder;
 import org.jocean.http.util.Nettys.ChannelAware;
 import org.jocean.http.util.RxNettys;
+import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.JOArrays;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxActions;
 import org.jocean.idiom.rx.RxObservables;
-import org.jocean.xharbor.api.MarkableTarget;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.RelayMemo.RESULT;
 import org.jocean.xharbor.api.RoutingInfo;
+import org.jocean.xharbor.api.ServiceMemo;
 import org.jocean.xharbor.api.Target;
 import org.jocean.xharbor.api.TradeReactor;
 import org.slf4j.Logger;
@@ -35,27 +40,37 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.QueryStringDecoder;
+import io.netty.util.Timeout;
+import io.netty.util.Timer;
+import io.netty.util.TimerTask;
 import rx.Observable;
 import rx.Single;
 import rx.functions.Action0;
+import rx.functions.Action1;
 import rx.functions.Func0;
 import rx.functions.Func1;
 
 public class ForwardTrade implements TradeReactor {
     
+    private static final long _period = 30; // 30 seconds
     private static final Logger LOG = LoggerFactory
             .getLogger(ForwardTrade.class);
     
     public ForwardTrade(
             final MatchRule  matcher,
             final HttpClient httpclient,
-            final RelayMemo.Builder memoBuilder
+            final RelayMemo.Builder memoBuilder, 
+            final ServiceMemo serviceMemo, 
+            final Timer timer
             ) {
         this._matcher = matcher;
         this._httpclient = httpclient;
         this._memoBuilder = memoBuilder;
+        this._serviceMemo = serviceMemo;
+        this._timer = timer;
     }
     
     public void addTarget(final Target target) {
@@ -75,10 +90,10 @@ public class ForwardTrade implements TradeReactor {
                             return null;
                         } else {
                             if ( _matcher.match(req) ) {
-                                final MarkableTarget target = selectTarget();
+                                final MarkableTargetImpl target = selectTarget();
                                 if (null == target) {
                                     //  no target
-                                    LOG.warn("no target to forward for trade {}", ctx.trade());
+                                    LOG.warn("NONE_TARGET to forward for trade {}", ctx.trade());
                                     return Observable.just(null);
                                 } else {
                                     return io4forward(ctx, io, target);
@@ -93,7 +108,7 @@ public class ForwardTrade implements TradeReactor {
                 .toSingle();
     }
     
-    private Observable<InOut> io4forward(final ReactContext ctx, final InOut originalio, final MarkableTarget target) {
+    private Observable<InOut> io4forward(final ReactContext ctx, final InOut originalio, final MarkableTargetImpl target) {
         final Observable<? extends HttpObject> outbound = 
                 buildOutbound(ctx.trade(), originalio.inbound(), target, ctx.watch());
         
@@ -103,36 +118,81 @@ public class ForwardTrade implements TradeReactor {
             ;
         
         //  启动转发 (forward)
-        return cachedOutbound.first().flatMap(new Func1<HttpObject, Observable<InOut>>() {
-            @Override
-            public Observable<InOut> call(final HttpObject httpobj) {
-                if (httpobj instanceof HttpResponse) {
-                    final HttpResponse resp = (HttpResponse)httpobj;
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("recv first response hear part {}, so push toNext valid io.", resp);
+        return cachedOutbound.first()
+            .doOnError(new Action1<Throwable>() {
+                @Override
+                public void call(final Throwable error) {
+                    //  remember reset to false after a while
+                    if (isCommunicationFailure(error)) {
+                        markServiceDownStatus(target, true);
+                        LOG.warn("COMMUNICATION_FAILURE({}), so mark service [{}] down.",
+                                ExceptionUtils.exception2detail(error), target.serviceUri());
+                        _timer.newTimeout(new TimerTask() {
+                            @Override
+                            public void run(final Timeout timeout) throws Exception {
+                                // reset down flag
+                                markServiceDownStatus(target, false);
+                                LOG.info("reset service [{}] down to false, after {} second cause by COMMUNICATION_FAILURE({}).",
+                                        target.serviceUri(), _period, ExceptionUtils.exception2detail(error));
+                            }
+                        },  _period, TimeUnit.SECONDS);
                     }
-                    //  TODO, check if 4XX or 5XX response and push Throwable if need
                     
-                    return Observable.<InOut>just(new InOut() {
-                        @Override
-                        public Observable<? extends HttpObject> inbound() {
-                            return originalio.inbound();
+                }})
+            .flatMap(new Func1<HttpObject, Observable<InOut>>() {
+                @Override
+                public Observable<InOut> call(final HttpObject httpobj) {
+                    if (httpobj instanceof HttpResponse) {
+                        final HttpResponse resp = (HttpResponse)httpobj;
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("recv first response hear part {}, so push toNext valid io.", resp);
                         }
-                        @Override
-                        public Observable<? extends HttpObject> outbound() {
-                            return cachedOutbound;
-                        }});
-                } else {
-                    LOG.warn("first httpobject {} is not HttpResponse, can't use as http response stream", httpobj);
-                    return Observable.error(new RuntimeException("invalid http response"));
-                }
+                        
+                        //  404 Not Found
+                        if (resp.status().equals(HttpResponseStatus.NOT_FOUND)) {
+                            //  Request-URI not found in target service, so try next matched forward target
+                            LOG.info("API_NOT_SUPPORTED for target {}, so forward trade({}) to next reactor", target, ctx.trade());
+                            return Observable.<InOut>just(null);
+                        }
+                        
+                        //  5XX Server Internal Error
+                        if (resp.status().code() >= 500) {
+                            //  Server Internal Error 
+                            target.markAPIDownStatus(true);
+                            LOG.warn("SERVER_ERROR({}), so mark service [{}]'s matched {} APIs down.",
+                                    resp.status(), target.serviceUri(), _matcher);
+                            _timer.newTimeout(new TimerTask() {
+                                @Override
+                                public void run(final Timeout timeout) throws Exception {
+                                    // reset down flag
+                                    target.markAPIDownStatus(false);
+                                    LOG.info("reset service [{}]'s matched {} APIs down to false, after {} second cause by SERVER_ERROR({}).",
+                                            target.serviceUri(), _matcher, _period, resp.status());
+                                }
+                            },  _period, TimeUnit.SECONDS);
+                            return Observable.error(new TransportException("SERVER_ERROR(" + resp.status() + ")"));
+                        }
+                        
+                        return Observable.<InOut>just(new InOut() {
+                            @Override
+                            public Observable<? extends HttpObject> inbound() {
+                                return originalio.inbound();
+                            }
+                            @Override
+                            public Observable<? extends HttpObject> outbound() {
+                                return cachedOutbound;
+                            }});
+                    } else {
+                        LOG.warn("first httpobject {} is not HttpResponse, can't use as http response stream", httpobj);
+                        return Observable.error(new RuntimeException("invalid http response"));
+                    }
             }});
     }
 
     private Observable<? extends HttpObject> buildOutbound(
             final HttpTrade trade, 
             final Observable<? extends HttpObject> inbound, 
-            final MarkableTarget target,
+            final Target target,
             final StopWatch stopWatch) {
         final AtomicReference<HttpRequest> refReq = new AtomicReference<>();
         final AtomicReference<HttpResponse> refResp = new AtomicReference<>();
@@ -215,11 +275,12 @@ public class ForwardTrade implements TradeReactor {
                                 channelHolder._channel,
                                 refReq.get(), 
                                 refResp.get());
-                    }});
+                    }})
+                ;
         return outbound;
     }
     
-    private MarkableTarget selectTarget() {
+    private MarkableTargetImpl selectTarget() {
         int total = 0;
         MarkableTargetImpl best = null;
         for ( MarkableTargetImpl peer : this._targets ) {
@@ -248,9 +309,12 @@ public class ForwardTrade implements TradeReactor {
         return best;
     }
     
-    private boolean isTargetActive(final MarkableTargetImpl peer) {
-//        return !(this._serviceMemo.isServiceDown(peer._target.serviceUri()) || peer._down.get());
-        return !peer._down.get();
+    private boolean isTargetActive(final MarkableTargetImpl target) {
+        return !(this._serviceMemo.isServiceDown(target.serviceUri()) || target._down.get());
+    }
+    
+    private void markServiceDownStatus(final Target target, final boolean isDown) {
+        this._serviceMemo.markServiceDownStatus(target.serviceUri(), isDown);
     }
     
     private RoutingInfo buildRoutingInfo(final HttpRequest req) {
@@ -278,7 +342,13 @@ public class ForwardTrade implements TradeReactor {
         return path;
     }
 
-    private class MarkableTargetImpl implements MarkableTarget {
+    private boolean isCommunicationFailure(final Throwable error) {
+        return (error instanceof TransportException)
+            || (error instanceof ConnectException)
+            || (error instanceof ClosedChannelException);
+    }
+
+    private class MarkableTargetImpl implements Target {
         
         private static final int MAX_EFFECTIVEWEIGHT = 1000;
         
@@ -296,7 +366,7 @@ public class ForwardTrade implements TradeReactor {
             return this._target.features();
         }
         
-        @Override
+        @SuppressWarnings("unused")
         public int addWeight(final int deltaWeight) {
             int weight = this._effectiveWeight.addAndGet(deltaWeight);
             if ( weight > MAX_EFFECTIVEWEIGHT ) {
@@ -305,14 +375,8 @@ public class ForwardTrade implements TradeReactor {
             return weight;
         }
         
-        @Override
         public void markAPIDownStatus(final boolean isDown) {
             this._down.set(isDown);
-        }
-        
-        @Override
-        public void markServiceDownStatus(final boolean isDown) {
-//            _serviceMemo.markServiceDownStatus(this._target.serviceUri(), isDown);
         }
         
         private final Target _target;
@@ -321,9 +385,12 @@ public class ForwardTrade implements TradeReactor {
         private final AtomicBoolean _down = new AtomicBoolean(false);
     }
     
-    private final HttpClient    _httpclient;
-    private final RelayMemo.Builder _memoBuilder;
     private final MatchRule     _matcher;
     private final List<MarkableTargetImpl>  _targets = 
             Lists.newCopyOnWriteArrayList();
+    
+    private final HttpClient    _httpclient;
+    private final RelayMemo.Builder _memoBuilder;
+    private final ServiceMemo   _serviceMemo;
+    private final Timer         _timer;
 }

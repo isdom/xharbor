@@ -31,14 +31,14 @@ public interface RelayMemo extends BizMemo<RelayMemo.STEP, RelayMemo.RESULT> {
     }
     
     public interface Builder {
-        public RelayMemo build(final MarkableTarget target, final RoutingInfo info);
+        public RelayMemo build(final Target target, final RoutingInfo info);
     }
     
     public static class Utils {
         public static Builder compositeBuilder(final Builder ... builders) {
             return new Builder() {
                 @Override
-                public RelayMemo build(final MarkableTarget target, final RoutingInfo info) {
+                public RelayMemo build(final Target target, final RoutingInfo info) {
                     return InterfaceUtils.combineImpls(RelayMemo.class, 
                         new ArrayList<RelayMemo>() {
                             private static final long serialVersionUID = 1L;

@@ -15,9 +15,9 @@
                 <bean class="org.jocean.xharbor.util.RelayMemoBuilderForStats">
                     <constructor-arg ref="statsRegister"/>
                 </bean>
-                <bean class="org.jocean.xharbor.util.RelayMemoBuilderForDispatchFeedback">
+                <!-- bean class="org.jocean.xharbor.util.RelayMemoBuilderForDispatchFeedback">
                     <constructor-arg ref="timer"/>
-                </bean>
+                </bean -->
             </array>
         </constructor-arg>
     </bean>

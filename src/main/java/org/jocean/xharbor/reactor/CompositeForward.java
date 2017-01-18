@@ -12,12 +12,14 @@ import javax.inject.Inject;
 import org.jocean.http.client.HttpClient;
 import org.jocean.idiom.Ordered;
 import org.jocean.xharbor.api.RelayMemo;
+import org.jocean.xharbor.api.ServiceMemo;
 import org.jocean.xharbor.api.TradeReactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Maps;
 
+import io.netty.util.Timer;
 import rx.Single;
 import rx.functions.Action0;
 import rx.functions.Func1;
@@ -73,7 +75,7 @@ public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardDat
             for (ForwardData f : data) {
                 ForwardTrade reactor = matcher2reactor.get(f.matcher());
                 if (null == reactor) {
-                    reactor = new ForwardTrade(f.matcher(), this._httpclient, this._memoBuilder);
+                    reactor = new ForwardTrade(f.matcher(), this._httpclient, this._memoBuilder, this._serviceMemo, this._timer);
                     matcher2reactor.put(f.matcher(), reactor);
                 }
                 reactor.addTarget(f.target());
@@ -116,6 +118,12 @@ public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardDat
     
     @Inject
     private RelayMemo.Builder _memoBuilder;
+    
+    @Inject
+    private ServiceMemo     _serviceMemo;
+    
+    @Inject
+    private Timer _timer;
     
     private int _ordinal = 0;
 }

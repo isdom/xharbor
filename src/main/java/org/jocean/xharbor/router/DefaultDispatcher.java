@@ -24,7 +24,6 @@ import org.jocean.idiom.rx.RxObservables;
 import org.jocean.idiom.stats.BizMemo;
 import org.jocean.idiom.stats.BizMemo.StepMemo;
 import org.jocean.xharbor.api.Dispatcher;
-import org.jocean.xharbor.api.MarkableTarget;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.RelayMemo.RESULT;
 import org.jocean.xharbor.api.RelayMemo.STEP;
@@ -109,7 +108,7 @@ public class DefaultDispatcher implements Dispatcher {
         }}.toArray(new String[0]) );
     }
 
-    private MarkableTarget dispatch() {
+    private MarkableTargetImpl dispatch() {
         int total = 0;
         MarkableTargetImpl best = null;
         for ( MarkableTargetImpl peer : this._targets ) {
@@ -151,7 +150,7 @@ public class DefaultDispatcher implements Dispatcher {
         return !(this._serviceMemo.isServiceDown(peer._target.serviceUri()) || peer._down.get());
     }
     
-    private class MarkableTargetImpl implements MarkableTarget {
+    private class MarkableTargetImpl implements Target {
         
         MarkableTargetImpl(final Target target) {
             this._target = target;
@@ -167,7 +166,6 @@ public class DefaultDispatcher implements Dispatcher {
             return this._target.features();
         }
         
-        @Override
         public int addWeight(final int deltaWeight) {
             int weight = this._effectiveWeight.addAndGet(deltaWeight);
             if ( weight > MAX_EFFECTIVEWEIGHT ) {
@@ -176,12 +174,10 @@ public class DefaultDispatcher implements Dispatcher {
             return weight;
         }
         
-        @Override
         public void markAPIDownStatus(final boolean isDown) {
             this._down.set(isDown);
         }
         
-        @Override
         public void markServiceDownStatus(final boolean isDown) {
             _serviceMemo.markServiceDownStatus(this._target.serviceUri(), isDown);
         }
@@ -223,7 +219,7 @@ public class DefaultDispatcher implements Dispatcher {
             final HttpRequest request, 
             final Observable<? extends HttpObject> fullRequest) {
         
-        final MarkableTarget target = dispatch();
+        final MarkableTargetImpl target = dispatch();
         if (null==target) {
             LOG.warn("can't found matched target service for http inbound ({})\nrequest:[{}]\njust return 200 OK.", 
                     ctx.transport, request);

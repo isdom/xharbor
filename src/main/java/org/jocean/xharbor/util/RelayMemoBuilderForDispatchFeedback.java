@@ -3,17 +3,13 @@
  */
 package org.jocean.xharbor.util;
 
-import io.netty.util.Timeout;
-import io.netty.util.Timer;
-import io.netty.util.TimerTask;
-
-import java.util.concurrent.TimeUnit;
-
-import org.jocean.xharbor.api.MarkableTarget;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.RoutingInfo;
+import org.jocean.xharbor.api.Target;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import io.netty.util.Timer;
 
 /**
  * @author isdom
@@ -29,7 +25,7 @@ public class RelayMemoBuilderForDispatchFeedback implements RelayMemo.Builder {
     }
     
     @Override
-    public RelayMemo build(final MarkableTarget target, final RoutingInfo info) {
+    public RelayMemo build(final Target target, final RoutingInfo info) {
         return new RelayMemo() {
             @Override
             public void beginBizStep(final STEP step) {
@@ -39,16 +35,19 @@ public class RelayMemoBuilderForDispatchFeedback implements RelayMemo.Builder {
                 if ( step.equals(STEP.RECV_RESP) ) {
                     //  0ms <= ttl < 500 ms
                     if ( ttl >= 0 && ttl < 500 ) {
+                        /*
                         final int weight = target.addWeight(1);
                         if ( LOG.isDebugEnabled() ) {
                             LOG.debug("endBizStep for RECV_RESP with ttl < 500ms, so add weight with 1 to {}",
                                     weight);
                         }
+                        */
                     }
                 }
             }
             @Override
             public void incBizResult(final RESULT result, final long ttl) {
+                /*
                 if (result.equals(RESULT.CONNECTDESTINATION_FAILURE)) {
                     markServiceDown4Result(60L, target, "CONNECTDESTINATION_FAILURE");
                 }
@@ -64,9 +63,11 @@ public class RelayMemoBuilderForDispatchFeedback implements RelayMemo.Builder {
                 else if (result.equals(RESULT.HTTP_SERVER_ERROR)) {
                     markAPIDown4Result(60L, target, info, "HTTP_SERVER_ERROR");
                 }
+                */
             }};
     }
 
+    /*
     private void markAPIDown4Result(
             final long period, 
             final MarkableTarget target, 
@@ -103,6 +104,7 @@ public class RelayMemoBuilderForDispatchFeedback implements RelayMemo.Builder {
             }
         }, period, TimeUnit.SECONDS);
     }
+    */
 
     private final Timer _timer;
 }
