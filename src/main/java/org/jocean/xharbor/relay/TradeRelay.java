@@ -77,8 +77,8 @@ public class TradeRelay extends Subscriber<HttpTrade> {
         .subscribe(new Action1<InOut>() {
             @Override
             public void call(final InOut io) {
-                if (null == io.outbound()) {
-                    LOG.warn("TradeRelay can't relay trade({}), NO Target.", trade);
+                if (null == io || null == io.outbound()) {
+                    LOG.warn("NO_INOUT for trade({}), react io detail: {}.", trade, io);
                 }
                 trade.outboundResponse(buildResponse(trade.inboundRequest(), io)
                 );
@@ -93,7 +93,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
 
     private Observable<? extends HttpObject> buildResponse(
             final Observable<? extends HttpObject> originalInbound, final InOut io) {
-        return null != io.outbound()
+        return (null != io && null != io.outbound())
             ? io.outbound()
             : originalInbound.compose(RxNettys.asHttpRequest())
                 .map(new Func1<HttpRequest, HttpVersion>() {
