@@ -117,10 +117,10 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                 return errors.compose(RxObservables.retryIfMatch(ifMatch(trade), 100))
                         .compose(RxObservables.retryMaxTimes(_maxRetryTimes))
                         .compose(RxObservables.retryDelayTo(_retryIntervalBase))
-                        .doOnNext(new Action1<Object>() {
+                        .doOnNext(new Action1<Integer>() {
                             @Override
-                            public void call(final Object obj) {
-                                LOG.info("FORWARD_RETRY with retry-count {} for trade {}", obj, trade);
+                            public void call(final Integer retryCount) {
+                                LOG.info("FORWARD_RETRY with retry-count {} for trade {}", retryCount, trade);
                             }})
                         ;
             }};
