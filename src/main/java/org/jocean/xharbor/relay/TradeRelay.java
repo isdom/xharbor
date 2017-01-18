@@ -111,16 +111,16 @@ public class TradeRelay extends Subscriber<HttpTrade> {
     }
 
     private Func1<Observable<? extends Throwable>, ? extends Observable<?>> retryPolicy(final HttpTrade trade) {
-        final RetryPolicy<Object> policy = new RetryPolicy<Object>() {
+        final RetryPolicy<Integer> policy = new RetryPolicy<Integer>() {
             @Override
-            public Observable<Object> call(final Observable<Throwable> errors) {
-                return errors.compose(RxObservables.retryIfMatch(_RETRY_IF, 100))
+            public Observable<Integer> call(final Observable<Throwable> errors) {
+                return errors.compose(RxObservables.retryIfMatch(ifMatch(trade), 100))
                         .compose(RxObservables.retryMaxTimes(_maxRetryTimes))
                         .compose(RxObservables.retryDelayTo(_retryIntervalBase))
                         .doOnNext(new Action1<Object>() {
                             @Override
                             public void call(final Object obj) {
-                                LOG.info("FORWARD_RETRY by push object {} for trade {}", obj, trade);
+                                LOG.info("FORWARD_RETRY with retry-count {} for trade {}", obj, trade);
                             }})
                         ;
             }};
@@ -133,24 +133,28 @@ public class TradeRelay extends Subscriber<HttpTrade> {
         };
     }
     
-    private static final Func1<Throwable, Boolean> _RETRY_IF = new Func1<Throwable, Boolean>() {
-        @Override
-        public Boolean call(final Throwable e) {
-            final boolean matched = (e instanceof TransportException)
-                || (e instanceof ConnectException)
-                || (e instanceof ClosedChannelException);
-            if (matched) {
-                LOG.info("react with error {}, and retry", ExceptionUtils.exception2detail(e));
-            } else {
-                LOG.warn("react with error {}, NOT IN RETRY exception set response with internal error.", 
-                    ExceptionUtils.exception2detail(e));
+    private static Func1<Throwable, Boolean> ifMatch(final HttpTrade trade) {
+        return new Func1<Throwable, Boolean>() {
+            @Override
+            public Boolean call(final Throwable e) {
+                final boolean matched = (e instanceof TransportException)
+                    || (e instanceof ConnectException)
+                    || (e instanceof ClosedChannelException);
+                if (matched) {
+                    LOG.info("RETRY for trade({}), bcs of error: {}", 
+                            trade, ExceptionUtils.exception2detail(e));
+                } else {
+                    LOG.warn("NOT_RETRY for trade({}), bcs of error: {}", 
+                            trade, ExceptionUtils.exception2detail(e));
+                }
+                return matched;
             }
-            return matched;
-        }
-        @Override
-        public String toString() {
-            return "TransportException or ConnectException or ClosedChannelException";
-        }};
+            @Override
+            public String toString() {
+                return "TransportException or ConnectException or ClosedChannelException";
+            }
+        };
+    }
 
     private final TradeReactor _tradeReactor;
     private int _maxRetryTimes = 3;
