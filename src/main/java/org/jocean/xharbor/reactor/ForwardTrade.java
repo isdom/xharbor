@@ -34,9 +34,10 @@ import org.slf4j.LoggerFactory;
 import com.google.common.collect.Lists;
 
 import io.netty.channel.Channel;
+import io.netty.handler.codec.http.DefaultHttpRequest;
+import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
-import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -222,7 +223,7 @@ public class ForwardTrade implements TradeReactor {
                     new InetSocketAddress(
                         target.serviceUri().getHost(), 
                         target.serviceUri().getPort()), 
-                    inbound
+                    inbound.flatMap(RxNettys.splitFullHttpMessage())
                     .map(new Func1<HttpObject, HttpObject>() {
                         @Override
                         public HttpObject call(final HttpObject httpobj) {
@@ -230,14 +231,18 @@ public class ForwardTrade implements TradeReactor {
                                 final HttpRequest req = (HttpRequest)httpobj;
                                 refReq.set(req);
                                 //  only check first time, bcs inbound could be process many times
-                                if (!req.method().equals(HttpMethod.HEAD) 
-                                        && isKeepAliveFromClient.get()) {
+                                if (isKeepAliveFromClient.get()) {
                                     isKeepAliveFromClient.set(HttpUtil.isKeepAlive(req));
                                     if (!isKeepAliveFromClient.get()) {
                                         // if NOT keep alive, force it
-                                        //  TODO, need to duplicate req?
-                                        req.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                                        final DefaultHttpRequest newreq = new DefaultHttpRequest(
+                                                req.protocolVersion(), 
+                                                req.method(),
+                                                req.uri());
+                                        newreq.headers().add(req.headers());
+                                        newreq.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
                                         LOG.info("FORCE-KeepAlive: add Connection header with KeepAlive for incoming req:\n[{}]", req);
+                                        return newreq;
                                     }
                                 }
                             }
@@ -247,6 +252,7 @@ public class ForwardTrade implements TradeReactor {
                             channelHolder, 
                             org.jocean.http.util.HttpUtil.buildHoldMessageFeature(holderFactory))
                     )
+                .flatMap(RxNettys.splitFullHttpMessage())
                 .map(new Func1<HttpObject, HttpObject>() {
                         @Override
                         public HttpObject call(final HttpObject httpobj) {
@@ -254,10 +260,16 @@ public class ForwardTrade implements TradeReactor {
                                 final HttpResponse resp = (HttpResponse)httpobj;
                                 refResp.set(resp);
                                 if (!isKeepAliveFromClient.get()) {
-                                    // if NOT keep alive from client, remove keepalive header
-                                    //  TODO, need to duplicate resp?
-                                    resp.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-                                    LOG.info("FORCE-KeepAlive: set Connection header with Close for sendback resp:\n[{}]", resp);
+                                    if (HttpUtil.isKeepAlive(resp)) {
+                                        // if NOT keep alive from client, remove keepalive header
+                                        final DefaultHttpResponse newresp = new DefaultHttpResponse(
+                                                resp.protocolVersion(), 
+                                                resp.status());
+                                        newresp.headers().add(resp.headers());
+                                        newresp.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+                                        LOG.info("FORCE-KeepAlive: set Connection header with Close for sendback resp:\n[{}]", resp);
+                                        return newresp;
+                                    }
                                 }
                             }
                             return httpobj;
