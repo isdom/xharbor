@@ -3,7 +3,6 @@ package org.jocean.xharbor.reactor;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.nio.channels.ClosedChannelException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -355,9 +354,7 @@ public class ForwardTrade implements TradeReactor {
     }
 
     private boolean isCommunicationFailure(final Throwable error) {
-        return (error instanceof TransportException)
-            || (error instanceof ConnectException)
-            || (error instanceof ClosedChannelException);
+        return error instanceof ConnectException;
     }
 
     private class MarkableTargetImpl implements Target {
