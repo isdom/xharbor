@@ -137,6 +137,11 @@ public class TradeRelay extends Subscriber<HttpTrade> {
         return new Func1<Throwable, Boolean>() {
             @Override
             public Boolean call(final Throwable e) {
+                if (trade.inboundHolder().isFragmented()) {
+                    LOG.warn("NOT_RETRY for trade({}), bcs of trade's inbound has fragmented.", 
+                            trade);
+                    return false;
+                }
                 final boolean matched = (e instanceof TransportException)
                     || (e instanceof ConnectException)
                     || (e instanceof ClosedChannelException);

@@ -16,11 +16,13 @@ import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.HttpMessageHolder;
 import org.jocean.http.util.Nettys.ChannelAware;
 import org.jocean.http.util.RxNettys;
+import org.jocean.http.util.SendedMessageAware;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.JOArrays;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxActions;
 import org.jocean.idiom.rx.RxObservables;
+import org.jocean.idiom.rx.RxSubscribers;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.RelayMemo.RESULT;
 import org.jocean.xharbor.api.RoutingInfo;
@@ -55,7 +57,8 @@ import rx.functions.Func1;
 
 public class ForwardTrade implements TradeReactor {
     
-    private static final long _period = 30; // 30 seconds
+    private static final int MAX_RETAINED_SIZE = 8 * 1024;
+    private static final long _period = 20; // 30 seconds
     private static final Logger LOG = LoggerFactory
             .getLogger(ForwardTrade.class);
     
@@ -215,6 +218,26 @@ public class ForwardTrade implements TradeReactor {
                 return holder;
             }};
             
+        final class ReleaseSendedMessage extends Feature.AbstractFeature0 
+            implements SendedMessageAware {
+            @Override
+            public void setSendedMessage(final Observable<? extends Object> sendedMessage) {
+                sendedMessage.subscribe(new Action1<Object>() {
+                    @Override
+                    public void call(final Object msg) {
+                        if (msg instanceof HttpObject) {
+                            if (trade.inboundHolder().isFragmented()
+                                || trade.retainedInboundMemory() > MAX_RETAINED_SIZE) {
+                                trade.inboundHolder().releaseHttpObject((HttpObject)msg);
+                                LOG.info("inboundholder release msg, now trade({})'s retained size: {}",
+                                        trade, trade.retainedInboundMemory());
+                            }
+                        }
+                    }},
+                    RxSubscribers.ignoreError());
+            }
+        }
+            
         final AtomicBoolean isKeepAliveFromClient = new AtomicBoolean(true);
         
         final Observable<? extends HttpObject> outbound = 
@@ -249,6 +272,7 @@ public class ForwardTrade implements TradeReactor {
                         }}),
                     JOArrays.addFirst(Feature[].class, target.features().call(),
                             channelHolder, 
+                            new ReleaseSendedMessage(),
                             org.jocean.http.util.HttpUtil.buildHoldMessageFeature(holderFactory))
                     )
                 .flatMap(RxNettys.splitFullHttpMessage())
