@@ -37,6 +37,7 @@ import com.google.common.collect.Lists;
 import io.netty.channel.Channel;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpObject;
@@ -225,10 +226,10 @@ public class ForwardTrade implements TradeReactor {
                 sendedMessage.subscribe(new Action1<Object>() {
                     @Override
                     public void call(final Object msg) {
-                        if (msg instanceof HttpObject) {
+                        if (msg instanceof HttpContent) {
                             if (trade.inboundHolder().isFragmented()
                                 || trade.retainedInboundMemory() > MAX_RETAINED_SIZE) {
-                                trade.inboundHolder().releaseHttpObject((HttpObject)msg);
+                                trade.inboundHolder().releaseHttpContent((HttpContent)msg);
                                 LOG.info("inboundholder release msg, now trade({})'s retained size: {}",
                                         trade, trade.retainedInboundMemory());
                             }
