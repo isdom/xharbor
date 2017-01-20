@@ -229,9 +229,11 @@ public class ForwardTrade implements TradeReactor {
                         if (msg instanceof HttpContent) {
                             if (trade.inboundHolder().isFragmented()
                                 || trade.retainedInboundMemory() > MAX_RETAINED_SIZE) {
+                                LOG.info("trade({})'s inboundHolder BEGIN_RELEASE msg({}), now it's retained size: {}",
+                                        trade, msg, trade.retainedInboundMemory());
                                 trade.inboundHolder().releaseHttpContent((HttpContent)msg);
-                                LOG.info("inboundholder release msg, now trade({})'s retained size: {}",
-                                        trade, trade.retainedInboundMemory());
+                                LOG.info("trade({})'s inboundHolder ENDOF_RELEASE msg({}), now it's retained size: {}",
+                                        trade, msg, trade.retainedInboundMemory());
                             }
                         }
                     }},
