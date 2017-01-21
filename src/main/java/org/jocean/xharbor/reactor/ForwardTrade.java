@@ -18,7 +18,6 @@ import org.jocean.http.util.Nettys.ChannelAware;
 import org.jocean.http.util.RxNettys;
 import org.jocean.http.util.SendedMessageAware;
 import org.jocean.idiom.ExceptionUtils;
-import org.jocean.idiom.JOArrays;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxActions;
 import org.jocean.idiom.rx.RxObservables;
@@ -244,62 +243,18 @@ public class ForwardTrade implements TradeReactor {
         final AtomicBoolean isKeepAliveFromClient = new AtomicBoolean(true);
         
         final Observable<? extends HttpObject> outbound = 
-            this._httpclient.defineInteraction(
-                    new InetSocketAddress(
-                        target.serviceUri().getHost(), 
-                        target.serviceUri().getPort()), 
-                    inbound.flatMap(RxNettys.splitFullHttpMessage())
-                    .map(new Func1<HttpObject, HttpObject>() {
-                        @Override
-                        public HttpObject call(final HttpObject httpobj) {
-                            if (httpobj instanceof HttpRequest) {
-                                final HttpRequest req = (HttpRequest)httpobj;
-                                refReq.set(req);
-                                //  only check first time, bcs inbound could be process many times
-                                if (isKeepAliveFromClient.get()) {
-                                    isKeepAliveFromClient.set(HttpUtil.isKeepAlive(req));
-                                    if (!isKeepAliveFromClient.get()) {
-                                        // if NOT keep alive, force it
-                                        final DefaultHttpRequest newreq = new DefaultHttpRequest(
-                                                req.protocolVersion(), 
-                                                req.method(),
-                                                req.uri());
-                                        newreq.headers().add(req.headers());
-                                        newreq.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
-                                        LOG.info("FORCE-KeepAlive: add Connection header with KeepAlive for incoming req:\n[{}]", req);
-                                        return newreq;
-                                    }
-                                }
-                            }
-                            return httpobj;
-                        }}),
-                    JOArrays.addFirst(Feature[].class, target.features().call(),
-                            channelHolder, 
-                            new ReleaseSendedMessage(),
-                            org.jocean.http.util.HttpUtil.buildHoldMessageFeature(holderFactory))
-                    )
+            this._httpclient.interaction()
+                .remoteAddress(new InetSocketAddress(
+                    target.serviceUri().getHost(), 
+                    target.serviceUri().getPort()))
+                .request(buildRequest(inbound, refReq, isKeepAliveFromClient))
+                .feature(target.features().call())
+                .feature(org.jocean.http.util.HttpUtil.buildHoldMessageFeature(holderFactory))
+                .feature(new ReleaseSendedMessage())
+                .feature(channelHolder)
+                .build()
                 .flatMap(RxNettys.splitFullHttpMessage())
-                .map(new Func1<HttpObject, HttpObject>() {
-                        @Override
-                        public HttpObject call(final HttpObject httpobj) {
-                            if (httpobj instanceof HttpResponse) {
-                                final HttpResponse resp = (HttpResponse)httpobj;
-                                refResp.set(resp);
-                                if (!isKeepAliveFromClient.get()) {
-                                    if (HttpUtil.isKeepAlive(resp)) {
-                                        // if NOT keep alive from client, remove keepalive header
-                                        final DefaultHttpResponse newresp = new DefaultHttpResponse(
-                                                resp.protocolVersion(), 
-                                                resp.status());
-                                        newresp.headers().add(resp.headers());
-                                        newresp.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-                                        LOG.info("FORCE-KeepAlive: set Connection header with Close for sendback resp:\n[{}]", resp);
-                                        return newresp;
-                                    }
-                                }
-                            }
-                            return httpobj;
-                        }})
+                .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))
                 .doOnCompleted(new Action0() {
                     @Override
                     public void call() {
@@ -316,6 +271,63 @@ public class ForwardTrade implements TradeReactor {
                     }})
                 ;
         return outbound;
+    }
+
+    private Func1<HttpObject, HttpObject> removeKeepAliveIfNeeded(
+            final AtomicReference<HttpResponse> refResp,
+            final AtomicBoolean isKeepAliveFromClient) {
+        return new Func1<HttpObject, HttpObject>() {
+                @Override
+                public HttpObject call(final HttpObject httpobj) {
+                    if (httpobj instanceof HttpResponse) {
+                        final HttpResponse resp = (HttpResponse)httpobj;
+                        refResp.set(resp);
+                        if (!isKeepAliveFromClient.get()) {
+                            if (HttpUtil.isKeepAlive(resp)) {
+                                // if NOT keep alive from client, remove keepalive header
+                                final DefaultHttpResponse newresp = new DefaultHttpResponse(
+                                        resp.protocolVersion(), 
+                                        resp.status());
+                                newresp.headers().add(resp.headers());
+                                newresp.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+                                LOG.info("FORCE-KeepAlive: set Connection header with Close for sendback resp:\n[{}]", resp);
+                                return newresp;
+                            }
+                        }
+                    }
+                    return httpobj;
+                }};
+    }
+
+    private Observable<HttpObject> buildRequest(
+            final Observable<? extends HttpObject> inbound,
+            final AtomicReference<HttpRequest> refReq,
+            final AtomicBoolean isKeepAliveFromClient) {
+        return inbound.flatMap(RxNettys.splitFullHttpMessage())
+            .map(new Func1<HttpObject, HttpObject>() {
+                @Override
+                public HttpObject call(final HttpObject httpobj) {
+                    if (httpobj instanceof HttpRequest) {
+                        final HttpRequest req = (HttpRequest)httpobj;
+                        refReq.set(req);
+                        //  only check first time, bcs inbound could be process many times
+                        if (isKeepAliveFromClient.get()) {
+                            isKeepAliveFromClient.set(HttpUtil.isKeepAlive(req));
+                            if (!isKeepAliveFromClient.get()) {
+                                // if NOT keep alive, force it
+                                final DefaultHttpRequest newreq = new DefaultHttpRequest(
+                                        req.protocolVersion(), 
+                                        req.method(),
+                                        req.uri());
+                                newreq.headers().add(req.headers());
+                                newreq.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                                LOG.info("FORCE-KeepAlive: add Connection header with KeepAlive for incoming req:\n[{}]", req);
+                                return newreq;
+                            }
+                        }
+                    }
+                    return httpobj;
+                }});
     }
     
     private MarkableTargetImpl selectTarget() {
