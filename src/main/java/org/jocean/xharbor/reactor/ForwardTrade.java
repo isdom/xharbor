@@ -252,6 +252,7 @@ public class ForwardTrade implements TradeReactor {
                 .feature(org.jocean.http.util.HttpUtil.buildHoldMessageFeature(holderFactory))
                 .feature(new ReleaseSendedMessage())
                 .feature(channelHolder)
+                .feature(Feature.FLUSH_PER_WRITE)
                 .build()
                 .flatMap(RxNettys.splitFullHttpMessage())
                 .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))
