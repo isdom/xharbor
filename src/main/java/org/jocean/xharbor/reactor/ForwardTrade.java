@@ -197,9 +197,6 @@ public class ForwardTrade implements TradeReactor {
             final Observable<? extends HttpObject> inbound, 
             final Target target,
             final StopWatch stopWatch) {
-        final AtomicReference<HttpRequest> refReq = new AtomicReference<>();
-        final AtomicReference<HttpResponse> refResp = new AtomicReference<>();
-        
         final class ChannelHolder extends Feature.AbstractFeature0 
             implements ChannelAware {
             @Override
@@ -241,12 +238,12 @@ public class ForwardTrade implements TradeReactor {
         }
             
         final AtomicBoolean isKeepAliveFromClient = new AtomicBoolean(true);
+        final AtomicReference<HttpRequest> refReq = new AtomicReference<>();
+        final AtomicReference<HttpResponse> refResp = new AtomicReference<>();
         
         final Observable<? extends HttpObject> outbound = 
             this._httpclient.interaction()
-                .remoteAddress(new InetSocketAddress(
-                    target.serviceUri().getHost(), 
-                    target.serviceUri().getPort()))
+                .remoteAddress(buildAddress(target))
                 .request(buildRequest(inbound, refReq, isKeepAliveFromClient))
                 .feature(target.features().call())
                 .feature(org.jocean.http.util.HttpUtil.buildHoldMessageFeature(holderFactory))
@@ -272,6 +269,12 @@ public class ForwardTrade implements TradeReactor {
                     }})
                 ;
         return outbound;
+    }
+
+    private InetSocketAddress buildAddress(final Target target) {
+        return new InetSocketAddress(
+            target.serviceUri().getHost(), 
+            target.serviceUri().getPort());
     }
 
     private Func1<HttpObject, HttpObject> removeKeepAliveIfNeeded(
