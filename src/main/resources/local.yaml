@@ -2,6 +2,7 @@ name: units
 parameters: |
   __spring.xml=xharbor/xharbor.xml,http/httpclient.xml,http/httpserver.xml
 children:
+  - name: nettystats
   - name: redisclient
     parameters: |
       redis.server.hostname=localhost
