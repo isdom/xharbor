@@ -1,7 +1,7 @@
 xharbor
 ============
 
-    http gateway (switch)
+    API gateway (switch)
 
 TODO:
 
