@@ -1,7 +1,7 @@
 xharbor
 ============
 
-    http gateway (switch)
+    API gateway (switch)
 
 TODO:
 
@@ -24,9 +24,9 @@ TODO:
   7、~~增加 JMX ConnectServer using jmxmp protocol~~
   
   // TODO
-  8、Routing 计算是否可以异步化？可行，改进Router的接口定义，允许较为耗时的 routing 动作 异步化进行，在RelayFlow中增加"ROUTING"状态, 
-    标识 异步化计算路由的阶段。
-  
+  8、~~Routing 计算是否可以异步化？可行，改进Router的接口定义，允许较为耗时的 routing 动作 异步化进行~~，在RelayFlow中增加"ROUTING"状态, 
+    标识 异步化计算路由的阶段。 2017-01 已实现，相关代码参见 : org.jocean.xharbor.api.TradeReactor 接口 及其 实现类。
+    
   9、~~在有限次转发失败后，暂时屏蔽该达到转发失败次数上限的特定转发路由~~， 目前功能是 单次转发失败（连接失败）后，即标识为down机。
   
   10、增加 URI 的 黑、白名单，均在 netty 接收线程池中进行，凡是匹配 黑名单正则表达式的，全部拒绝，或者 只有匹配白名单正则表达式的才予以处理。
