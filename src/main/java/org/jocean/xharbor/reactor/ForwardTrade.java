@@ -14,6 +14,7 @@ import org.jocean.http.TransportException;
 import org.jocean.http.client.HttpClient;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.HttpMessageHolder;
+import org.jocean.http.util.HttpUtil.TrafficCounterFeature;
 import org.jocean.http.util.Nettys.ChannelAware;
 import org.jocean.http.util.RxNettys;
 import org.jocean.http.util.SendedMessageAware;
@@ -240,6 +241,8 @@ public class ForwardTrade implements TradeReactor {
         final AtomicBoolean isKeepAliveFromClient = new AtomicBoolean(true);
         final AtomicReference<HttpRequest> refReq = new AtomicReference<>();
         final AtomicReference<HttpResponse> refResp = new AtomicReference<>();
+        final TrafficCounterFeature trafficCounter = 
+                org.jocean.http.util.HttpUtil.buildTrafficCounterFeature();
         
         final Observable<? extends HttpObject> outbound = 
             this._httpclient.interaction()
@@ -250,6 +253,7 @@ public class ForwardTrade implements TradeReactor {
                 .feature(new ReleaseSendedMessage())
                 .feature(channelHolder)
                 .feature(Feature.FLUSH_PER_WRITE)
+                .feature(trafficCounter)
                 .build()
                 .flatMap(RxNettys.splitFullHttpMessage())
                 .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))
@@ -259,8 +263,12 @@ public class ForwardTrade implements TradeReactor {
                         final long ttl = stopWatch.stopAndRestart();
                         final RelayMemo memo = _memoBuilder.build(target, buildRoutingInfo(refReq.get()));
                         memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
-                        LOG.info("FORWARD_SUCCESS\ncost:[{}]s, forward_to:[{}]\ninbound:{}\noutbound:{}\nREQ\n[{}]\nsendback\nRESP\n[{}]",
+                        LOG.info("FORWARD_SUCCESS"
+                                + "\ncost:[{}]s,upload:[{}]bytes,download:[{}]bytes,forward_to:[{}]"
+                                + "\ninbound:{}\noutbound:{}\nREQ\n[{}]\nsendback\nRESP\n[{}]",
                                 ttl / (float)1000.0, 
+                                trafficCounter.uploadBytes(),
+                                trafficCounter.downloadBytes(),
                                 target.serviceUri(), 
                                 trade.transport(),
                                 channelHolder._channel,
