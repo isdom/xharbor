@@ -267,8 +267,8 @@ public class ForwardTrade implements TradeReactor {
                                 + "\ncost:[{}]s,upload:[{}]bytes,download:[{}]bytes,forward_to:[{}]"
                                 + "\ninbound:{}\noutbound:{}\nREQ\n[{}]\nsendback\nRESP\n[{}]",
                                 ttl / (float)1000.0, 
-                                trafficCounter.uploadBytes(),
-                                trafficCounter.downloadBytes(),
+                                trafficCounter.outboundBytes(),
+                                trafficCounter.inboundBytes(),
                                 target.serviceUri(), 
                                 trade.transport(),
                                 channelHolder._channel,
