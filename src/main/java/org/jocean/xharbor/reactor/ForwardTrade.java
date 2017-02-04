@@ -264,12 +264,17 @@ public class ForwardTrade implements TradeReactor {
                         final RelayMemo memo = _memoBuilder.build(target, buildRoutingInfo(refReq.get()));
                         memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
                         LOG.info("FORWARD_SUCCESS"
-                                + "\ncost:[{}]s,upload:[{}]bytes,download:[{}]bytes,forward_to:[{}]"
-                                + "\ninbound:{}\noutbound:{}\nREQ\n[{}]\nsendback\nRESP\n[{}]",
+                                + "\ncost:[{}]s,forward_to:[{}]"
+                                + "\nFROM:inbound:[{}]bytes,outbound:[{}]bytes"
+                                + "\nTO:upload:[{}]bytes,download:[{}]bytes"
+                                + "\nin-channel:{}\nout-channel:{}"
+                                + "\nREQ\n[{}]\nsendback\nRESP\n[{}]",
                                 ttl / (float)1000.0, 
+                                target.serviceUri(), 
+                                trade.trafficCounter().inboundBytes(),
+                                trade.trafficCounter().outboundBytes(),
                                 trafficCounter.outboundBytes(),
                                 trafficCounter.inboundBytes(),
-                                target.serviceUri(), 
                                 trade.transport(),
                                 channelHolder._channel,
                                 refReq.get(), 
