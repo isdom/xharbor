@@ -51,7 +51,6 @@ import io.netty.util.Timer;
 import io.netty.util.TimerTask;
 import rx.Observable;
 import rx.Single;
-import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.functions.Func0;
 import rx.functions.Func1;
@@ -256,31 +255,30 @@ public class ForwardTrade implements TradeReactor {
                 .feature(trafficCounter)
                 .build()
                 .flatMap(RxNettys.splitFullHttpMessage())
-                .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))
-                .doOnCompleted(new Action0() {
-                    @Override
-                    public void call() {
-                        final long ttl = stopWatch.stopAndRestart();
-                        final RelayMemo memo = _memoBuilder.build(target, buildRoutingInfo(refReq.get()));
-                        memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
-                        LOG.info("FORWARD_SUCCESS"
-                                + "\ncost:[{}]s,forward_to:[{}]"
-                                + "\nFROM:inbound:[{}]bytes,outbound:[{}]bytes"
-                                + "\nTO:upload:[{}]bytes,download:[{}]bytes"
-                                + "\nin-channel:{}\nout-channel:{}"
-                                + "\nREQ\n[{}]\nsendback\nRESP\n[{}]",
-                                ttl / (float)1000.0, 
-                                target.serviceUri(), 
-                                trade.trafficCounter().inboundBytes(),
-                                trade.trafficCounter().outboundBytes(),
-                                trafficCounter.outboundBytes(),
-                                trafficCounter.inboundBytes(),
-                                trade.transport(),
-                                channelHolder._channel,
-                                refReq.get(), 
-                                refResp.get());
-                    }})
-                ;
+                .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient));
+        trade.addCloseHook(new Action1<HttpTrade>() {
+            @Override
+            public void call(HttpTrade t) {
+                final long ttl = stopWatch.stopAndRestart();
+                final RelayMemo memo = _memoBuilder.build(target, buildRoutingInfo(refReq.get()));
+                memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
+                LOG.info("FORWARD_SUCCESS"
+                        + "\ncost:[{}]s,forward_to:[{}]"
+                        + "\nFROM:inbound:[{}]bytes,outbound:[{}]bytes"
+                        + "\nTO:upload:[{}]bytes,download:[{}]bytes"
+                        + "\nin-channel:{}\nout-channel:{}"
+                        + "\nREQ\n[{}]\nsendback\nRESP\n[{}]",
+                        ttl / (float)1000.0, 
+                        target.serviceUri(), 
+                        trade.trafficCounter().inboundBytes(),
+                        trade.trafficCounter().outboundBytes(),
+                        trafficCounter.outboundBytes(),
+                        trafficCounter.inboundBytes(),
+                        trade.transport(),
+                        channelHolder._channel,
+                        refReq.get(), 
+                        refResp.get());
+            }});
         return outbound;
     }
 
