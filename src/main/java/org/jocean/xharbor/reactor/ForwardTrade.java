@@ -222,6 +222,8 @@ public class ForwardTrade implements TradeReactor {
                 sendedMessage.subscribe(new Action1<Object>() {
                     @Override
                     public void call(final Object msg) {
+                        LOG.info("setInboundAutoRead ON for msg: {} sended", msg);
+                        trade.setInboundAutoRead(true);
                         if (msg instanceof HttpContent) {
                             if (trade.inboundHolder().isFragmented()
                                 || trade.retainedInboundMemory() > MAX_RETAINED_SIZE) {
@@ -246,7 +248,7 @@ public class ForwardTrade implements TradeReactor {
         final Observable<? extends HttpObject> outbound = 
             this._httpclient.interaction()
                 .remoteAddress(buildAddress(target))
-                .request(buildRequest(inbound, refReq, isKeepAliveFromClient))
+                .request(buildRequest(trade, inbound, refReq, isKeepAliveFromClient))
                 .feature(target.features().call())
                 .feature(org.jocean.http.util.HttpUtil.buildHoldMessageFeature(holderFactory))
                 .feature(new ReleaseSendedMessage())
@@ -315,6 +317,7 @@ public class ForwardTrade implements TradeReactor {
     }
 
     private Observable<HttpObject> buildRequest(
+            final HttpTrade trade, 
             final Observable<? extends HttpObject> inbound,
             final AtomicReference<HttpRequest> refReq,
             final AtomicBoolean isKeepAliveFromClient) {
@@ -342,7 +345,14 @@ public class ForwardTrade implements TradeReactor {
                         }
                     }
                     return httpobj;
-                }});
+                }})
+            .doOnNext(new Action1<HttpObject>() {
+                @Override
+                public void call(final HttpObject httpobj) {
+                    LOG.info("setInboundAutoRead OFF for msg: {} recvd", httpobj);
+                    trade.setInboundAutoRead(false);
+                }})
+            ;
     }
     
     private MarkableTargetImpl selectTarget() {
