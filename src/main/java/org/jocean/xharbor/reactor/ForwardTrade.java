@@ -222,7 +222,7 @@ public class ForwardTrade implements TradeReactor {
                 sendedMessage.subscribe(new Action1<Object>() {
                     @Override
                     public void call(final Object msg) {
-                        LOG.info("setInboundAutoRead ON for msg: {} sended", msg);
+                        LOG.info("trade {} setInboundAutoRead ON for msg: {} sended", trade, msg);
                         trade.setInboundAutoRead(true);
                         if (msg instanceof HttpContent) {
                             if (trade.inboundHolder().isFragmented()
@@ -349,7 +349,7 @@ public class ForwardTrade implements TradeReactor {
             .doOnNext(new Action1<HttpObject>() {
                 @Override
                 public void call(final HttpObject httpobj) {
-                    LOG.info("setInboundAutoRead OFF for msg: {} recvd", httpobj);
+                    LOG.info("trade {} setInboundAutoRead OFF for msg: {} recvd", trade, httpobj);
                     trade.setInboundAutoRead(false);
                 }})
             ;
