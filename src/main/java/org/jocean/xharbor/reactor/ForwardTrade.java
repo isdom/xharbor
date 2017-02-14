@@ -430,7 +430,8 @@ public class ForwardTrade implements TradeReactor {
             final long timeoutToRead = (long) (((float)trade.trafficCounter().inboundBytes() / this._inboundMaxBytesPerSecond) * 1000L
                     - stopWatch.pauseAndContinue());
             if (timeoutToRead > 0) {
-                LOG.info("current inbound speed: {} Bytes/Second more than MAX ISC: {} Bytes/Second,, so trade {} setInboundAutoRead ON will be delay {} MILLISECONDS for ISC", 
+                LOG.info("inbound bytes:{} bytes/cost time:{} MILLISECONDS\ncurrent inbound speed: {} Bytes/Second more than MAX ISC: {} Bytes/Second, so trade {} setInboundAutoRead ON will be delay {} MILLISECONDS for ISC", 
+                        trade.trafficCounter().inboundBytes(), stopWatch.pauseAndContinue(),
                         currentSpeed, this._inboundMaxBytesPerSecond, trade, timeoutToRead);
                 this._timer.newTimeout(new TimerTask() {
                     @Override
