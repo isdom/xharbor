@@ -42,6 +42,10 @@ public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardDat
             }};
     }
     
+    public void setInboundMaxBytesPerSecond(final long maxBytesPerSecond) {
+        this._inboundMaxBytesPerSecond = maxBytesPerSecond;
+    }
+    
     public void setOrdinal(final int ordinal) {
         this._ordinal = ordinal;
     }
@@ -75,7 +79,12 @@ public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardDat
             for (ForwardData f : data) {
                 ForwardTrade reactor = matcher2reactor.get(f.matcher());
                 if (null == reactor) {
-                    reactor = new ForwardTrade(f.matcher(), this._httpclient, this._memoBuilder, this._serviceMemo, this._timer);
+                    reactor = new ForwardTrade(f.matcher(), 
+                            this._httpclient, 
+                            this._memoBuilder, 
+                            this._serviceMemo, 
+                            this._timer,
+                            this._inboundMaxBytesPerSecond);
                     matcher2reactor.put(f.matcher(), reactor);
                 }
                 reactor.addTarget(f.target());
@@ -112,6 +121,8 @@ public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardDat
     
     private final AtomicStampedReference<ForwardTrade[]> _reactorsRef = 
             new AtomicStampedReference<>(null, 0);
+    
+    private long _inboundMaxBytesPerSecond = 1024 * 1024;
     
     @Inject
     private HttpClient _httpclient;

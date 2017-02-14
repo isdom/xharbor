@@ -75,6 +75,7 @@ children:
       - name: rules.100
         parameters: |
           priority=100
+          in.maxBPS = 1024
         children:
           - name: forward.jmxhtml.self
             parameters: |

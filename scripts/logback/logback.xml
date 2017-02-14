@@ -74,7 +74,8 @@
  -->
 <!--     <logger name="org.jocean" level="TRACE"/>
  -->
-    <logger name="io.netty" level="DEBUG"/>
+    <!-- logger name="io.netty" level="DEBUG"/ -->
+    <logger name="org.jocean.http.util" level="DEBUG"/>
     <logger name="org.apache.zookeeper" level="WARN"/>
     <logger name="org.jocean.xharbor" level="DEBUG"/>
     <logger name="org.springframework" level="INFO"/>
@@ -92,7 +93,7 @@
         <appender-ref ref="file"/>
     </appender>
 
-    <root level="DEBUG">
+    <root level="INFO">
         <appender-ref ref="stdout"/>
         <appender-ref ref="ASYNC"/>
         <appender-ref ref="errorFile"/>
