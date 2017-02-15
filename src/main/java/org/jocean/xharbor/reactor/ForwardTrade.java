@@ -46,6 +46,7 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.QueryStringDecoder;
+import io.netty.util.AttributeKey;
 import io.netty.util.Timeout;
 import io.netty.util.Timer;
 import io.netty.util.TimerTask;
@@ -350,7 +351,7 @@ public class ForwardTrade implements TradeReactor {
             .doOnNext(new Action1<HttpObject>() {
                 @Override
                 public void call(final HttpObject httpobj) {
-                    LOG.info("trade {} setInboundAutoRead OFF for msg: {} recvd", trade, httpobj);
+                    LOG.info("trade {} setInboundAutoRead OFF for recv msg: {}", trade, httpobj);
                     trade.setInboundAutoRead(false);
                 }})
             ;
@@ -421,24 +422,39 @@ public class ForwardTrade implements TradeReactor {
     private boolean isCommunicationFailure(final Throwable error) {
         return error instanceof ConnectException;
     }
+    
+    private final static AttributeKey<TimerTask> DELAY_AUTOREAD_ON = AttributeKey.valueOf("DELAY_AUTOREAD_ON");
 
     private void ctrlInboundSpeed(final HttpTrade trade, final StopWatch stopWatch) {
         final long currentSpeed = (long) (trade.trafficCounter().inboundBytes() 
                 / (stopWatch.pauseAndContinue() / 1000.0F));
         if (currentSpeed > this._inboundMaxBytesPerSecond) {
-            // calculate next read time to wait 
-            final long timeoutToRead = (long) (((float)trade.trafficCounter().inboundBytes() / this._inboundMaxBytesPerSecond) * 1000L
-                    - stopWatch.pauseAndContinue());
+            // calculate next read time to wait, and max time to delay is 500ms
+            final long timeoutToRead = Math.min(
+                    (long) (((float)trade.trafficCounter().inboundBytes() / this._inboundMaxBytesPerSecond) * 1000L
+                    - stopWatch.pauseAndContinue())
+                    , 500L);
             if (timeoutToRead > 0) {
-                LOG.info("inbound bytes:{} bytes/cost time:{} MILLISECONDS\ncurrent inbound speed: {} Bytes/Second more than MAX ISC: {} Bytes/Second, so trade {} setInboundAutoRead ON will be delay {} MILLISECONDS for ISC", 
-                        trade.trafficCounter().inboundBytes(), stopWatch.pauseAndContinue(),
-                        currentSpeed, this._inboundMaxBytesPerSecond, trade, timeoutToRead);
-                this._timer.newTimeout(new TimerTask() {
+                final TimerTask delayAutoReadONTask = new TimerTask() {
                     @Override
                     public void run(final Timeout timeout) throws Exception {
-                        LOG.info("trade {} setInboundAutoRead ON for ISC wait {} MILLISECONDS", trade, timeoutToRead);
+                        LOG.info("trade {} setInboundAutoRead ON for ISC wait {} MILLISECONDS", 
+                                trade, timeoutToRead);
                         trade.setInboundAutoRead(true);
-                    }}, timeoutToRead, TimeUnit.MILLISECONDS);
+                        //  check this task own the attr, and clear the attr
+                        trade.attr(DELAY_AUTOREAD_ON).compareAndSet(this, null);
+                    }};
+                final TimerTask current = trade.attr(DELAY_AUTOREAD_ON).setIfAbsent(delayAutoReadONTask);
+                if (null == current) {
+                    //  this is the first delay setAutoRead on task, set success
+                    LOG.info("inbound bytes:{} bytes/cost time:{} MILLISECONDS\ncurrent inbound speed: {} Bytes/Second more than MAX ISC: {} Bytes/Second, so trade {} setInboundAutoRead ON will be delay {} MILLISECONDS for ISC", 
+                            trade.trafficCounter().inboundBytes(), stopWatch.pauseAndContinue(),
+                            currentSpeed, this._inboundMaxBytesPerSecond, trade, timeoutToRead);
+                    this._timer.newTimeout(delayAutoReadONTask, timeoutToRead, TimeUnit.MILLISECONDS);
+                } else {
+                    LOG.info("trade {} has pending setInboundAutoRead ON TASK: {}, ignore Redundant ON TASK", 
+                        trade, current);
+                }
                 return;
             }
         }
