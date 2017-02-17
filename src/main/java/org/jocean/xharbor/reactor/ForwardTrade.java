@@ -225,7 +225,7 @@ public class ForwardTrade implements TradeReactor {
                 sendedMessage.subscribe(new Action1<Object>() {
                     @Override
                     public void call(final Object msg) {
-                        ctrlInboundSpeed(trade, stopWatch);
+//                        ctrlInboundSpeed(trade, stopWatch);
                         if (msg instanceof HttpContent) {
                             if (trade.inboundHolder().isFragmented()
                                 || trade.retainedInboundMemory() > MAX_RETAINED_SIZE) {
@@ -348,12 +348,12 @@ public class ForwardTrade implements TradeReactor {
                     }
                     return httpobj;
                 }})
-            .doOnNext(new Action1<HttpObject>() {
-                @Override
-                public void call(final HttpObject httpobj) {
-                    LOG.info("trade {} setInboundAutoRead OFF for recv msg: {}", trade, httpobj);
-                    trade.setInboundAutoRead(false);
-                }})
+//            .doOnNext(new Action1<HttpObject>() {
+//                @Override
+//                public void call(final HttpObject httpobj) {
+//                    LOG.info("trade {} setInboundAutoRead OFF for recv msg: {}", trade, httpobj);
+//                    trade.setInboundAutoRead(false);
+//                }})
             ;
     }
     

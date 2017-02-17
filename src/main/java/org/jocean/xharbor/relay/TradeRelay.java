@@ -6,8 +6,11 @@ package org.jocean.xharbor.relay;
 import java.net.ConnectException;
 import java.nio.channels.ClosedChannelException;
 
+import javax.inject.Inject;
+
 import org.jocean.http.TransportException;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
+import org.jocean.http.server.InboundSpeedController;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
@@ -53,6 +56,9 @@ public class TradeRelay extends Subscriber<HttpTrade> {
 
     @Override
     public void onNext(final HttpTrade trade) {
+        if ( null != _inboundSpeedController) {
+            _inboundSpeedController.applyTo(trade);
+        }
         final StopWatch watch4Result = new StopWatch();
         final ReactContext ctx = new ReactContext() {
             @Override
@@ -164,4 +170,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
     private final TradeReactor _tradeReactor;
     private int _maxRetryTimes = 3;
     private int _retryIntervalBase = 2;
+    
+    @Inject
+    private InboundSpeedController _inboundSpeedController = null;
 }
