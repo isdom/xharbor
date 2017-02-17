@@ -46,7 +46,6 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.QueryStringDecoder;
-import io.netty.util.AttributeKey;
 import io.netty.util.Timeout;
 import io.netty.util.Timer;
 import io.netty.util.TimerTask;
@@ -68,15 +67,13 @@ public class ForwardTrade implements TradeReactor {
             final HttpClient httpclient,
             final RelayMemo.Builder memoBuilder, 
             final ServiceMemo serviceMemo, 
-            final Timer timer,
-            final long inboundMaxBytesPerSecond
+            final Timer timer
             ) {
         this._matcher = matcher;
         this._httpclient = httpclient;
         this._memoBuilder = memoBuilder;
         this._serviceMemo = serviceMemo;
         this._timer = timer;
-        this._inboundMaxBytesPerSecond = inboundMaxBytesPerSecond;
     }
     
     public void addTarget(final Target target) {
@@ -225,7 +222,6 @@ public class ForwardTrade implements TradeReactor {
                 sendedMessage.subscribe(new Action1<Object>() {
                     @Override
                     public void call(final Object msg) {
-//                        ctrlInboundSpeed(trade, stopWatch);
                         if (msg instanceof HttpContent) {
                             if (trade.inboundHolder().isFragmented()
                                 || trade.retainedInboundMemory() > MAX_RETAINED_SIZE) {
@@ -348,12 +344,6 @@ public class ForwardTrade implements TradeReactor {
                     }
                     return httpobj;
                 }})
-//            .doOnNext(new Action1<HttpObject>() {
-//                @Override
-//                public void call(final HttpObject httpobj) {
-//                    LOG.info("trade {} setInboundAutoRead OFF for recv msg: {}", trade, httpobj);
-//                    trade.setInboundAutoRead(false);
-//                }})
             ;
     }
     
@@ -423,46 +413,6 @@ public class ForwardTrade implements TradeReactor {
         return error instanceof ConnectException;
     }
     
-    private final static AttributeKey<TimerTask> DELAY_AUTOREAD_ON = AttributeKey.valueOf("DELAY_AUTOREAD_ON");
-
-    private void ctrlInboundSpeed(final HttpTrade trade, final StopWatch stopWatch) {
-        final long currentSpeed = (long) (trade.trafficCounter().inboundBytes() 
-                / (stopWatch.pauseAndContinue() / 1000.0F));
-        if (currentSpeed > this._inboundMaxBytesPerSecond) {
-            // calculate next read time to wait, and max time to delay is 500ms
-            final long timeoutToRead = Math.min(
-                    (long) (((float)trade.trafficCounter().inboundBytes() / this._inboundMaxBytesPerSecond) * 1000L
-                    - stopWatch.pauseAndContinue())
-                    , 500L);
-            if (timeoutToRead > 0) {
-                final TimerTask delayAutoReadONTask = new TimerTask() {
-                    @Override
-                    public void run(final Timeout timeout) throws Exception {
-                        LOG.info("trade {} setInboundAutoRead ON for ISC wait {} MILLISECONDS", 
-                                trade, timeoutToRead);
-                        trade.setInboundAutoRead(true);
-                        //  check this task own the attr, and clear the attr
-                        trade.attr(DELAY_AUTOREAD_ON).compareAndSet(this, null);
-                    }};
-                final TimerTask current = trade.attr(DELAY_AUTOREAD_ON).setIfAbsent(delayAutoReadONTask);
-                if (null == current) {
-                    //  this is the first delay setAutoRead on task, set success
-                    LOG.info("inbound bytes:{} bytes/cost time:{} MILLISECONDS\ncurrent inbound speed: {} Bytes/Second more than MAX ISC: {} Bytes/Second, so trade {} setInboundAutoRead ON will be delay {} MILLISECONDS for ISC", 
-                            trade.trafficCounter().inboundBytes(), stopWatch.pauseAndContinue(),
-                            currentSpeed, this._inboundMaxBytesPerSecond, trade, timeoutToRead);
-                    this._timer.newTimeout(delayAutoReadONTask, timeoutToRead, TimeUnit.MILLISECONDS);
-                } else {
-                    LOG.info("trade {} has pending setInboundAutoRead ON TASK: {}, ignore Redundant ON TASK", 
-                        trade, current);
-                }
-                return;
-            }
-        }
-        LOG.info("current inbound speed: {} Bytes/Second less than MAX ISC: {} Bytes/Second, so trade {} setInboundAutoRead ON right now", 
-                currentSpeed, this._inboundMaxBytesPerSecond, trade);
-        trade.setInboundAutoRead(true);
-    }
-
     private class MarkableTargetImpl implements Target {
         
         private static final int MAX_EFFECTIVEWEIGHT = 1000;
@@ -500,7 +450,6 @@ public class ForwardTrade implements TradeReactor {
         private final AtomicBoolean _down = new AtomicBoolean(false);
     }
     
-    private final long          _inboundMaxBytesPerSecond;
     private final MatchRule     _matcher;
     private final List<MarkableTargetImpl>  _targets = 
             Lists.newCopyOnWriteArrayList();

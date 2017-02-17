@@ -50,7 +50,6 @@
     
     <bean id="forwards" class="org.jocean.xharbor.reactor.CompositeForward">
         <property name="ordinal" value="70"/>
-        <property name="inboundMaxBytesPerSecond" value="${in.maxBPS:1048576}"/>
     </bean>
     
     <bean class="org.jocean.idiom.rx.RxActions"
