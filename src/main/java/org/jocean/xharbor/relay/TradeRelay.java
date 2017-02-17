@@ -6,12 +6,12 @@ package org.jocean.xharbor.relay;
 import java.net.ConnectException;
 import java.nio.channels.ClosedChannelException;
 
-import javax.inject.Inject;
-
 import org.jocean.http.TransportException;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.server.InboundSpeedController;
 import org.jocean.http.util.RxNettys;
+import org.jocean.idiom.BeanHolder;
+import org.jocean.idiom.BeanHolderAware;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxObservables;
@@ -34,13 +34,18 @@ import rx.functions.Func1;
  * @author isdom
  *
  */
-public class TradeRelay extends Subscriber<HttpTrade> {
+public class TradeRelay extends Subscriber<HttpTrade> implements BeanHolderAware {
 
     private static final Logger LOG =
             LoggerFactory.getLogger(TradeRelay.class);
 
     public TradeRelay(final TradeReactor reactor) {
         this._tradeReactor = reactor;
+    }
+    
+    @Override
+    public void setBeanHolder(final BeanHolder beanHolder) {
+        this._beanHolder = beanHolder;
     }
     
     @Override
@@ -56,8 +61,12 @@ public class TradeRelay extends Subscriber<HttpTrade> {
 
     @Override
     public void onNext(final HttpTrade trade) {
-        if ( null != _inboundSpeedController) {
-            _inboundSpeedController.applyTo(trade);
+        if ( null != this._beanHolder) {
+            final InboundSpeedController isc = 
+                    _beanHolder.getBean(InboundSpeedController.class);
+            if (null != isc) {
+                isc.applyTo(trade);
+            }
         }
         final StopWatch watch4Result = new StopWatch();
         final ReactContext ctx = new ReactContext() {
@@ -170,7 +179,5 @@ public class TradeRelay extends Subscriber<HttpTrade> {
     private final TradeReactor _tradeReactor;
     private int _maxRetryTimes = 3;
     private int _retryIntervalBase = 2;
-    
-    @Inject
-    private InboundSpeedController _inboundSpeedController = null;
+    private BeanHolder _beanHolder;
 }
