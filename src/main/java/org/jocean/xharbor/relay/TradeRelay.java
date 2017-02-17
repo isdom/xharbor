@@ -8,7 +8,7 @@ import java.nio.channels.ClosedChannelException;
 
 import org.jocean.http.TransportException;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
-import org.jocean.http.server.InboundSpeedController;
+import org.jocean.http.util.InboundSpeedController;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.BeanHolder;
 import org.jocean.idiom.BeanHolderAware;
@@ -65,7 +65,7 @@ public class TradeRelay extends Subscriber<HttpTrade> implements BeanHolderAware
             final InboundSpeedController isc = 
                     _beanHolder.getBean(InboundSpeedController.class);
             if (null != isc) {
-                isc.applyTo(trade);
+                isc.applyTo(trade.inbound());
             }
         }
         final StopWatch watch4Result = new StopWatch();
@@ -82,7 +82,7 @@ public class TradeRelay extends Subscriber<HttpTrade> implements BeanHolderAware
         this._tradeReactor.react(ctx, new InOut() {
             @Override
             public Observable<? extends HttpObject> inbound() {
-                return trade.inboundRequest();
+                return trade.inbound().message();
             }
             @Override
             public Observable<? extends HttpObject> outbound() {
@@ -95,7 +95,7 @@ public class TradeRelay extends Subscriber<HttpTrade> implements BeanHolderAware
                 if (null == io || null == io.outbound()) {
                     LOG.warn("NO_INOUT for trade({}), react io detail: {}.", trade, io);
                 }
-                trade.outboundResponse(buildResponse(trade.inboundRequest(), io)
+                trade.outboundResponse(buildResponse(trade.inbound().message(), io)
                 );
             }}, new Action1<Throwable>() {
             @Override
@@ -152,7 +152,7 @@ public class TradeRelay extends Subscriber<HttpTrade> implements BeanHolderAware
         return new Func1<Throwable, Boolean>() {
             @Override
             public Boolean call(final Throwable e) {
-                if (trade.inboundHolder().isFragmented()) {
+                if (trade.inbound().messageHolder().isFragmented()) {
                     LOG.warn("NOT_RETRY for trade({}), bcs of trade's inbound has fragmented.", 
                             trade);
                     return false;

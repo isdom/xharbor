@@ -223,13 +223,13 @@ public class ForwardTrade implements TradeReactor {
                     @Override
                     public void call(final Object msg) {
                         if (msg instanceof HttpContent) {
-                            if (trade.inboundHolder().isFragmented()
-                                || trade.retainedInboundMemory() > MAX_RETAINED_SIZE) {
+                            if (trade.inbound().messageHolder().isFragmented()
+                                || trade.inbound().holdingMemorySize() > MAX_RETAINED_SIZE) {
                                 LOG.info("trade({})'s inboundHolder BEGIN_RELEASE msg({}), now it's retained size: {}",
-                                        trade, msg, trade.retainedInboundMemory());
-                                trade.inboundHolder().releaseHttpContent((HttpContent)msg);
+                                        trade, msg, trade.inbound().holdingMemorySize());
+                                trade.inbound().messageHolder().releaseHttpContent((HttpContent)msg);
                                 LOG.info("trade({})'s inboundHolder ENDOF_RELEASE msg({}), now it's retained size: {}",
-                                        trade, msg, trade.retainedInboundMemory());
+                                        trade, msg, trade.inbound().holdingMemorySize());
                             }
                         }
                     }},
