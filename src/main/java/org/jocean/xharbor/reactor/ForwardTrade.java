@@ -13,14 +13,12 @@ import org.jocean.http.Feature;
 import org.jocean.http.TransportException;
 import org.jocean.http.client.HttpClient;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
-import org.jocean.http.util.HttpMessageHolder;
 import org.jocean.http.util.HttpUtil.TrafficCounterFeature;
 import org.jocean.http.util.Nettys.ChannelAware;
 import org.jocean.http.util.RxNettys;
 import org.jocean.http.util.SendedMessageAware;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
-import org.jocean.idiom.rx.RxActions;
 import org.jocean.idiom.rx.RxObservables;
 import org.jocean.idiom.rx.RxSubscribers;
 import org.jocean.xharbor.api.RelayMemo;
@@ -51,6 +49,7 @@ import io.netty.util.Timer;
 import io.netty.util.TimerTask;
 import rx.Observable;
 import rx.Single;
+import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.functions.Func0;
 import rx.functions.Func1;
@@ -206,14 +205,6 @@ public class ForwardTrade implements TradeReactor {
             private Channel _channel;
         }
         final ChannelHolder channelHolder = new ChannelHolder();
-        final Func1<Channel, HttpMessageHolder> holderFactory = new Func1<Channel, HttpMessageHolder>() {
-            @Override
-            public HttpMessageHolder call(final Channel channel) {
-                //  -1 means disable assemble piece to a big block feature
-                final HttpMessageHolder holder = new HttpMessageHolder(-1);
-                trade.addCloseHook(RxActions.<HttpTrade>toAction1(holder.release()));
-                return holder;
-            }};
             
         final class ReleaseSendedMessage extends Feature.AbstractFeature0 
             implements SendedMessageAware {
@@ -248,7 +239,6 @@ public class ForwardTrade implements TradeReactor {
                 .remoteAddress(buildAddress(target))
                 .request(buildRequest(trade, inbound, refReq, isKeepAliveFromClient))
                 .feature(target.features().call())
-                .feature(org.jocean.http.util.HttpUtil.buildHoldMessageFeature(holderFactory))
                 .feature(new ReleaseSendedMessage())
                 .feature(channelHolder)
                 .feature(Feature.FLUSH_PER_WRITE)
@@ -256,9 +246,9 @@ public class ForwardTrade implements TradeReactor {
                 .build()
                 .flatMap(RxNettys.splitFullHttpMessage())
                 .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient));
-        trade.addCloseHook(new Action1<HttpTrade>() {
+        trade.doOnTerminate(new Action0() {
             @Override
-            public void call(HttpTrade t) {
+            public void call() {
                 final long ttl = stopWatch.stopAndRestart();
                 final RelayMemo memo = _memoBuilder.build(target, buildRoutingInfo(refReq.get()));
                 memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
