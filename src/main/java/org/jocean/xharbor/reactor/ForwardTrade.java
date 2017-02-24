@@ -10,12 +10,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.http.Feature;
-import org.jocean.http.TrafficCounter;
+import org.jocean.http.InboundEndpoint;
 import org.jocean.http.TransportException;
 import org.jocean.http.client.HttpClient;
 import org.jocean.http.client.HttpClient.HttpInitiator;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
-import org.jocean.http.util.Nettys.ChannelAware;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
@@ -31,7 +30,6 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Lists;
 
-import io.netty.channel.Channel;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
@@ -195,26 +193,14 @@ public class ForwardTrade implements TradeReactor {
             final Observable<? extends HttpObject> inbound, 
             final Target target,
             final StopWatch stopWatch) {
-        final class ChannelHolder extends Feature.AbstractFeature0 
-            implements ChannelAware {
-            @Override
-            public void setChannel(final Channel channel) {
-                _channel = channel;
-            }
-            private Channel _channel;
-        }
-        final ChannelHolder channelHolder = new ChannelHolder();
             
         final AtomicBoolean isKeepAliveFromClient = new AtomicBoolean(true);
         final AtomicReference<HttpRequest> refReq = new AtomicReference<>();
         final AtomicReference<HttpResponse> refResp = new AtomicReference<>();
-        final AtomicReference<TrafficCounter> trafficCounter = new AtomicReference<>();
         
-        final Observable<? extends HttpObject> outbound = 
-            this._httpclient.initiator()
+        return this._httpclient.initiator()
                 .remoteAddress(buildAddress(target))
                 .feature(target.features().call())
-                .feature(channelHolder)
                 .build()
                 .flatMap(new Func1<HttpInitiator, Observable<? extends HttpObject> >() {
                     @Override
@@ -225,38 +211,38 @@ public class ForwardTrade implements TradeReactor {
                             public void call() {
                                 initiator.close();
                             }});
-                        trafficCounter.set(initiator.trafficCounter());
                         initiator.outbound().setFlushPerWrite(true);
-                        initiator.outbound().doOnSended(releaseSendedMessage(trade));
+                        initiator.outbound().doOnSended(unholdInboundMessage(trade.inbound()));
                         initiator.outbound().message(buildRequest(trade, inbound, refReq, isKeepAliveFromClient));
+                        
+                        trade.doOnTerminate(new Action0() {
+                            @Override
+                            public void call() {
+                                final long ttl = stopWatch.stopAndRestart();
+                                final RelayMemo memo = _memoBuilder.build(target, buildRoutingInfo(refReq.get()));
+                                memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
+                                LOG.info("FORWARD_SUCCESS"
+                                        + "\ncost:[{}]s,forward_to:[{}]"
+                                        + "\nFROM:inbound:[{}]bytes,outbound:[{}]bytes"
+                                        + "\nTO:upload:[{}]bytes,download:[{}]bytes"
+                                        + "\nin-channel:{}\nout-channel:{}"
+                                        + "\nREQ\n[{}]\nsendback\nRESP\n[{}]",
+                                        ttl / (float)1000.0, 
+                                        target.serviceUri(), 
+                                        trade.trafficCounter().inboundBytes(),
+                                        trade.trafficCounter().outboundBytes(),
+                                        initiator.trafficCounter().outboundBytes(),
+                                        initiator.trafficCounter().inboundBytes(),
+                                        trade.transport(),
+                                        initiator.transport(),
+                                        refReq.get(), 
+                                        refResp.get());
+                            }});
+                        
                         return initiator.inbound().message();
                     }})
                 .flatMap(RxNettys.splitFullHttpMessage())
                 .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient));
-        trade.doOnTerminate(new Action0() {
-            @Override
-            public void call() {
-                final long ttl = stopWatch.stopAndRestart();
-                final RelayMemo memo = _memoBuilder.build(target, buildRoutingInfo(refReq.get()));
-                memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
-                LOG.info("FORWARD_SUCCESS"
-                        + "\ncost:[{}]s,forward_to:[{}]"
-                        + "\nFROM:inbound:[{}]bytes,outbound:[{}]bytes"
-                        + "\nTO:upload:[{}]bytes,download:[{}]bytes"
-                        + "\nin-channel:{}\nout-channel:{}"
-                        + "\nREQ\n[{}]\nsendback\nRESP\n[{}]",
-                        ttl / (float)1000.0, 
-                        target.serviceUri(), 
-                        trade.trafficCounter().inboundBytes(),
-                        trade.trafficCounter().outboundBytes(),
-                        trafficCounter.get().outboundBytes(),
-                        trafficCounter.get().inboundBytes(),
-                        trade.transport(),
-                        channelHolder._channel,
-                        refReq.get(), 
-                        refResp.get());
-            }});
-        return outbound;
     }
 
     private InetSocketAddress buildAddress(final Target target) {
@@ -390,18 +376,18 @@ public class ForwardTrade implements TradeReactor {
         return error instanceof ConnectException;
     }
     
-    private Action1<Object> releaseSendedMessage(final HttpTrade trade) {
+    private Action1<Object> unholdInboundMessage(final InboundEndpoint inbound) {
         return new Action1<Object>() {
             @Override
             public void call(final Object msg) {
                 if (msg instanceof HttpContent) {
-                    if (trade.inbound().messageHolder().isFragmented()
-                        || trade.inbound().holdingMemorySize() > MAX_RETAINED_SIZE) {
-                        LOG.info("trade({})'s inboundHolder BEGIN_RELEASE msg({}), now it's retained size: {}",
-                                trade, msg, trade.inbound().holdingMemorySize());
-                        trade.inbound().messageHolder().releaseHttpContent((HttpContent)msg);
-                        LOG.info("trade({})'s inboundHolder ENDOF_RELEASE msg({}), now it's retained size: {}",
-                                trade, msg, trade.inbound().holdingMemorySize());
+                    if (inbound.messageHolder().isFragmented()
+                        || inbound.holdingMemorySize() > MAX_RETAINED_SIZE) {
+                        LOG.info("inbound({})'s inboundHolder BEGIN_RELEASE msg({}), now it's retained size: {}",
+                                inbound, msg, inbound.holdingMemorySize());
+                        inbound.messageHolder().releaseHttpContent((HttpContent)msg);
+                        LOG.info("inbound({})'s inboundHolder ENDOF_RELEASE msg({}), now it's retained size: {}",
+                                inbound, msg, inbound.holdingMemorySize());
                     }
                 }
             }};
