@@ -10,17 +10,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.http.Feature;
+import org.jocean.http.TrafficCounter;
 import org.jocean.http.TransportException;
 import org.jocean.http.client.HttpClient;
+import org.jocean.http.client.HttpClient.HttpInitiator;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
-import org.jocean.http.util.HttpUtil.TrafficCounterFeature;
 import org.jocean.http.util.Nettys.ChannelAware;
 import org.jocean.http.util.RxNettys;
-import org.jocean.http.util.SendedMessageAware;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxObservables;
-import org.jocean.idiom.rx.RxSubscribers;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.RelayMemo.RESULT;
 import org.jocean.xharbor.api.RoutingInfo;
@@ -206,44 +205,32 @@ public class ForwardTrade implements TradeReactor {
         }
         final ChannelHolder channelHolder = new ChannelHolder();
             
-        final class ReleaseSendedMessage extends Feature.AbstractFeature0 
-            implements SendedMessageAware {
-            @Override
-            public void setSendedMessage(final Observable<? extends Object> sendedMessage) {
-                sendedMessage.subscribe(new Action1<Object>() {
-                    @Override
-                    public void call(final Object msg) {
-                        if (msg instanceof HttpContent) {
-                            if (trade.inbound().messageHolder().isFragmented()
-                                || trade.inbound().holdingMemorySize() > MAX_RETAINED_SIZE) {
-                                LOG.info("trade({})'s inboundHolder BEGIN_RELEASE msg({}), now it's retained size: {}",
-                                        trade, msg, trade.inbound().holdingMemorySize());
-                                trade.inbound().messageHolder().releaseHttpContent((HttpContent)msg);
-                                LOG.info("trade({})'s inboundHolder ENDOF_RELEASE msg({}), now it's retained size: {}",
-                                        trade, msg, trade.inbound().holdingMemorySize());
-                            }
-                        }
-                    }},
-                    RxSubscribers.ignoreError());
-            }
-        }
-            
         final AtomicBoolean isKeepAliveFromClient = new AtomicBoolean(true);
         final AtomicReference<HttpRequest> refReq = new AtomicReference<>();
         final AtomicReference<HttpResponse> refResp = new AtomicReference<>();
-        final TrafficCounterFeature trafficCounter = 
-                org.jocean.http.util.HttpUtil.buildTrafficCounterFeature();
+        final AtomicReference<TrafficCounter> trafficCounter = new AtomicReference<>();
         
         final Observable<? extends HttpObject> outbound = 
-            this._httpclient.interaction()
+            this._httpclient.initiator()
                 .remoteAddress(buildAddress(target))
-                .request(buildRequest(trade, inbound, refReq, isKeepAliveFromClient))
                 .feature(target.features().call())
-                .feature(new ReleaseSendedMessage())
                 .feature(channelHolder)
-                .feature(Feature.FLUSH_PER_WRITE)
-                .feature(trafficCounter)
                 .build()
+                .flatMap(new Func1<HttpInitiator, Observable<? extends HttpObject> >() {
+                    @Override
+                    public Observable<? extends HttpObject> call(
+                            final HttpInitiator initiator) {
+                        trade.doOnTerminate(new Action0() {
+                            @Override
+                            public void call() {
+                                initiator.close();
+                            }});
+                        trafficCounter.set(initiator.trafficCounter());
+                        initiator.outbound().setFlushPerWrite(true);
+                        initiator.outbound().doOnSended(releaseSendedMessage(trade));
+                        initiator.outbound().message(buildRequest(trade, inbound, refReq, isKeepAliveFromClient));
+                        return initiator.inbound().message();
+                    }})
                 .flatMap(RxNettys.splitFullHttpMessage())
                 .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient));
         trade.doOnTerminate(new Action0() {
@@ -262,8 +249,8 @@ public class ForwardTrade implements TradeReactor {
                         target.serviceUri(), 
                         trade.trafficCounter().inboundBytes(),
                         trade.trafficCounter().outboundBytes(),
-                        trafficCounter.outboundBytes(),
-                        trafficCounter.inboundBytes(),
+                        trafficCounter.get().outboundBytes(),
+                        trafficCounter.get().inboundBytes(),
                         trade.transport(),
                         channelHolder._channel,
                         refReq.get(), 
@@ -403,6 +390,23 @@ public class ForwardTrade implements TradeReactor {
         return error instanceof ConnectException;
     }
     
+    private Action1<Object> releaseSendedMessage(final HttpTrade trade) {
+        return new Action1<Object>() {
+            @Override
+            public void call(final Object msg) {
+                if (msg instanceof HttpContent) {
+                    if (trade.inbound().messageHolder().isFragmented()
+                        || trade.inbound().holdingMemorySize() > MAX_RETAINED_SIZE) {
+                        LOG.info("trade({})'s inboundHolder BEGIN_RELEASE msg({}), now it's retained size: {}",
+                                trade, msg, trade.inbound().holdingMemorySize());
+                        trade.inbound().messageHolder().releaseHttpContent((HttpContent)msg);
+                        LOG.info("trade({})'s inboundHolder ENDOF_RELEASE msg({}), now it's retained size: {}",
+                                trade, msg, trade.inbound().holdingMemorySize());
+                    }
+                }
+            }};
+    }
+
     private class MarkableTargetImpl implements Target {
         
         private static final int MAX_EFFECTIVEWEIGHT = 1000;
