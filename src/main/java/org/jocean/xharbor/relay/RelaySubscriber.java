@@ -148,7 +148,7 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                 final RoutingInfo info = routectx.getProperty("routingInfo");
                 routectx.clear();
                 
-                _trade.outboundResponse(
+                _trade.outbound().message(
                     buildHttpResponse(dispatcher, _trade.transport(), req, this._request, info, new AtomicBoolean(true)));
             }
         }

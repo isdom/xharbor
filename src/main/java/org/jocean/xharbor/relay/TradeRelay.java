@@ -95,14 +95,14 @@ public class TradeRelay extends Subscriber<HttpTrade> implements BeanHolderAware
                 if (null == io || null == io.outbound()) {
                     LOG.warn("NO_INOUT for trade({}), react io detail: {}.", trade, io);
                 }
-                trade.outboundResponse(buildResponse(trade.inbound().message(), io)
+                trade.outbound().message(buildResponse(trade.inbound().message(), io)
                 );
             }}, new Action1<Throwable>() {
             @Override
             public void call(final Throwable error) {
                 LOG.warn("Trade {} react with error, detail:{}", 
                         trade, ExceptionUtils.exception2detail(error));
-                trade.abort();
+                trade.close();
             }});
     }
 
