@@ -40,7 +40,7 @@ public class ResponseWithHeaderonlyTestCase {
                 }})
             .toBlocking().value();
         
-        final HttpMessageHolder holder = new HttpMessageHolder(0);
+        final HttpMessageHolder holder = new HttpMessageHolder();
         io.outbound().compose(holder.assembleAndHold()).subscribe();
         
         final FullHttpResponse response = holder.httpMessageBuilder(RxNettys.BUILD_FULL_RESPONSE).call();

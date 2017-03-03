@@ -47,7 +47,7 @@ public class RewriteRequestTestCase {
                 }})
             .toBlocking().value();
         
-        final HttpMessageHolder holder = new HttpMessageHolder(0);
+        final HttpMessageHolder holder = new HttpMessageHolder();
         io.inbound().compose(holder.assembleAndHold()).subscribe();
         
         final FullHttpRequest rwreq = holder.httpMessageBuilder(RxNettys.BUILD_FULL_REQUEST).call();
@@ -100,7 +100,7 @@ public class RewriteRequestTestCase {
                 }})
             .toBlocking().value();
         
-        final HttpMessageHolder holder = new HttpMessageHolder(0);
+        final HttpMessageHolder holder = new HttpMessageHolder();
         io.inbound().compose(holder.assembleAndHold()).subscribe();
         
         final FullHttpRequest rwreq = holder.httpMessageBuilder(RxNettys.BUILD_FULL_REQUEST).call();
