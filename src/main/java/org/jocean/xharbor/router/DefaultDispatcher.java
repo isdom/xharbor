@@ -15,10 +15,10 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.jocean.http.Feature;
 import org.jocean.http.TransportException;
 import org.jocean.http.client.HttpClient;
+import org.jocean.http.client.HttpClient.HttpInitiator;
 import org.jocean.http.util.Nettys.ChannelAware;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.ExceptionUtils;
-import org.jocean.idiom.JOArrays;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxObservables;
 import org.jocean.idiom.stats.BizMemo;
@@ -42,7 +42,7 @@ import io.netty.buffer.ByteBufInputStream;
 import io.netty.channel.Channel;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -268,33 +268,39 @@ public class DefaultDispatcher implements Dispatcher {
             }
             final ChannelGetter channelGetter = new ChannelGetter();
             
-            return (Observable<HttpObject>) _httpClient.defineInteraction(
+            return (Observable<HttpObject>) _httpClient.initiator().remoteAddress(
                     new InetSocketAddress(
                         target.serviceUri().getHost(), 
-                        target.serviceUri().getPort()), 
-                    fullRequest.doOnNext(new Action1<HttpObject>() {
+                        target.serviceUri().getPort()))
+                    .feature(target.features().call())
+                    .feature(channelGetter)
+                    .build()
+                    .flatMap(new Func1<HttpInitiator, Observable<HttpObject>>() {
                         @Override
-                        public void call(final HttpObject httpObj) {
-                            if (httpObj instanceof HttpRequest) {
-                                stepmemo.beginBizStep(STEP.TRANSFER_CONTENT);
-                            } else if (httpObj instanceof HttpContent) {
-                                try {
-                                    if ( isJson(request.headers().get(HttpHeaders.Names.CONTENT_TYPE)) ) {
-                                        final ByteBuf content = ((HttpContent)httpObj).content();
-                                        final byte[] bytes = 
-                                            ByteStreams.toByteArray(new ByteBufInputStream(content.slice()));
-                                        LOG.info("DUMP CONTENT: request:[{}]'s json content is: {}", 
-                                                request, 
-                                                new String(bytes, Charsets.UTF_8));
+                        public Observable<HttpObject> call(HttpInitiator t) {
+                            t.outbound().message(fullRequest.doOnNext(new Action1<HttpObject>() {
+                                @Override
+                                public void call(final HttpObject httpObj) {
+                                    if (httpObj instanceof HttpRequest) {
+                                        stepmemo.beginBizStep(STEP.TRANSFER_CONTENT);
+                                    } else if (httpObj instanceof HttpContent) {
+                                        try {
+                                            if ( isJson(request.headers().get(HttpHeaderNames.CONTENT_TYPE)) ) {
+                                                final ByteBuf content = ((HttpContent)httpObj).content();
+                                                final byte[] bytes = 
+                                                    ByteStreams.toByteArray(new ByteBufInputStream(content.slice()));
+                                                LOG.info("DUMP CONTENT: request:[{}]'s json content is: {}", 
+                                                        request, 
+                                                        new String(bytes, Charsets.UTF_8));
+                                            }
+                                        } catch (Exception e) {
+                                            LOG.warn("exception when dump content, detail: {}", 
+                                                    ExceptionUtils.exception2detail(e));
+                                        }
                                     }
-                                } catch (Exception e) {
-                                    LOG.warn("exception when dump content, detail: {}", 
-                                            ExceptionUtils.exception2detail(e));
-                                }
-                            }
-                        }}),
-                    JOArrays.addFirst(Feature[].class, target.features().call(),
-                            channelGetter))
+                                }}));
+                            return (Observable<HttpObject>) t.inbound().message();
+                        }})
                     .doOnNext(new Action1<HttpObject>() {
                         @Override
                         public void call(final HttpObject httpObj) {
