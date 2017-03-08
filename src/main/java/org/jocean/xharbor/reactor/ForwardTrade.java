@@ -15,6 +15,7 @@ import org.jocean.http.TransportException;
 import org.jocean.http.client.HttpClient;
 import org.jocean.http.client.HttpClient.HttpInitiator;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
+import org.jocean.http.util.InboundSpeedController;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
@@ -206,6 +207,18 @@ public class ForwardTrade implements TradeReactor {
                     @Override
                     public Observable<? extends HttpObject> call(
                             final HttpInitiator initiator) {
+                        
+                        InboundSpeedController.setCanRead(trade.inbound(), new Func0<Boolean>() {
+                            @Override
+                            public Boolean call() {
+                                final boolean canRead = initiator.outbound().isWritable();
+                                if (!canRead) {
+                                    LOG.info("initiator {} 's outbound.isWritable: ({})", 
+                                        canRead);
+                                }
+                                return canRead;
+                            }});
+                        
                         trade.doOnTerminate(new Action0() {
                             @Override
                             public void call() {
