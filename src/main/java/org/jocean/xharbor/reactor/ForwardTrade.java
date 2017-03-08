@@ -212,10 +212,8 @@ public class ForwardTrade implements TradeReactor {
                             @Override
                             public Boolean call() {
                                 final boolean canRead = initiator.outbound().isWritable();
-                                if (!canRead) {
-                                    LOG.info("initiator {} 's outbound.isWritable: ({})", 
-                                        canRead);
-                                }
+                                LOG.info("initiator {} 's outbound.isWritable: ({})", 
+                                        initiator, canRead);
                                 return canRead;
                             }});
                         
