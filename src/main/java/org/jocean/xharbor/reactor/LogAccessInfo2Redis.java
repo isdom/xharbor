@@ -2,9 +2,9 @@ package org.jocean.xharbor.reactor;
 
 import java.util.Map;
 
-import javax.inject.Inject;
-
 import org.jocean.http.util.RxNettys;
+import org.jocean.idiom.BeanHolder;
+import org.jocean.idiom.BeanHolderAware;
 import org.jocean.idiom.Ordered;
 import org.jocean.idiom.Pair;
 import org.jocean.redis.RedisClient;
@@ -25,13 +25,33 @@ import rx.Single;
 import rx.functions.Action1;
 import rx.functions.Func1;
 
-public class LogAccessInfo2Redis implements TradeReactor, Ordered {
+public class LogAccessInfo2Redis implements TradeReactor, Ordered, BeanHolderAware {
     
     private static final Logger LOG = LoggerFactory
             .getLogger(LogAccessInfo2Redis.class);
     
     @Override
+    public void setBeanHolder(final BeanHolder beanHolder) {
+        this._beanHolder = beanHolder;
+    }
+    
+    @Override
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
+        if ( null != this._beanHolder) {
+            final RedisClient redisclient = 
+                    _beanHolder.getBean(RedisClient.class);
+            if (null != redisclient) {
+                return tryLogtoRedis(ctx, io, redisclient);
+            }
+        }
+        return Single.<InOut>just(null);
+        
+    }
+    
+    private Single<? extends InOut> tryLogtoRedis(
+            final ReactContext ctx, 
+            final InOut io,
+            final RedisClient redisclient) {
         if (null != io.inbound() && null != io.outbound()) {
             io.inbound().compose(RxNettys.asHttpRequest())
             .flatMap(new Func1<HttpRequest, Observable<Pair<HttpRequest, HttpResponse>>>() {
@@ -63,7 +83,7 @@ public class LogAccessInfo2Redis implements TradeReactor, Ordered {
                     data.put("respContentLength", resp.headers().get(HttpHeaderNames.CONTENT_LENGTH));
                     
                     if (null != remoteip) {
-                        return _redisclient.getConnection()
+                        return redisclient.getConnection()
                             .compose(RedisUtil.interactWithRedis(
                                     RedisUtil.cmdSet(remoteip, JSON.toJSONString(data)).build() ));
                     } else {
@@ -79,12 +99,11 @@ public class LogAccessInfo2Redis implements TradeReactor, Ordered {
         }
         return Single.<InOut>just(null);
     }
-    
+
     @Override
     public int ordinal() {
         return 0;
     }
     
-    @Inject
-    private RedisClient _redisclient;
+    private BeanHolder _beanHolder;
 }
