@@ -11,11 +11,15 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.http.Feature;
 import org.jocean.http.InboundEndpoint;
+import org.jocean.http.TrafficCounter;
 import org.jocean.http.TransportException;
 import org.jocean.http.client.HttpClient;
 import org.jocean.http.client.HttpClient.HttpInitiator;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
-import org.jocean.http.util.InboundSpeedController;
+import org.jocean.http.util.APPLY;
+import org.jocean.http.util.HttpMessageHolder;
+//  TODO ?
+//import org.jocean.http.util.InboundSpeedController;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
@@ -208,23 +212,20 @@ public class ForwardTrade implements TradeReactor {
                     public Observable<? extends HttpObject> call(
                             final HttpInitiator initiator) {
                         
-                        InboundSpeedController.setCanRead(trade.inbound(), new Func0<Boolean>() {
-                            @Override
-                            public Boolean call() {
-                                final boolean canRead = initiator.outbound().isWritable();
-                                LOG.info("initiator {} 's outbound.isWritable: ({})", 
-                                        initiator, canRead);
-                                return canRead;
-                            }});
+                        //  TODO ? add isWritable
+//                        InboundSpeedController.setCanRead(trade.inbound(), new Func0<Boolean>() {
+//                            @Override
+//                            public Boolean call() {
+//                                final boolean canRead = initiator.outbound().isWritable();
+//                                LOG.info("initiator {} 's outbound.isWritable: ({})", 
+//                                        initiator, canRead);
+//                                return canRead;
+//                            }});
                         
-                        trade.doOnTerminate(new Action0() {
-                            @Override
-                            public void call() {
-                                initiator.close();
-                            }});
-                        initiator.outbound().setFlushPerWrite(true);
-                        initiator.outbound().doOnSended(unholdInboundMessage(trade.inbound()));
-                        initiator.outbound().message(buildRequest(trade, inbound, refReq, isKeepAliveFromClient));
+                        trade.doOnTerminate(initiator.closer());
+                        initiator.setFlushPerWrite(true);
+                        initiator.setOnSended(unholdInboundMessage(trade.inbound()));
+                        final TrafficCounter initiatorCounter = initiator.enable(APPLY.TRAFFICCOUNTER);
                         
                         trade.doOnTerminate(new Action0() {
                             @Override
@@ -242,15 +243,19 @@ public class ForwardTrade implements TradeReactor {
                                         target.serviceUri(), 
                                         trade.trafficCounter().inboundBytes(),
                                         trade.trafficCounter().outboundBytes(),
-                                        initiator.trafficCounter().outboundBytes(),
-                                        initiator.trafficCounter().inboundBytes(),
+                                        initiatorCounter.outboundBytes(),
+                                        initiatorCounter.inboundBytes(),
                                         trade.transport(),
                                         initiator.transport(),
                                         refReq.get(), 
                                         refResp.get());
                             }});
                         
-                        return initiator.inbound().message();
+                        final HttpMessageHolder holder = new HttpMessageHolder();
+                        initiator.doOnTerminate(holder.closer());
+                        return initiator
+                            .defineInteraction(buildRequest(trade, inbound, refReq, isKeepAliveFromClient))
+                            .compose(holder.<HttpObject>assembleAndHold());
                     }})
                 .flatMap(RxNettys.splitFullHttpMessage())
                 .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient));

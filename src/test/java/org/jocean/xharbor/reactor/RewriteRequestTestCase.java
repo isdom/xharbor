@@ -48,9 +48,9 @@ public class RewriteRequestTestCase {
             .toBlocking().value();
         
         final HttpMessageHolder holder = new HttpMessageHolder();
-        io.inbound().compose(holder.assembleAndHold()).subscribe();
+        io.inbound().compose(holder.<HttpObject>assembleAndHold()).subscribe();
         
-        final FullHttpRequest rwreq = holder.httpMessageBuilder(RxNettys.BUILD_FULL_REQUEST).call();
+        final FullHttpRequest rwreq = holder.fullOf(RxNettys.BUILD_FULL_REQUEST).call();
         
         assertEquals("/yjy_psm/fetchMetadata", orgreq.uri());
         assertEquals("/yjy_common/fetchMetadata", rwreq.uri());
@@ -101,9 +101,9 @@ public class RewriteRequestTestCase {
             .toBlocking().value();
         
         final HttpMessageHolder holder = new HttpMessageHolder();
-        io.inbound().compose(holder.assembleAndHold()).subscribe();
+        io.inbound().compose(holder.<HttpObject>assembleAndHold()).subscribe();
         
-        final FullHttpRequest rwreq = holder.httpMessageBuilder(RxNettys.BUILD_FULL_REQUEST).call();
+        final FullHttpRequest rwreq = holder.fullOf(RxNettys.BUILD_FULL_REQUEST).call();
         
         assertEquals("/yjy_psm/fetchMetadata", orgreq.uri());
         assertEquals("/yjy_common/fetchMetadata", rwreq.uri());

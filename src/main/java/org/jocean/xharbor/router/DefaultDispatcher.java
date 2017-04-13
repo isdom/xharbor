@@ -278,7 +278,7 @@ public class DefaultDispatcher implements Dispatcher {
                     .flatMap(new Func1<HttpInitiator, Observable<HttpObject>>() {
                         @Override
                         public Observable<HttpObject> call(HttpInitiator t) {
-                            t.outbound().message(fullRequest.doOnNext(new Action1<HttpObject>() {
+                            return (Observable<HttpObject>) t.defineInteraction(fullRequest.doOnNext(new Action1<HttpObject>() {
                                 @Override
                                 public void call(final HttpObject httpObj) {
                                     if (httpObj instanceof HttpRequest) {
@@ -299,7 +299,6 @@ public class DefaultDispatcher implements Dispatcher {
                                         }
                                     }
                                 }}));
-                            return (Observable<HttpObject>) t.inbound().message();
                         }})
                     .doOnNext(new Action1<HttpObject>() {
                         @Override

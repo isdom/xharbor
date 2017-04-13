@@ -41,9 +41,9 @@ public class ResponseWithHeaderonlyTestCase {
             .toBlocking().value();
         
         final HttpMessageHolder holder = new HttpMessageHolder();
-        io.outbound().compose(holder.assembleAndHold()).subscribe();
+        io.outbound().compose(holder.<HttpObject>assembleAndHold()).subscribe();
         
-        final FullHttpResponse response = holder.httpMessageBuilder(RxNettys.BUILD_FULL_RESPONSE).call();
+        final FullHttpResponse response = holder.fullOf(RxNettys.BUILD_FULL_RESPONSE).call();
         
         assertEquals(HttpResponseStatus.OK, response.status());
         assertEquals(HttpVersion.HTTP_1_0, response.protocolVersion());
