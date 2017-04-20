@@ -129,7 +129,7 @@ public class TradeRelay extends Subscriber<HttpTrade> implements BeanHolderAware
         final RetryPolicy<Integer> policy = new RetryPolicy<Integer>() {
             @Override
             public Observable<Integer> call(final Observable<Throwable> errors) {
-                return errors.compose(RxObservables.retryIfMatch(ifMatch(trade), 100))
+                return (Observable<Integer>) errors.compose(RxObservables.retryIfMatch(ifMatch(trade), 100))
                         .compose(RxObservables.retryMaxTimes(_maxRetryTimes))
                         .compose(RxObservables.retryDelayTo(_retryIntervalBase))
                         .doOnNext(new Action1<Integer>() {
