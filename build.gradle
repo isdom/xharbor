@@ -8,54 +8,19 @@ configurations {
 }
 
 dependencies {
-    compile 'javax.inject:javax.inject:1'
-
     /* jocean */
     compile('org.jocean:jocean-idiom:0.1.4-SNAPSHOT')
-    compile('org.jocean:jocean-j2se:0.0.4-SNAPSHOT') { transitive = false }
+    compile('org.jocean:jocean-j2se:0.0.4-SNAPSHOT')
     compile('org.jocean:jocean-http:0.0.2-SNAPSHOT')
     compile('org.jocean:jocean-jdmk:0.0.2') { transitive = false }
 
-    compile 'commons-beanutils:commons-beanutils:1.9.1'
-    compile 'org.apache.commons:commons-lang3:3.3.2'
-    compile 'commons-io:commons-io:2.4'
-    compile 'org.apache.commons:commons-pool2:2.2'
-    compile 'com.google.guava:guava:21.0'
-
-    compile 'com.alibaba:fastjson:1.2.31'
-
-    compile 'javax.ws.rs:javax.ws.rs-api:2.0'
-    
-    /* for yaml */
-    compile 'org.yaml:snakeyaml:1.18'
-
-    // jolokia-agent
-    compile 'org.jolokia:jolokia-spring:1.3.6'
-    
-    runtime 'org.javassist:javassist:3.18.2-GA'
-    compile 'com.jcraft:jzlib:1.1.2'
-    
     /* Log */
-    compile 'org.slf4j:jcl-over-slf4j:1.7.25'
-    compile 'org.slf4j:log4j-over-slf4j:1.7.25'
-    compile 'ch.qos.logback:logback-classic:1.2.2'
+    runtime 'org.slf4j:jcl-over-slf4j:1.7.25'
+    runtime 'org.slf4j:log4j-over-slf4j:1.7.25'
+    runtime 'ch.qos.logback:logback-classic:1.2.2'
     /* compile('org.logback-extensions:logback-ext-spring:0.1.2') { transitive = false } */
 
-    /* spring */
-    compile "org.springframework:spring-context-support:${springVersion}"
-    compile "org.springframework:spring-orm:${springVersion}"
-    compile "org.springframework:spring-test:${springVersion}"
-
-    /* zookeeper */
-    compile 'org.apache.curator:curator-recipes:3.3.0'
-    
-    runtime 'cglib:cglib:3.0'
-    runtime 'org.aspectj:aspectjweaver:1.7.3'
-
-    runtime 'org.jvnet.opendmk:jmxremote_optional:1.0_01-ea'
-
-    testCompile 'junit:junit:4.11'
-    testCompile 'org.apache.curator:curator-examples:2.7.1'
+    testCompile 'junit:junit:4.12'
     /* testCompile 'org.jmockit:jmockit:1.15' */
     testCompile 'org.jmock:jmock:2.6.0'
 }
