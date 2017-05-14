@@ -11,7 +11,7 @@
         <constructor-arg>
             <bean class="org.jocean.xharbor.reactor.RewriteRequest">
 		        <constructor-arg value="${rewrite.path}"/>
-		        <constructor-arg value="${rewrite.to}"/>
+		        <constructor-arg value="${rewrite.to:}"/>
                 <constructor-arg value="${rewrite.header.name:}"/>
                 <constructor-arg value="${rewrite.header.value:}"/>
             </bean>

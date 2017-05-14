@@ -58,7 +58,11 @@ public class RewriteRequest implements TradeReactor {
         final DefaultHttpRequest newreq = new DefaultHttpRequest(req.protocolVersion(), 
                 req.method(), req.uri(), true);
         newreq.headers().set(req.headers());
-        newreq.setUri(matcher.replaceFirst(_replacePathTo));
+        if (null != this._replacePathTo
+            && !this._replacePathTo.isEmpty()) {
+            // when _replacePathTo not empty, then modify original path
+            newreq.setUri(matcher.replaceFirst(_replacePathTo));
+        }
         if (null != this._replaceHeaderName
             && !this._replaceHeaderName.isEmpty()) {
             newreq.headers().set(this._replaceHeaderName, _replaceHeaderValue);
