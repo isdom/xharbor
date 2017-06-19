@@ -16,7 +16,7 @@ import org.jocean.http.TransportException;
 import org.jocean.http.client.HttpClient;
 import org.jocean.http.client.HttpClient.HttpInitiator;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
-import org.jocean.http.util.APPLY;
+import org.jocean.http.util.HttpHandlers;
 import org.jocean.http.util.HttpMessageHolder;
 //  TODO ?
 //import org.jocean.http.util.InboundSpeedController;
@@ -225,7 +225,7 @@ public class ForwardTrade implements TradeReactor {
                         trade.doOnTerminate(initiator.closer());
                         initiator.setFlushPerWrite(true);
                         initiator.setOnSended(unholdInboundMessage(trade.inbound()));
-                        final TrafficCounter initiatorCounter = initiator.enable(APPLY.TRAFFICCOUNTER);
+                        final TrafficCounter initiatorCounter = initiator.enable(HttpHandlers.TRAFFICCOUNTER);
                         
                         trade.doOnTerminate(new Action0() {
                             @Override
