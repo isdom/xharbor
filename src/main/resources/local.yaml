@@ -43,6 +43,26 @@ children:
         parameters: |
           priority=100
         children:
+          - name: forward.live
+            parameters: |
+              forward.path=/demo/[/|\\w]*
+              forward.to=http://live.iplusmed.com:80
+              features.name=default
+          - name: rwreq.live
+            parameters: |
+              rewrite.path=/demo/[/|\\w]*
+              rewrite.header.name=Host
+              rewrite.header.value=live.iplusmed.com
+          - name: forward.crossdomain
+            parameters: |
+              forward.path=/crossdomain.xml
+              forward.to=http://wapp.jocean.org:80
+              features.name=default
+          - name: rwreq.crossdomain
+            parameters: |
+              rewrite.path=/crossdomain.xml
+              rewrite.header.name=Host
+              rewrite.header.value=wapp.jocean.org
           - name: respond.checkhealth
             parameters: |
               request.method=HEAD|GET
@@ -83,8 +103,8 @@ children:
               forward.to=http://127.0.0.1:8083
           - name: rwreq.jmxhtml
             parameters: |
-              rewrite.path=/jmxhtml[\\w|\\.]*
-              rewrite.to=
+              rewrite.path=/jmxhtml/[\\w|\\.]*
+              rewrite.to=/
               rewrite.header.name=x-jmx
               rewrite.header.value=jmxhtml.self
           - name: auth.jmxhtml
