@@ -224,7 +224,8 @@ public class ForwardTrade implements TradeReactor {
                         
                         trade.doOnTerminate(initiator.closer());
                         initiator.setFlushPerWrite(true);
-                        initiator.setOnSended(unholdInboundMessage(trade.inbound()));
+                        // TBD: re-impl by trade.inmessage()
+//                        initiator.setOnSended(unholdInboundMessage(trade.inbound()));
                         final TrafficCounter initiatorCounter = initiator.enable(HttpHandlers.TRAFFICCOUNTER);
                         
                         trade.doOnTerminate(new Action0() {
@@ -392,6 +393,7 @@ public class ForwardTrade implements TradeReactor {
         return error instanceof ConnectException;
     }
     
+    /*  TBD: re-impl by trade.inmessage()
     private Action1<Object> unholdInboundMessage(final InboundEndpoint inbound) {
         return new Action1<Object>() {
             @Override
@@ -408,6 +410,7 @@ public class ForwardTrade implements TradeReactor {
                 }
             }};
     }
+    */
 
     private class MarkableTargetImpl implements Target {
         
