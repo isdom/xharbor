@@ -77,7 +77,7 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
     @Override
     public void onNext(final HttpTrade trade) {
         @SuppressWarnings("unchecked")
-        final Observable<HttpObject> cached = (Observable<HttpObject>) trade.inbound().message();
+        final Observable<HttpObject> cached = (Observable<HttpObject>) trade.inbound();
             
         cached.subscribe(new RequestSubscriber(trade, cached));
     }
@@ -148,7 +148,7 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                 final RoutingInfo info = routectx.getProperty("routingInfo");
                 routectx.clear();
                 
-                _trade.outbound().message(
+                _trade.outbound(
                     buildHttpResponse(dispatcher, _trade.transport(), req, this._request, info, new AtomicBoolean(true)));
             }
         }
