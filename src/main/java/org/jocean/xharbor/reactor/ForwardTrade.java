@@ -10,13 +10,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.http.Feature;
-import org.jocean.http.InboundEndpoint;
 import org.jocean.http.TrafficCounter;
 import org.jocean.http.TransportException;
 import org.jocean.http.client.HttpClient;
 import org.jocean.http.client.HttpClient.HttpInitiator;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
-import org.jocean.http.util.HttpHandlers;
 import org.jocean.http.util.HttpMessageHolder;
 //  TODO ?
 //import org.jocean.http.util.InboundSpeedController;
@@ -226,7 +224,7 @@ public class ForwardTrade implements TradeReactor {
                         initiator.setFlushPerWrite(true);
                         // TBD: re-impl by trade.inmessage()
 //                        initiator.setOnSended(unholdInboundMessage(trade.inbound()));
-                        final TrafficCounter initiatorCounter = initiator.enable(HttpHandlers.TRAFFICCOUNTER);
+                        final TrafficCounter initiatorTraffic = initiator.traffic();
                         
                         trade.doOnTerminate(new Action0() {
                             @Override
@@ -242,10 +240,10 @@ public class ForwardTrade implements TradeReactor {
                                         + "\nREQ\n[{}]\nsendback\nRESP\n[{}]",
                                         ttl / (float)1000.0, 
                                         target.serviceUri(), 
-                                        trade.trafficCounter().inboundBytes(),
-                                        trade.trafficCounter().outboundBytes(),
-                                        initiatorCounter.outboundBytes(),
-                                        initiatorCounter.inboundBytes(),
+                                        trade.traffic().inboundBytes(),
+                                        trade.traffic().outboundBytes(),
+                                        initiatorTraffic.outboundBytes(),
+                                        initiatorTraffic.inboundBytes(),
                                         trade.transport(),
                                         initiator.transport(),
                                         refReq.get(), 

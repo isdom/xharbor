@@ -7,8 +7,8 @@ import java.net.ConnectException;
 import java.nio.channels.ClosedChannelException;
 
 import org.jocean.http.TransportException;
+import org.jocean.http.Inboundable.ReadPolicy;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
-import org.jocean.http.util.InboundSpeedController;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.BeanHolder;
 import org.jocean.idiom.BeanHolderAware;
@@ -62,12 +62,10 @@ public class TradeRelay extends Subscriber<HttpTrade> implements BeanHolderAware
     @Override
     public void onNext(final HttpTrade trade) {
         if ( null != this._beanHolder) {
-            //  TODO，replace by new SpeedController
-//            final InboundSpeedController isc = 
-//                    _beanHolder.getBean(InboundSpeedController.class);
-//            if (null != isc) {
-//                isc.applyTo(trade.inbound());
-//            }
+            final ReadPolicy policy = _beanHolder.getBean(ReadPolicy.class);
+            if (null != policy) {
+                trade.setReadPolicy(policy);
+            }
         }
         final StopWatch watch4Result = new StopWatch();
         final ReactContext ctx = new ReactContext() {
