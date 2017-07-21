@@ -6,8 +6,8 @@ package org.jocean.xharbor.relay;
 import java.net.ConnectException;
 import java.nio.channels.ClosedChannelException;
 
+import org.jocean.http.ReadPolicy;
 import org.jocean.http.TransportException;
-import org.jocean.http.Inboundable.ReadPolicy;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.BeanHolder;
