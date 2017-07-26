@@ -16,8 +16,7 @@ import org.jocean.http.client.HttpClient;
 import org.jocean.http.client.HttpClient.HttpInitiator;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.HttpMessageHolder;
-//  TODO ?
-//import org.jocean.http.util.InboundSpeedController;
+
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
@@ -222,8 +221,8 @@ public class ForwardTrade implements TradeReactor {
                         
                         trade.doOnTerminate(initiator.closer());
                         initiator.setFlushPerWrite(true);
-                        // TBD: re-impl by trade.inmessage()
-//                        initiator.setOnSended(unholdInboundMessage(trade.inbound()));
+                        
+                        initiator.sended().subscribe(unholdInboundMessage(trade.inboundHolder()));
                         final TrafficCounter initiatorTraffic = initiator.traffic();
                         
                         trade.doOnTerminate(new Action0() {
@@ -391,24 +390,22 @@ public class ForwardTrade implements TradeReactor {
         return error instanceof ConnectException;
     }
     
-    /*  TBD: re-impl by trade.inmessage()
-    private Action1<Object> unholdInboundMessage(final InboundEndpoint inbound) {
+    private Action1<Object> unholdInboundMessage(final HttpMessageHolder holder) {
         return new Action1<Object>() {
             @Override
             public void call(final Object msg) {
                 if (msg instanceof HttpContent) {
-                    if (inbound.messageHolder().isFragmented()
-                        || inbound.holdingMemorySize() > MAX_RETAINED_SIZE) {
-                        LOG.info("inbound({})'s inboundHolder BEGIN_RELEASE msg({}), now it's retained size: {}",
-                                inbound, msg, inbound.holdingMemorySize());
-                        inbound.messageHolder().releaseHttpContent((HttpContent)msg);
-                        LOG.info("inbound({})'s inboundHolder ENDOF_RELEASE msg({}), now it's retained size: {}",
-                                inbound, msg, inbound.holdingMemorySize());
+                    if (holder.isFragmented()
+                        || holder.retainedByteBufSize() > MAX_RETAINED_SIZE) {
+                        LOG.info("holder({}) BEGIN_RELEASE msg({}), now it's retained size: {}",
+                                holder, msg, holder.retainedByteBufSize());
+                        holder.releaseHttpContent((HttpContent)msg);
+                        LOG.info("holder({}) ENDOF_RELEASE msg({}), now it's retained size: {}",
+                                holder, msg, holder.retainedByteBufSize());
                     }
                 }
             }};
     }
-    */
 
     private class MarkableTargetImpl implements Target {
         
