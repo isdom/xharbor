@@ -209,6 +209,10 @@ public class ForwardTrade implements TradeReactor {
                     @Override
                     public Observable<? extends HttpObject> call(
                             final HttpInitiator initiator) {
+                        
+                        // TBD: using ReadPolicies.ByOutbound
+                        // ref: https://github.com/isdom/xharbor/commit/e81069dd56bfb68b08c971923d24958c438ffe2b#diff-0a4a34cc848464f04687f26d3d122a59L211
+                        
                         trade.doOnTerminate(initiator.closer());
                         final TrafficCounter initiatorTraffic = initiator.traffic();
                         
