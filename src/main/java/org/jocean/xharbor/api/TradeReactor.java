@@ -3,6 +3,7 @@ package org.jocean.xharbor.api;
 import java.util.Iterator;
 
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
+import org.jocean.idiom.DisposableWrapper;
 import org.jocean.idiom.StopWatch;
 
 import io.netty.handler.codec.http.HttpObject;
@@ -18,7 +19,7 @@ public interface TradeReactor {
     }
     
     public interface InOut {
-        public Observable<? extends HttpObject> inbound();
+        public Observable<? extends DisposableWrapper<HttpObject>> inbound();
         public Observable<? extends HttpObject> outbound();
     }
     

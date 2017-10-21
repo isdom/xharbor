@@ -19,6 +19,8 @@ import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.HttpMessageHolder;
 
 import org.jocean.http.util.RxNettys;
+import org.jocean.idiom.DisposableWrapper;
+import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxObservables;
@@ -84,7 +86,7 @@ public class ForwardTrade implements TradeReactor {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().compose(RxNettys.asHttpRequest())
+        return io.inbound().map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpRequest())
                 .flatMap(new Func1<HttpRequest, Observable<InOut>>() {
                     @Override
                     public Observable<InOut> call(final HttpRequest req) {
@@ -177,7 +179,7 @@ public class ForwardTrade implements TradeReactor {
                         
                         return Observable.<InOut>just(new InOut() {
                             @Override
-                            public Observable<? extends HttpObject> inbound() {
+                            public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
                                 return originalio.inbound();
                             }
                             @Override
@@ -193,7 +195,7 @@ public class ForwardTrade implements TradeReactor {
 
     private Observable<? extends HttpObject> buildOutbound(
             final HttpTrade trade, 
-            final Observable<? extends HttpObject> inbound, 
+            final Observable<? extends DisposableWrapper<HttpObject>> inbound, 
             final Target target,
             final StopWatch stopWatch) {
             
@@ -242,15 +244,32 @@ public class ForwardTrade implements TradeReactor {
                         
                         final HttpMessageHolder holder = new HttpMessageHolder();
                         initiator.doOnTerminate(holder.closer());
+                        
+                        final AtomicInteger sendingSize = new AtomicInteger(0);
                         return initiator.defineInteraction(
-                                buildRequest(trade, inbound, refReq, isKeepAliveFromClient),
-                                new WritePolicy() {
+                                buildRequest(trade, inbound, refReq, isKeepAliveFromClient).doOnNext(dwh -> {
+                                    final HttpObject hobj = ((DisposableWrapper<HttpObject>) dwh).unwrap();
+                                    if (hobj instanceof HttpContent) {
+                                        sendingSize.addAndGet(((HttpContent) hobj).content().readableBytes());
+                                    }
+                                }), new WritePolicy() {
                                     @Override
                                     public void applyTo(final Outboundable outboundable) {
                                         outboundable.setFlushPerWrite(true);
-                                        outboundable.sended().subscribe(unholdInboundMessage(trade.inboundHolder()));
-                                    }})
-                            .compose(holder.<HttpObject>assembleAndHold());
+                                        outboundable.sended().subscribe(sended -> {
+                                            if (sendingSize.get() > MAX_RETAINED_SIZE) {
+                                                if (LOG.isTraceEnabled()) {
+                                                    LOG.trace("sendingSize is {}, dispose sended {}", sendingSize.get(), sended);
+                                                }
+                                                DisposableWrapperUtil.dispose(sended);
+                                            } else {
+                                                if (LOG.isTraceEnabled()) {
+                                                    LOG.trace("sendingSize is {}, SKIP sended {}", sendingSize.get(), sended);
+                                                }
+                                            }
+                                        });
+                                    }
+                                }).compose(holder.<HttpObject>assembleAndHold());
                     }})
                 .flatMap(RxNettys.splitFullHttpMessage())
                 .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient));
@@ -288,17 +307,17 @@ public class ForwardTrade implements TradeReactor {
                 }};
     }
 
-    private Observable<HttpObject> buildRequest(
+    private Observable<DisposableWrapper<HttpObject>> buildRequest(
             final HttpTrade trade, 
-            final Observable<? extends HttpObject> inbound,
+            final Observable<? extends DisposableWrapper<HttpObject>> inbound,
             final AtomicReference<HttpRequest> refReq,
             final AtomicBoolean isKeepAliveFromClient) {
-        return inbound.flatMap(RxNettys.splitFullHttpMessage())
-            .map(new Func1<HttpObject, HttpObject>() {
+        return inbound.flatMap(RxNettys.splitdwhs())
+            .map(new Func1<DisposableWrapper<HttpObject>, DisposableWrapper<HttpObject>>() {
                 @Override
-                public HttpObject call(final HttpObject httpobj) {
-                    if (httpobj instanceof HttpRequest) {
-                        final HttpRequest req = (HttpRequest)httpobj;
+                public DisposableWrapper<HttpObject> call(final DisposableWrapper<HttpObject> dwh) {
+                    if (dwh.unwrap() instanceof HttpRequest) {
+                        final HttpRequest req = (HttpRequest)dwh.unwrap();
                         refReq.set(req);
                         //  only check first time, bcs inbound could be process many times
                         if (isKeepAliveFromClient.get()) {
@@ -312,11 +331,11 @@ public class ForwardTrade implements TradeReactor {
                                 newreq.headers().add(req.headers());
                                 newreq.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
                                 LOG.info("FORCE-KeepAlive: add Connection header with KeepAlive for incoming req:\n[{}]", req);
-                                return newreq;
+                                return RxNettys.wrap(newreq);
                             }
                         }
                     }
-                    return httpobj;
+                    return dwh;
                 }})
             ;
     }

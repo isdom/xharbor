@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 
 import org.jocean.http.util.HttpMessageHolder;
 import org.jocean.http.util.RxNettys;
+import org.jocean.idiom.DisposableWrapper;
 import org.jocean.xharbor.api.TradeReactor.InOut;
 import org.jocean.xharbor.reactor.BasicAuthenticate;
 import org.junit.Test;
@@ -32,8 +33,8 @@ public class BasicAuthenticateTestCase {
         final InOut io = 
             authorizer.react(null, new InOut() {
                 @Override
-                public Observable<? extends HttpObject> inbound() {
-                    return Observable.<HttpObject>just(orgreq);
+                public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
+                    return Observable.just(RxNettys.wrap(orgreq));
                 }
                 @Override
                 public Observable<? extends HttpObject> outbound() {
@@ -48,6 +49,6 @@ public class BasicAuthenticateTestCase {
         
         assertEquals(HttpResponseStatus.UNAUTHORIZED, response.status());
         assertEquals(HttpVersion.HTTP_1_0, response.protocolVersion());
-        assertEquals("demo", response.headers().get(HttpHeaderNames.WWW_AUTHENTICATE));
+        assertEquals("Basic realm=\"demo\"", response.headers().get(HttpHeaderNames.WWW_AUTHENTICATE));
     }
 }

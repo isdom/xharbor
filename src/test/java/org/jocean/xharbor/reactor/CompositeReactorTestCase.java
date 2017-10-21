@@ -6,6 +6,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.jocean.idiom.DisposableWrapper;
 import org.jocean.idiom.Ordered;
 import org.jocean.xharbor.api.TradeReactor;
 import org.jocean.xharbor.api.TradeReactor.InOut;
@@ -63,7 +64,7 @@ public class CompositeReactorTestCase {
         final InOut io =
         cr.react(null, new InOut() {
             @Override
-            public Observable<? extends HttpObject> inbound() {
+            public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
                 return null;
             }
             @Override

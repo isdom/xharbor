@@ -23,8 +23,8 @@ children:
       - name: httpfeatures.default
         parameters: |
           features.name=default
-        children:
-          - name: feature_logging
+#        children:
+#          - name: feature_logging
   - name: router.biz
     children:
       - name: nop.httpin
@@ -75,6 +75,12 @@ children:
               
               forward.to=http://api.iplusmed.com:80
               features.name=compress
+          - name: forward.snsgw
+            parameters: |
+              forward.path=/test/[/|\\w]*
+              
+              forward.to=http://127.0.0.1:9090
+              features.name=default
           - name: forward.zkwebui
             parameters: |
               forward.path=/zkwebui/[/|\\w]*
@@ -92,6 +98,8 @@ children:
       - name: httpin.8889
         parameters: |
           http.port=8889
+        children:
+          - name: feature_logging
       - name: rules.100
         parameters: |
           priority=100
@@ -103,7 +111,7 @@ children:
               forward.to=http://127.0.0.1:8083
           - name: rwreq.jmxhtml
             parameters: |
-              rewrite.path=/jmxhtml/[\\w|\\.]*
+              rewrite.path=/jmxhtml/
               rewrite.to=/
               rewrite.header.name=x-jmx
               rewrite.header.value=jmxhtml.self

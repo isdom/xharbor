@@ -12,6 +12,8 @@ import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.BeanHolder;
 import org.jocean.idiom.BeanHolderAware;
+import org.jocean.idiom.DisposableWrapper;
+import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxObservables;
@@ -80,8 +82,8 @@ public class TradeRelay extends Subscriber<HttpTrade> implements BeanHolderAware
         
         this._tradeReactor.react(ctx, new InOut() {
             @Override
-            public Observable<? extends HttpObject> inbound() {
-                return trade.inbound();
+            public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
+                return trade.obsrequest();
             }
             @Override
             public Observable<? extends HttpObject> outbound() {
@@ -94,7 +96,7 @@ public class TradeRelay extends Subscriber<HttpTrade> implements BeanHolderAware
                 if (null == io || null == io.outbound()) {
                     LOG.warn("NO_INOUT for trade({}), react io detail: {}.", trade, io);
                 }
-                trade.outbound(buildResponse(trade.inbound(), io)
+                trade.outbound(buildResponse(trade.obsrequest(), io)
                 );
             }}, new Action1<Throwable>() {
             @Override
@@ -106,10 +108,10 @@ public class TradeRelay extends Subscriber<HttpTrade> implements BeanHolderAware
     }
 
     private Observable<? extends HttpObject> buildResponse(
-            final Observable<? extends HttpObject> originalInbound, final InOut io) {
+            final Observable<? extends DisposableWrapper<HttpObject>> originalInbound, final InOut io) {
         return (null != io && null != io.outbound())
             ? io.outbound()
-            : originalInbound.compose(RxNettys.asHttpRequest())
+            : originalInbound.map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpRequest())
                 .map(new Func1<HttpRequest, HttpVersion>() {
                     @Override
                     public HttpVersion call(final HttpRequest req) {
@@ -151,11 +153,12 @@ public class TradeRelay extends Subscriber<HttpTrade> implements BeanHolderAware
         return new Func1<Throwable, Boolean>() {
             @Override
             public Boolean call(final Throwable e) {
-                if (trade.inboundHolder().isFragmented()) {
-                    LOG.warn("NOT_RETRY for trade({}), bcs of trade's inbound has fragmented.", 
-                            trade);
-                    return false;
-                }
+                //  TODO, check obsrequest has been disposed ?
+//                if (trade.inboundHolder().isFragmented()) {
+//                    LOG.warn("NOT_RETRY for trade({}), bcs of trade's inbound has fragmented.", 
+//                            trade);
+//                    return false;
+//                }
                 final boolean matched = (e instanceof TransportException)
                     || (e instanceof ConnectException)
                     || (e instanceof ClosedChannelException);

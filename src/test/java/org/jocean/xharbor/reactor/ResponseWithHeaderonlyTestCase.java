@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 
 import org.jocean.http.util.HttpMessageHolder;
 import org.jocean.http.util.RxNettys;
+import org.jocean.idiom.DisposableWrapper;
 import org.jocean.xharbor.api.TradeReactor.InOut;
 import org.jocean.xharbor.reactor.ResponseWithHeaderonly;
 import org.junit.Test;
@@ -31,8 +32,8 @@ public class ResponseWithHeaderonlyTestCase {
         final InOut io = 
             responder.react(null, new InOut() {
                 @Override
-                public Observable<? extends HttpObject> inbound() {
-                    return Observable.<HttpObject>just(request);
+                public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
+                    return Observable.just(RxNettys.wrap(request));
                 }
                 @Override
                 public Observable<? extends HttpObject> outbound() {

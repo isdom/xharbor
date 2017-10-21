@@ -4,6 +4,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.jocean.http.util.RxNettys;
+import org.jocean.idiom.DisposableWrapper;
+import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.idiom.Regexs;
 import org.jocean.xharbor.api.TradeReactor;
 
@@ -33,7 +35,7 @@ public class RewriteRequest implements TradeReactor {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().compose(RxNettys.asHttpRequest())
+        return io.inbound().map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpRequest())
             .map(new Func1<HttpRequest, InOut>() {
                 @Override
                 public InOut call(final HttpRequest req) {
@@ -75,11 +77,11 @@ public class RewriteRequest implements TradeReactor {
             final Matcher matcher) {
         return new InOut() {
             @Override
-            public Observable<? extends HttpObject> inbound() {
-                return Observable.<HttpObject>just(rewriteRequest(matcher, originalreq))
+            public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
+                return Observable.<DisposableWrapper<HttpObject>>just(RxNettys.wrap(rewriteRequest(matcher, originalreq)))
                     .concatWith(
                         originalio.inbound()
-                        .flatMap(RxNettys.splitFullHttpMessage())
+                        .flatMap(RxNettys.splitdwhs())
                         .skip(1));
             }
             @Override

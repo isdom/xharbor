@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jocean.http.TransportException;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
+import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.xharbor.api.Dispatcher;
 import org.jocean.xharbor.api.Dispatcher.ResponseCtx;
@@ -76,8 +77,7 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
 
     @Override
     public void onNext(final HttpTrade trade) {
-        @SuppressWarnings("unchecked")
-        final Observable<HttpObject> cached = (Observable<HttpObject>) trade.inbound();
+        final Observable<HttpObject> cached = trade.obsrequest().map(DisposableWrapperUtil.unwrap());
             
         cached.subscribe(new RequestSubscriber(trade, cached));
     }

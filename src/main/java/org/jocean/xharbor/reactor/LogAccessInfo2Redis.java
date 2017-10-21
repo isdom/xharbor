@@ -5,6 +5,7 @@ import java.util.Map;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.BeanHolder;
 import org.jocean.idiom.BeanHolderAware;
+import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.idiom.Ordered;
 import org.jocean.idiom.Pair;
 import org.jocean.redis.RedisClient;
@@ -53,7 +54,7 @@ public class LogAccessInfo2Redis implements TradeReactor, Ordered, BeanHolderAwa
             final InOut io,
             final RedisClient redisclient) {
         if (null != io.inbound() && null != io.outbound()) {
-            io.inbound().compose(RxNettys.asHttpRequest())
+            io.inbound().map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpRequest())
             .flatMap(new Func1<HttpRequest, Observable<Pair<HttpRequest, HttpResponse>>>() {
                 @Override
                 public Observable<Pair<HttpRequest, HttpResponse>> call(

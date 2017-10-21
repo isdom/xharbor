@@ -3,6 +3,8 @@ package org.jocean.xharbor.reactor;
 import java.util.Map;
 
 import org.jocean.http.util.RxNettys;
+import org.jocean.idiom.DisposableWrapper;
+import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.xharbor.api.TradeReactor;
 
 import io.netty.handler.codec.http.HttpObject;
@@ -27,7 +29,7 @@ public class RewriteResponse implements TradeReactor {
         if (null == io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().compose(RxNettys.asHttpRequest())
+        return io.inbound().map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpRequest())
                 .map(new Func1<HttpRequest, InOut>() {
                     @Override
                     public InOut call(final HttpRequest req) {
@@ -49,7 +51,7 @@ public class RewriteResponse implements TradeReactor {
             final HttpRequest originalreq) {
         return new InOut() {
             @Override
-            public Observable<? extends HttpObject> inbound() {
+            public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
                 return originalio.inbound();
             }
             @Override

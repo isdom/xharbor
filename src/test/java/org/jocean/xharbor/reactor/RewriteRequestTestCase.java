@@ -7,12 +7,11 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.util.Arrays;
 
-import org.jocean.http.util.HttpMessageHolder;
 import org.jocean.http.util.Nettys;
 import org.jocean.http.util.RxNettys;
+import org.jocean.idiom.DisposableWrapper;
 import org.jocean.xharbor.api.TradeReactor;
 import org.jocean.xharbor.api.TradeReactor.InOut;
-import org.jocean.xharbor.reactor.RewriteRequest;
 import org.junit.Test;
 
 import io.netty.buffer.Unpooled;
@@ -38,8 +37,8 @@ public class RewriteRequestTestCase {
         final InOut io = 
             reactor.react(null, new InOut() {
                 @Override
-                public Observable<? extends HttpObject> inbound() {
-                    return Observable.<HttpObject>just(orgreq);
+                public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
+                    return Observable.just(RxNettys.wrap(orgreq));
                 }
                 @Override
                 public Observable<? extends HttpObject> outbound() {
@@ -47,10 +46,7 @@ public class RewriteRequestTestCase {
                 }})
             .toBlocking().value();
         
-        final HttpMessageHolder holder = new HttpMessageHolder();
-        io.inbound().compose(holder.<HttpObject>assembleAndHold()).subscribe();
-        
-        final FullHttpRequest rwreq = holder.fullOf(RxNettys.BUILD_FULL_REQUEST).call();
+        final FullHttpRequest rwreq = io.inbound().compose(RxNettys.message2fullreq(null)).toBlocking().single().unwrap();
         
         assertEquals("/yjy_psm/fetchMetadata", orgreq.uri());
         assertEquals("/yjy_common/fetchMetadata", rwreq.uri());
@@ -67,8 +63,8 @@ public class RewriteRequestTestCase {
         final InOut io = 
             reactor.react(null, new InOut() {
                 @Override
-                public Observable<? extends HttpObject> inbound() {
-                    return Observable.<HttpObject>just(orgreq);
+                public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
+                    return Observable.just(RxNettys.wrap(orgreq));
                 }
                 @Override
                 public Observable<? extends HttpObject> outbound() {
@@ -91,8 +87,8 @@ public class RewriteRequestTestCase {
         final InOut io = 
             reactor.react(null, new InOut() {
                 @Override
-                public Observable<? extends HttpObject> inbound() {
-                    return Observable.<HttpObject>just(orgreq);
+                public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
+                    return Observable.just(RxNettys.wrap(orgreq));
                 }
                 @Override
                 public Observable<? extends HttpObject> outbound() {
@@ -100,10 +96,7 @@ public class RewriteRequestTestCase {
                 }})
             .toBlocking().value();
         
-        final HttpMessageHolder holder = new HttpMessageHolder();
-        io.inbound().compose(holder.<HttpObject>assembleAndHold()).subscribe();
-        
-        final FullHttpRequest rwreq = holder.fullOf(RxNettys.BUILD_FULL_REQUEST).call();
+        final FullHttpRequest rwreq = io.inbound().compose(RxNettys.message2fullreq(null)).toBlocking().single().unwrap();
         
         assertEquals("/yjy_psm/fetchMetadata", orgreq.uri());
         assertEquals("/yjy_common/fetchMetadata", rwreq.uri());
