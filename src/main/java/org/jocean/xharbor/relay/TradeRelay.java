@@ -96,8 +96,7 @@ public class TradeRelay extends Subscriber<HttpTrade> implements BeanHolderAware
                 if (null == io || null == io.outbound()) {
                     LOG.warn("NO_INOUT for trade({}), react io detail: {}.", trade, io);
                 }
-                trade.outbound(buildResponse(trade.obsrequest(), io)
-                );
+                trade.outbound(buildResponse(trade.obsrequest(), io));
             }}, new Action1<Throwable>() {
             @Override
             public void call(final Throwable error) {
@@ -128,6 +127,7 @@ public class TradeRelay extends Subscriber<HttpTrade> implements BeanHolderAware
 
     private Func1<Observable<? extends Throwable>, ? extends Observable<?>> retryPolicy(final HttpTrade trade) {
         final RetryPolicy<Integer> policy = new RetryPolicy<Integer>() {
+            @SuppressWarnings("unchecked")
             @Override
             public Observable<Integer> call(final Observable<Throwable> errors) {
                 return (Observable<Integer>) errors.compose(RxObservables.retryIfMatch(ifMatch(trade), 100))
