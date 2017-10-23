@@ -78,14 +78,14 @@ public class RewriteRequest implements TradeReactor {
         return new InOut() {
             @Override
             public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
-                return Observable.<DisposableWrapper<HttpObject>>just(RxNettys.wrap(rewriteRequest(matcher, originalreq)))
+                return Observable.<DisposableWrapper<HttpObject>>just(RxNettys.wrap4release(rewriteRequest(matcher, originalreq)))
                     .concatWith(
                         originalio.inbound()
                         .flatMap(RxNettys.splitdwhs())
                         .skip(1));
             }
             @Override
-            public Observable<? extends HttpObject> outbound() {
+            public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
                 return originalio.outbound();
             }};
     }

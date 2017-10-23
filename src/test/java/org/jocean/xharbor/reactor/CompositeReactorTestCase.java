@@ -68,7 +68,7 @@ public class CompositeReactorTestCase {
                 return null;
             }
             @Override
-            public Observable<? extends HttpObject> outbound() {
+            public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
                 return null;
             }})
         .toBlocking().value();

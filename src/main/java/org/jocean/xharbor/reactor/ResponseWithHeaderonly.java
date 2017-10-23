@@ -50,7 +50,7 @@ public class ResponseWithHeaderonly implements TradeReactor {
                             return null;
                         } else {
                             if (_matcher.match(req)) {
-                                return io4Response(io, req);
+                                return io4Response(ctx, io, req);
                             } else {
                                 //  not handle this trade
                                 return null;
@@ -60,7 +60,7 @@ public class ResponseWithHeaderonly implements TradeReactor {
                 .toSingle();
     }
 
-    private InOut io4Response(final InOut originalio, 
+    private InOut io4Response(final ReactContext ctx, final InOut originalio, 
             final HttpRequest originalreq) {
         return new InOut() {
             @Override
@@ -68,7 +68,7 @@ public class ResponseWithHeaderonly implements TradeReactor {
                 return originalio.inbound();
             }
             @Override
-            public Observable<? extends HttpObject> outbound() {
+            public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
                 final FullHttpResponse response = new DefaultFullHttpResponse(
                         originalreq.protocolVersion(), HttpResponseStatus.valueOf(_responseStatus));
                 response.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
@@ -78,6 +78,7 @@ public class ResponseWithHeaderonly implements TradeReactor {
                     }
                 }
                 return Observable.<HttpObject>just(response)
+                    .map(DisposableWrapperUtil.wrap(RxNettys.disposerOf(), null != ctx ? ctx.trade() : null))
                     .delaySubscription(originalio.inbound().ignoreElements())
                     .doOnCompleted(new Action0() {
                         @Override

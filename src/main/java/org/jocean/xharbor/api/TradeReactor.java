@@ -20,7 +20,7 @@ public interface TradeReactor {
     
     public interface InOut {
         public Observable<? extends DisposableWrapper<HttpObject>> inbound();
-        public Observable<? extends HttpObject> outbound();
+        public Observable<? extends DisposableWrapper<HttpObject>> outbound();
     }
     
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io);

@@ -12,12 +12,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.jocean.http.Feature;
 import org.jocean.http.TrafficCounter;
 import org.jocean.http.TransportException;
-import org.jocean.http.WritePolicy;
 import org.jocean.http.client.HttpClient;
-import org.jocean.http.client.HttpClient.HttpInitiator;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.HttpMessageHolder;
-
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.DisposableWrapper;
 import org.jocean.idiom.DisposableWrapperUtil;
@@ -113,87 +110,92 @@ public class ForwardTrade implements TradeReactor {
     }
     
     private Observable<InOut> io4forward(final ReactContext ctx, final InOut originalio, final MarkableTargetImpl target) {
-        final Observable<? extends HttpObject> outbound = 
-                buildOutbound(ctx.trade(), originalio.inbound(), target, ctx.watch());
-        
-        //  outbound 可被重复订阅
-        final Observable<? extends HttpObject> cachedOutbound = outbound.cache()
-            .compose(RxNettys.duplicateHttpContent())
-            ;
+        // outbound 可被重复订阅
+        final Observable<? extends DisposableWrapper<HttpObject>> cachedOutbound = buildOutbound(ctx.trade(),
+                originalio.inbound(), target, ctx.watch()).cache().map(dwh -> {
+                    if (dwh.unwrap() instanceof HttpContent) {
+                        return DisposableWrapperUtil.wrap(((HttpContent) dwh.unwrap()).duplicate(), dwh);
+                    } else {
+                        return dwh;
+                    }
+                });
         
         //  启动转发 (forward)
-        return cachedOutbound.first()
-            .doOnError(new Action1<Throwable>() {
-                @Override
-                public void call(final Throwable error) {
-                    //  remember reset to false after a while
-                    if (isCommunicationFailure(error)) {
-                        markServiceDownStatus(target, true);
-                        LOG.warn("COMMUNICATION_FAILURE({}), so mark service [{}] down.",
-                                ExceptionUtils.exception2detail(error), target.serviceUri());
-                        _timer.newTimeout(new TimerTask() {
-                            @Override
-                            public void run(final Timeout timeout) throws Exception {
-                                // reset down flag
-                                markServiceDownStatus(target, false);
-                                LOG.info("reset service [{}] down to false, after {} second cause by COMMUNICATION_FAILURE({}).",
-                                        target.serviceUri(), _period, ExceptionUtils.exception2detail(error));
-                            }
-                        },  _period, TimeUnit.SECONDS);
+        return cachedOutbound.first().doOnError(new Action1<Throwable>() {
+            @Override
+            public void call(final Throwable error) {
+                // remember reset to false after a while
+                if (isCommunicationFailure(error)) {
+                    markServiceDownStatus(target, true);
+                    LOG.warn("COMMUNICATION_FAILURE({}), so mark service [{}] down.",
+                            ExceptionUtils.exception2detail(error), target.serviceUri());
+                    _timer.newTimeout(new TimerTask() {
+                        @Override
+                        public void run(final Timeout timeout) throws Exception {
+                            // reset down flag
+                            markServiceDownStatus(target, false);
+                            LOG.info(
+                                    "reset service [{}] down to false, after {} second cause by COMMUNICATION_FAILURE({}).",
+                                    target.serviceUri(), _period, ExceptionUtils.exception2detail(error));
+                        }
+                    }, _period, TimeUnit.SECONDS);
+                }
+
+            }
+        }).flatMap(dwh -> {
+            if (dwh.unwrap() instanceof HttpResponse) {
+                final HttpResponse resp = (HttpResponse) dwh.unwrap();
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("recv first response hear part {}, so push toNext valid io.", resp);
+                }
+
+                // 404 Not Found
+                if (resp.status().equals(HttpResponseStatus.NOT_FOUND)) {
+                    // Request-URI not found in target service, so try next
+                    // matched forward target
+                    LOG.info("API_NOT_SUPPORTED for target {}, so forward trade({}) to next reactor", target,
+                            ctx.trade());
+                    return Observable.<InOut>just(null);
+                }
+
+                // 5XX Server Internal Error
+                if (resp.status().code() >= 500) {
+                    // Server Internal Error
+                    target.markAPIDownStatus(true);
+                    LOG.warn("SERVER_ERROR({}), so mark service [{}]'s matched {} APIs down.", resp.status(),
+                            target.serviceUri(), _matcher);
+                    _timer.newTimeout(new TimerTask() {
+                        @Override
+                        public void run(final Timeout timeout) throws Exception {
+                            // reset down flag
+                            target.markAPIDownStatus(false);
+                            LOG.info(
+                                    "reset service [{}]'s matched {} APIs down to false, after {} second cause by SERVER_ERROR({}).",
+                                    target.serviceUri(), _matcher, _period, resp.status());
+                        }
+                    }, _period, TimeUnit.SECONDS);
+                    return Observable.error(new TransportException("SERVER_ERROR(" + resp.status() + ")"));
+                }
+
+                return Observable.<InOut>just(new InOut() {
+                    @Override
+                    public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
+                        return originalio.inbound();
                     }
-                    
-                }})
-            .flatMap(new Func1<HttpObject, Observable<InOut>>() {
-                @Override
-                public Observable<InOut> call(final HttpObject httpobj) {
-                    if (httpobj instanceof HttpResponse) {
-                        final HttpResponse resp = (HttpResponse)httpobj;
-                        if (LOG.isDebugEnabled()) {
-                            LOG.debug("recv first response hear part {}, so push toNext valid io.", resp);
-                        }
-                        
-                        //  404 Not Found
-                        if (resp.status().equals(HttpResponseStatus.NOT_FOUND)) {
-                            //  Request-URI not found in target service, so try next matched forward target
-                            LOG.info("API_NOT_SUPPORTED for target {}, so forward trade({}) to next reactor", target, ctx.trade());
-                            return Observable.<InOut>just(null);
-                        }
-                        
-                        //  5XX Server Internal Error
-                        if (resp.status().code() >= 500) {
-                            //  Server Internal Error 
-                            target.markAPIDownStatus(true);
-                            LOG.warn("SERVER_ERROR({}), so mark service [{}]'s matched {} APIs down.",
-                                    resp.status(), target.serviceUri(), _matcher);
-                            _timer.newTimeout(new TimerTask() {
-                                @Override
-                                public void run(final Timeout timeout) throws Exception {
-                                    // reset down flag
-                                    target.markAPIDownStatus(false);
-                                    LOG.info("reset service [{}]'s matched {} APIs down to false, after {} second cause by SERVER_ERROR({}).",
-                                            target.serviceUri(), _matcher, _period, resp.status());
-                                }
-                            },  _period, TimeUnit.SECONDS);
-                            return Observable.error(new TransportException("SERVER_ERROR(" + resp.status() + ")"));
-                        }
-                        
-                        return Observable.<InOut>just(new InOut() {
-                            @Override
-                            public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
-                                return originalio.inbound();
-                            }
-                            @Override
-                            public Observable<? extends HttpObject> outbound() {
-                                return cachedOutbound;
-                            }});
-                    } else {
-                        LOG.warn("first httpobject {} is not HttpResponse, can't use as http response stream", httpobj);
-                        return Observable.error(new RuntimeException("invalid http response"));
+
+                    @Override
+                    public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
+                        return cachedOutbound;
                     }
-            }});
+                });
+            } else {
+                LOG.warn("first httpobject {} is not HttpResponse, can't use as http response stream", dwh);
+                return Observable.error(new RuntimeException("invalid http response"));
+            }
+        });
     }
 
-    private Observable<? extends HttpObject> buildOutbound(
+    private Observable<? extends DisposableWrapper<HttpObject>> buildOutbound(
             final HttpTrade trade, 
             final Observable<? extends DisposableWrapper<HttpObject>> inbound, 
             final Target target,
@@ -203,75 +205,62 @@ public class ForwardTrade implements TradeReactor {
         final AtomicReference<HttpRequest> refReq = new AtomicReference<>();
         final AtomicReference<HttpResponse> refResp = new AtomicReference<>();
         
-        return this._httpclient.initiator()
-                .remoteAddress(buildAddress(target))
-                .feature(target.features().call())
-                .build()
-                .flatMap(new Func1<HttpInitiator, Observable<? extends HttpObject> >() {
-                    @Override
-                    public Observable<? extends HttpObject> call(
-                            final HttpInitiator initiator) {
-                        
-                        // TBD: using ReadPolicies.ByOutbound
-                        // ref: https://github.com/isdom/xharbor/commit/e81069dd56bfb68b08c971923d24958c438ffe2b#diff-0a4a34cc848464f04687f26d3d122a59L211
-                        
-                        trade.doOnTerminate(initiator.closer());
-                        final TrafficCounter initiatorTraffic = initiator.traffic();
-                        
-                        trade.doOnTerminate(new Action0() {
-                            @Override
-                            public void call() {
-                                final long ttl = stopWatch.stopAndRestart();
-                                final RelayMemo memo = _memoBuilder.build(target, buildRoutingInfo(refReq.get()));
-                                memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
-                                LOG.info("FORWARD_SUCCESS"
-                                        + "\ncost:[{}]s,forward_to:[{}]"
-                                        + "\nFROM:inbound:[{}]bytes,outbound:[{}]bytes"
-                                        + "\nTO:upload:[{}]bytes,download:[{}]bytes"
-                                        + "\nin-channel:{}\nout-channel:{}"
-                                        + "\nREQ\n[{}]\nsendback\nRESP\n[{}]",
-                                        ttl / (float)1000.0, 
-                                        target.serviceUri(), 
-                                        trade.traffic().inboundBytes(),
-                                        trade.traffic().outboundBytes(),
-                                        initiatorTraffic.outboundBytes(),
-                                        initiatorTraffic.inboundBytes(),
-                                        trade.transport(),
-                                        initiator.transport(),
-                                        refReq.get(), 
-                                        refResp.get());
-                            }});
-                        
-                        final HttpMessageHolder holder = new HttpMessageHolder();
-                        initiator.doOnTerminate(holder.closer());
-                        
-                        final AtomicInteger sendingSize = new AtomicInteger(0);
-                        return initiator.defineInteraction(
-                                buildRequest(trade, inbound, refReq, isKeepAliveFromClient).doOnNext(dwh -> {
-                                    final HttpObject hobj = ((DisposableWrapper<HttpObject>) dwh).unwrap();
-                                    if (hobj instanceof HttpContent) {
-                                        sendingSize.addAndGet(((HttpContent) hobj).content().readableBytes());
+        return this._httpclient.initiator().remoteAddress(buildAddress(target)).feature(target.features().call())
+                .build().flatMap(initiator -> {
+                    // TBD: using ReadPolicies.ByOutbound
+                    // ref:
+                    // https://github.com/isdom/xharbor/commit/e81069dd56bfb68b08c971923d24958c438ffe2b#diff-0a4a34cc848464f04687f26d3d122a59L211
+
+                    trade.doOnTerminate(initiator.closer());
+                    final TrafficCounter initiatorTraffic = initiator.traffic();
+
+                    trade.doOnTerminate(new Action0() {
+                        @Override
+                        public void call() {
+                            final long ttl = stopWatch.stopAndRestart();
+                            final RelayMemo memo = _memoBuilder.build(target, buildRoutingInfo(refReq.get()));
+                            memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
+                            LOG.info(
+                                    "FORWARD_SUCCESS" + "\ncost:[{}]s,forward_to:[{}]"
+                                            + "\nFROM:inbound:[{}]bytes,outbound:[{}]bytes"
+                                            + "\nTO:upload:[{}]bytes,download:[{}]bytes"
+                                            + "\nin-channel:{}\nout-channel:{}" + "\nREQ\n[{}]\nsendback\nRESP\n[{}]",
+                                    ttl / (float) 1000.0, target.serviceUri(), trade.traffic().inboundBytes(),
+                                    trade.traffic().outboundBytes(), initiatorTraffic.outboundBytes(),
+                                    initiatorTraffic.inboundBytes(), trade.transport(), initiator.transport(),
+                                    refReq.get(), refResp.get());
+                        }
+                    });
+
+                    // final HttpMessageHolder holder = new HttpMessageHolder();
+                    // initiator.doOnTerminate(holder.closer());
+
+                    final AtomicInteger sendingSize = new AtomicInteger(0);
+                    return initiator.defineInteraction(
+                            buildRequest(trade, inbound, refReq, isKeepAliveFromClient).doOnNext(dwh -> {
+                                final HttpObject hobj = ((DisposableWrapper<HttpObject>) dwh).unwrap();
+                                if (hobj instanceof HttpContent) {
+                                    sendingSize.addAndGet(((HttpContent) hobj).content().readableBytes());
+                                }
+                            }), outboundable -> {
+                                outboundable.setFlushPerWrite(true);
+                                outboundable.sended().subscribe(sended -> {
+                                    if (sendingSize.get() > MAX_RETAINED_SIZE) {
+                                        if (LOG.isTraceEnabled()) {
+                                            LOG.trace("sendingSize is {}, dispose sended {}", sendingSize.get(),
+                                                    sended);
+                                        }
+                                        DisposableWrapperUtil.dispose(sended);
+                                    } else {
+                                        if (LOG.isTraceEnabled()) {
+                                            LOG.trace("sendingSize is {}, SKIP sended {}", sendingSize.get(), sended);
+                                        }
                                     }
-                                }), new WritePolicy() {
-                                    @Override
-                                    public void applyTo(final Outboundable outboundable) {
-                                        outboundable.setFlushPerWrite(true);
-                                        outboundable.sended().subscribe(sended -> {
-                                            if (sendingSize.get() > MAX_RETAINED_SIZE) {
-                                                if (LOG.isTraceEnabled()) {
-                                                    LOG.trace("sendingSize is {}, dispose sended {}", sendingSize.get(), sended);
-                                                }
-                                                DisposableWrapperUtil.dispose(sended);
-                                            } else {
-                                                if (LOG.isTraceEnabled()) {
-                                                    LOG.trace("sendingSize is {}, SKIP sended {}", sendingSize.get(), sended);
-                                                }
-                                            }
-                                        });
-                                    }
-                                }).compose(holder.<HttpObject>assembleAndHold());
-                    }})
-                .flatMap(RxNettys.splitFullHttpMessage())
+                                });
+                            })
+                    // .compose(holder.<HttpObject>assembleAndHold())
+                    ;
+                }).flatMap(RxNettys.splitdwhs())
                 .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient));
     }
 
@@ -281,30 +270,28 @@ public class ForwardTrade implements TradeReactor {
             target.serviceUri().getPort());
     }
 
-    private Func1<HttpObject, HttpObject> removeKeepAliveIfNeeded(
+    private Func1<DisposableWrapper<HttpObject>, DisposableWrapper<HttpObject>> removeKeepAliveIfNeeded(
             final AtomicReference<HttpResponse> refResp,
             final AtomicBoolean isKeepAliveFromClient) {
-        return new Func1<HttpObject, HttpObject>() {
-                @Override
-                public HttpObject call(final HttpObject httpobj) {
-                    if (httpobj instanceof HttpResponse) {
-                        final HttpResponse resp = (HttpResponse)httpobj;
-                        refResp.set(resp);
-                        if (!isKeepAliveFromClient.get()) {
-                            if (HttpUtil.isKeepAlive(resp)) {
-                                // if NOT keep alive from client, remove keepalive header
-                                final DefaultHttpResponse newresp = new DefaultHttpResponse(
-                                        resp.protocolVersion(), 
-                                        resp.status());
-                                newresp.headers().add(resp.headers());
-                                newresp.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-                                LOG.info("FORCE-KeepAlive: set Connection header with Close for sendback resp:\n[{}]", resp);
-                                return newresp;
-                            }
-                        }
+        return dwh -> {
+            if (dwh.unwrap() instanceof HttpResponse) {
+                final HttpResponse resp = (HttpResponse) dwh.unwrap();
+                refResp.set(resp);
+                if (!isKeepAliveFromClient.get()) {
+                    if (HttpUtil.isKeepAlive(resp)) {
+                        // if NOT keep alive from client, remove keepalive
+                        // header
+                        final DefaultHttpResponse newresp = new DefaultHttpResponse(resp.protocolVersion(),
+                                resp.status());
+                        newresp.headers().add(resp.headers());
+                        newresp.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+                        LOG.info("FORCE-KeepAlive: set Connection header with Close for sendback resp:\n[{}]", resp);
+                        return RxNettys.wrap4release(newresp);
                     }
-                    return httpobj;
-                }};
+                }
+            }
+            return dwh;
+        };
     }
 
     private Observable<DisposableWrapper<HttpObject>> buildRequest(
@@ -331,7 +318,7 @@ public class ForwardTrade implements TradeReactor {
                                 newreq.headers().add(req.headers());
                                 newreq.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
                                 LOG.info("FORCE-KeepAlive: add Connection header with KeepAlive for incoming req:\n[{}]", req);
-                                return RxNettys.wrap(newreq);
+                                return RxNettys.wrap4release(newreq);
                             }
                         }
                     }

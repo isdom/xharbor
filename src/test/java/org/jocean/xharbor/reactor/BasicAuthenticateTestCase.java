@@ -2,11 +2,9 @@ package org.jocean.xharbor.reactor;
 
 import static org.junit.Assert.assertEquals;
 
-import org.jocean.http.util.HttpMessageHolder;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.DisposableWrapper;
 import org.jocean.xharbor.api.TradeReactor.InOut;
-import org.jocean.xharbor.reactor.BasicAuthenticate;
 import org.junit.Test;
 
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
@@ -34,18 +32,15 @@ public class BasicAuthenticateTestCase {
             authorizer.react(null, new InOut() {
                 @Override
                 public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
-                    return Observable.just(RxNettys.wrap(orgreq));
+                    return Observable.just(RxNettys.wrap4release(orgreq));
                 }
                 @Override
-                public Observable<? extends HttpObject> outbound() {
+                public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
                     return null;
                 }})
             .toBlocking().value();
         
-        final HttpMessageHolder holder = new HttpMessageHolder();
-        io.outbound().compose(holder.<HttpObject>assembleAndHold()).subscribe();
-        
-        final FullHttpResponse response = holder.fullOf(RxNettys.BUILD_FULL_RESPONSE).call();
+        final FullHttpResponse response = io.outbound().compose(RxNettys.message2fullresp(null)).toBlocking().single().unwrap();
         
         assertEquals(HttpResponseStatus.UNAUTHORIZED, response.status());
         assertEquals(HttpVersion.HTTP_1_0, response.protocolVersion());

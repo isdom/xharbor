@@ -59,7 +59,7 @@ public class LogAccessInfo2Redis implements TradeReactor, Ordered, BeanHolderAwa
                 @Override
                 public Observable<Pair<HttpRequest, HttpResponse>> call(
                         final HttpRequest req) {
-                    return io.outbound().compose(RxNettys.asHttpResponse())
+                    return io.outbound().map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpResponse())
                         .flatMap(new Func1<HttpResponse, Observable<Pair<HttpRequest, HttpResponse>>>() {
                         @Override
                         public  Observable<Pair<HttpRequest, HttpResponse>> call(

@@ -63,7 +63,7 @@ public class TradeRelay extends Subscriber<HttpTrade> implements BeanHolderAware
 
     @Override
     public void onNext(final HttpTrade trade) {
-        if ( null != this._beanHolder) {
+        if (null != this._beanHolder) {
             final ReadPolicy policy = _beanHolder.getBean(ReadPolicy.class);
             if (null != policy) {
                 trade.setReadPolicy(policy);
@@ -75,39 +75,44 @@ public class TradeRelay extends Subscriber<HttpTrade> implements BeanHolderAware
             public HttpTrade trade() {
                 return trade;
             }
+
             @Override
             public StopWatch watch() {
                 return watch4Result;
-            }};
-        
+            }
+        };
+
         this._tradeReactor.react(ctx, new InOut() {
             @Override
             public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
                 return trade.obsrequest();
             }
+
             @Override
-            public Observable<? extends HttpObject> outbound() {
+            public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
                 return null;
-            }})
-        .retryWhen(retryPolicy(trade))
-        .subscribe(new Action1<InOut>() {
+            }
+        }).retryWhen(retryPolicy(trade)).subscribe(new Action1<InOut>() {
             @Override
             public void call(final InOut io) {
                 if (null == io || null == io.outbound()) {
                     LOG.warn("NO_INOUT for trade({}), react io detail: {}.", trade, io);
                 }
-                trade.outbound(buildResponse(trade.obsrequest(), io));
-            }}, new Action1<Throwable>() {
+                trade.outbound(buildResponse(trade, trade.obsrequest(), io), outboundable -> {
+                    outboundable.sended().subscribe(sended -> DisposableWrapperUtil.dispose(sended));
+                });
+            }
+        }, new Action1<Throwable>() {
             @Override
             public void call(final Throwable error) {
-                LOG.warn("Trade {} react with error, detail:{}", 
-                        trade, ExceptionUtils.exception2detail(error));
+                LOG.warn("Trade {} react with error, detail:{}", trade, ExceptionUtils.exception2detail(error));
                 trade.close();
-            }});
+            }
+        });
     }
 
-    private Observable<? extends HttpObject> buildResponse(
-            final Observable<? extends DisposableWrapper<HttpObject>> originalInbound, final InOut io) {
+    private Observable<? extends DisposableWrapper<HttpObject>> buildResponse(
+            final HttpTrade trade, final Observable<? extends DisposableWrapper<HttpObject>> originalInbound, final InOut io) {
         return (null != io && null != io.outbound())
             ? io.outbound()
             : originalInbound.map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpRequest())
@@ -122,6 +127,7 @@ public class TradeRelay extends Subscriber<HttpTrade> implements BeanHolderAware
                             final HttpVersion version) {
                         return RxNettys.response200OK(version);
                     }})
+                .map(DisposableWrapperUtil.wrap(RxNettys.disposerOf(), trade))
                 .delaySubscription(originalInbound.ignoreElements());// response when request send completed
     }
 

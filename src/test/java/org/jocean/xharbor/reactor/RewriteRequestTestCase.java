@@ -38,10 +38,10 @@ public class RewriteRequestTestCase {
             reactor.react(null, new InOut() {
                 @Override
                 public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
-                    return Observable.just(RxNettys.wrap(orgreq));
+                    return Observable.just(RxNettys.wrap4release(orgreq));
                 }
                 @Override
-                public Observable<? extends HttpObject> outbound() {
+                public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
                     return null;
                 }})
             .toBlocking().value();
@@ -64,10 +64,10 @@ public class RewriteRequestTestCase {
             reactor.react(null, new InOut() {
                 @Override
                 public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
-                    return Observable.just(RxNettys.wrap(orgreq));
+                    return Observable.just(RxNettys.wrap4release(orgreq));
                 }
                 @Override
-                public Observable<? extends HttpObject> outbound() {
+                public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
                     return null;
                 }})
             .toBlocking().value();
@@ -88,10 +88,10 @@ public class RewriteRequestTestCase {
             reactor.react(null, new InOut() {
                 @Override
                 public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
-                    return Observable.just(RxNettys.wrap(orgreq));
+                    return Observable.just(RxNettys.wrap4release(orgreq));
                 }
                 @Override
-                public Observable<? extends HttpObject> outbound() {
+                public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
                     return null;
                 }})
             .toBlocking().value();

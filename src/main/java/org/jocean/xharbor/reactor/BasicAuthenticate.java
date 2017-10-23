@@ -50,7 +50,7 @@ public class BasicAuthenticate implements TradeReactor {
                                     return null;
                                 } else {
                                     // response 401 Unauthorized
-                                    return io4Unauthorized(io, req);
+                                    return io4Unauthorized(ctx, io, req);
                                 }
                             } else {
                                 //  not handle this trade
@@ -61,7 +61,7 @@ public class BasicAuthenticate implements TradeReactor {
                 .toSingle();
     }
 
-    private InOut io4Unauthorized(final InOut originalio, 
+    private InOut io4Unauthorized(final ReactContext ctx, final InOut originalio, 
             final HttpRequest originalreq) {
         return new InOut() {
             @Override
@@ -69,10 +69,11 @@ public class BasicAuthenticate implements TradeReactor {
                 return originalio.inbound();
             }
             @Override
-            public Observable<? extends HttpObject> outbound() {
+            public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
                 return RxNettys.response401Unauthorized(
                         originalreq.protocolVersion(), 
                         "Basic realm=\"" + _strWWWAuthenticate + "\"")
+                    .map(DisposableWrapperUtil.wrap(RxNettys.disposerOf(), null != ctx ? ctx.trade() : null))
                     .delaySubscription(originalio.inbound().ignoreElements());
             }};
     }

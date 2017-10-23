@@ -2,11 +2,9 @@ package org.jocean.xharbor.reactor;
 
 import static org.junit.Assert.assertEquals;
 
-import org.jocean.http.util.HttpMessageHolder;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.DisposableWrapper;
 import org.jocean.xharbor.api.TradeReactor.InOut;
-import org.jocean.xharbor.reactor.ResponseWithHeaderonly;
 import org.junit.Test;
 
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
@@ -33,18 +31,15 @@ public class ResponseWithHeaderonlyTestCase {
             responder.react(null, new InOut() {
                 @Override
                 public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
-                    return Observable.just(RxNettys.wrap(request));
+                    return Observable.just(RxNettys.wrap4release(request));
                 }
                 @Override
-                public Observable<? extends HttpObject> outbound() {
+                public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
                     return null;
                 }})
             .toBlocking().value();
         
-        final HttpMessageHolder holder = new HttpMessageHolder();
-        io.outbound().compose(holder.<HttpObject>assembleAndHold()).subscribe();
-        
-        final FullHttpResponse response = holder.fullOf(RxNettys.BUILD_FULL_RESPONSE).call();
+        final FullHttpResponse response = io.outbound().compose(RxNettys.message2fullresp(null)).toBlocking().single().unwrap();
         
         assertEquals(HttpResponseStatus.OK, response.status());
         assertEquals(HttpVersion.HTTP_1_0, response.protocolVersion());

@@ -12,7 +12,6 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import rx.Observable;
 import rx.Single;
-import rx.functions.Action1;
 import rx.functions.Func1;
 
 public class RewriteResponse implements TradeReactor {
@@ -47,26 +46,25 @@ public class RewriteResponse implements TradeReactor {
                 .toSingle();
     }
     
-    private InOut io4rewriteResponse(final InOut originalio, 
-            final HttpRequest originalreq) {
+    private InOut io4rewriteResponse(final InOut originalio, final HttpRequest originalreq) {
         return new InOut() {
             @Override
             public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
                 return originalio.inbound();
             }
+
             @Override
-            public Observable<? extends HttpObject> outbound() {
-                return originalio.outbound().doOnNext(new Action1<HttpObject>() {
-                    @Override
-                    public void call(final HttpObject httpobj) {
-                        if (httpobj instanceof HttpResponse) {
-                            final HttpResponse response = (HttpResponse)httpobj;
-                            for (Map.Entry<String, String> entry : _extraHeaders.entrySet()) {
-                                response.headers().set(entry.getKey(), entry.getValue());
-                            }
+            public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
+                return originalio.outbound().doOnNext(dwh -> {
+                    if (dwh.unwrap() instanceof HttpResponse) {
+                        final HttpResponse response = (HttpResponse) dwh.unwrap();
+                        for (Map.Entry<String, String> entry : _extraHeaders.entrySet()) {
+                            response.headers().set(entry.getKey(), entry.getValue());
                         }
-                    }});
-            }};
+                    }
+                });
+            }
+        };
     }
     
     private final MatchRule _matcher;
