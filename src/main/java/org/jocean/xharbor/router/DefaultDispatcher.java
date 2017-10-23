@@ -18,6 +18,7 @@ import org.jocean.http.client.HttpClient;
 import org.jocean.http.client.HttpClient.HttpInitiator;
 import org.jocean.http.util.Nettys.ChannelAware;
 import org.jocean.http.util.RxNettys;
+import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxObservables;
@@ -278,7 +279,7 @@ public class DefaultDispatcher implements Dispatcher {
                     .flatMap(new Func1<HttpInitiator, Observable<HttpObject>>() {
                         @Override
                         public Observable<HttpObject> call(HttpInitiator t) {
-                            return (Observable<HttpObject>) t.defineInteraction(fullRequest.doOnNext(new Action1<HttpObject>() {
+                            return t.defineInteraction(fullRequest.doOnNext(new Action1<HttpObject>() {
                                 @Override
                                 public void call(final HttpObject httpObj) {
                                     if (httpObj instanceof HttpRequest) {
@@ -298,7 +299,7 @@ public class DefaultDispatcher implements Dispatcher {
                                                     ExceptionUtils.exception2detail(e));
                                         }
                                     }
-                                }}));
+                                }})).map(DisposableWrapperUtil.<HttpObject>unwrap());
                         }})
                     .doOnNext(new Action1<HttpObject>() {
                         @Override
