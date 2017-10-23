@@ -14,7 +14,6 @@ import org.jocean.http.TrafficCounter;
 import org.jocean.http.TransportException;
 import org.jocean.http.client.HttpClient;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
-import org.jocean.http.util.HttpMessageHolder;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.DisposableWrapper;
 import org.jocean.idiom.DisposableWrapperUtil;
@@ -393,22 +392,22 @@ public class ForwardTrade implements TradeReactor {
         return error instanceof ConnectException;
     }
     
-    private Action1<Object> unholdInboundMessage(final HttpMessageHolder holder) {
-        return new Action1<Object>() {
-            @Override
-            public void call(final Object msg) {
-                if (msg instanceof HttpContent) {
-                    if (holder.isFragmented()
-                        || holder.retainedByteBufSize() > MAX_RETAINED_SIZE) {
-                        LOG.info("holder({}) BEGIN_RELEASE msg({}), now it's retained size: {}",
-                                holder, msg, holder.retainedByteBufSize());
-                        holder.releaseHttpContent((HttpContent)msg);
-                        LOG.info("holder({}) ENDOF_RELEASE msg({}), now it's retained size: {}",
-                                holder, msg, holder.retainedByteBufSize());
-                    }
-                }
-            }};
-    }
+//    private Action1<Object> unholdInboundMessage(final HttpMessageHolder holder) {
+//        return new Action1<Object>() {
+//            @Override
+//            public void call(final Object msg) {
+//                if (msg instanceof HttpContent) {
+//                    if (holder.isFragmented()
+//                        || holder.retainedByteBufSize() > MAX_RETAINED_SIZE) {
+//                        LOG.info("holder({}) BEGIN_RELEASE msg({}), now it's retained size: {}",
+//                                holder, msg, holder.retainedByteBufSize());
+//                        holder.releaseHttpContent((HttpContent)msg);
+//                        LOG.info("holder({}) ENDOF_RELEASE msg({}), now it's retained size: {}",
+//                                holder, msg, holder.retainedByteBufSize());
+//                    }
+//                }
+//            }};
+//    }
 
     private class MarkableTargetImpl implements Target {
         
