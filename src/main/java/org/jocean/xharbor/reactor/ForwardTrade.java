@@ -48,7 +48,6 @@ import io.netty.util.TimerTask;
 import rx.Observable;
 import rx.Single;
 import rx.functions.Action0;
-import rx.functions.Action1;
 import rx.functions.Func0;
 import rx.functions.Func1;
 
@@ -82,30 +81,25 @@ public class ForwardTrade implements TradeReactor {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpRequest())
-                .flatMap(new Func1<HttpRequest, Observable<InOut>>() {
-                    @Override
-                    public Observable<InOut> call(final HttpRequest req) {
-                        if (null == req) {
-                            return null;
-                        } else {
-                            if ( _matcher.match(req) ) {
-                                final MarkableTargetImpl target = selectTarget();
-                                if (null == target) {
-                                    //  no target
-                                    LOG.warn("NONE_TARGET to forward for trade {}", ctx.trade());
-                                    return Observable.just(null);
-                                } else {
-                                    return io4forward(ctx, io, target);
-                                }
-                            } else {
-                                //  not handle this trade
-                                return Observable.just(null);
-                            }
-                        }
-                    }})
-                .compose(RxObservables.<InOut>ensureSubscribeAtmostOnce())
-                .toSingle();
+        return io.inbound().map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpRequest()).flatMap(req -> {
+            if (null == req) {
+                return null;
+            } else {
+                if (_matcher.match(req)) {
+                    final MarkableTargetImpl target = selectTarget();
+                    if (null == target) {
+                        // no target
+                        LOG.warn("NONE_TARGET to forward for trade {}", ctx.trade());
+                        return Observable.just(null);
+                    } else {
+                        return io4forward(ctx, io, target);
+                    }
+                } else {
+                    // not handle this trade
+                    return Observable.just(null);
+                }
+            }
+        }).compose(RxObservables.<InOut>ensureSubscribeAtmostOnce()).toSingle();
     }
     
     private Observable<InOut> io4forward(final ReactContext ctx, final InOut originalio, final MarkableTargetImpl target) {
@@ -120,26 +114,22 @@ public class ForwardTrade implements TradeReactor {
                 });
         
         //  启动转发 (forward)
-        return cachedOutbound.first().doOnError(new Action1<Throwable>() {
-            @Override
-            public void call(final Throwable error) {
-                // remember reset to false after a while
-                if (isCommunicationFailure(error)) {
-                    markServiceDownStatus(target, true);
-                    LOG.warn("COMMUNICATION_FAILURE({}), so mark service [{}] down.",
-                            ExceptionUtils.exception2detail(error), target.serviceUri());
-                    _timer.newTimeout(new TimerTask() {
-                        @Override
-                        public void run(final Timeout timeout) throws Exception {
-                            // reset down flag
-                            markServiceDownStatus(target, false);
-                            LOG.info(
-                                    "reset service [{}] down to false, after {} second cause by COMMUNICATION_FAILURE({}).",
-                                    target.serviceUri(), _period, ExceptionUtils.exception2detail(error));
-                        }
-                    }, _period, TimeUnit.SECONDS);
-                }
-
+        return cachedOutbound.first().doOnError(error -> {
+            // remember reset to false after a while
+            if (isCommunicationFailure(error)) {
+                markServiceDownStatus(target, true);
+                LOG.warn("COMMUNICATION_FAILURE({}), so mark service [{}] down.",
+                        ExceptionUtils.exception2detail(error), target.serviceUri());
+                _timer.newTimeout(new TimerTask() {
+                    @Override
+                    public void run(final Timeout timeout) throws Exception {
+                        // reset down flag
+                        markServiceDownStatus(target, false);
+                        LOG.info(
+                                "reset service [{}] down to false, after {} second cause by COMMUNICATION_FAILURE({}).",
+                                target.serviceUri(), _period, ExceptionUtils.exception2detail(error));
+                    }
+                }, _period, TimeUnit.SECONDS);
             }
         }).flatMap(dwh -> {
             if (dwh.unwrap() instanceof HttpResponse) {
@@ -231,9 +221,6 @@ public class ForwardTrade implements TradeReactor {
                         }
                     });
 
-                    // final HttpMessageHolder holder = new HttpMessageHolder();
-                    // initiator.doOnTerminate(holder.closer());
-
                     final AtomicInteger sendingSize = new AtomicInteger(0);
                     return initiator.defineInteraction(
                             buildRequest(trade, inbound, refReq, isKeepAliveFromClient).doOnNext(dwh -> {
@@ -256,9 +243,7 @@ public class ForwardTrade implements TradeReactor {
                                         }
                                     }
                                 });
-                            })
-                    // .compose(holder.<HttpObject>assembleAndHold())
-                    ;
+                            });
                 }).flatMap(RxNettys.splitdwhs())
                 .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient));
     }
@@ -298,32 +283,27 @@ public class ForwardTrade implements TradeReactor {
             final Observable<? extends DisposableWrapper<HttpObject>> inbound,
             final AtomicReference<HttpRequest> refReq,
             final AtomicBoolean isKeepAliveFromClient) {
-        return inbound.flatMap(RxNettys.splitdwhs())
-            .map(new Func1<DisposableWrapper<HttpObject>, DisposableWrapper<HttpObject>>() {
-                @Override
-                public DisposableWrapper<HttpObject> call(final DisposableWrapper<HttpObject> dwh) {
-                    if (dwh.unwrap() instanceof HttpRequest) {
-                        final HttpRequest req = (HttpRequest)dwh.unwrap();
-                        refReq.set(req);
-                        //  only check first time, bcs inbound could be process many times
-                        if (isKeepAliveFromClient.get()) {
-                            isKeepAliveFromClient.set(HttpUtil.isKeepAlive(req));
-                            if (!isKeepAliveFromClient.get()) {
-                                // if NOT keep alive, force it
-                                final DefaultHttpRequest newreq = new DefaultHttpRequest(
-                                        req.protocolVersion(), 
-                                        req.method(),
-                                        req.uri());
-                                newreq.headers().add(req.headers());
-                                newreq.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
-                                LOG.info("FORCE-KeepAlive: add Connection header with KeepAlive for incoming req:\n[{}]", req);
-                                return RxNettys.wrap4release(newreq);
-                            }
-                        }
+        return inbound.flatMap(RxNettys.splitdwhs()).map(dwh -> {
+            if (dwh.unwrap() instanceof HttpRequest) {
+                final HttpRequest req = (HttpRequest) dwh.unwrap();
+                refReq.set(req);
+                // only check first time, bcs inbound could be process many
+                // times
+                if (isKeepAliveFromClient.get()) {
+                    isKeepAliveFromClient.set(HttpUtil.isKeepAlive(req));
+                    if (!isKeepAliveFromClient.get()) {
+                        // if NOT keep alive, force it
+                        final DefaultHttpRequest newreq = new DefaultHttpRequest(req.protocolVersion(), req.method(),
+                                req.uri());
+                        newreq.headers().add(req.headers());
+                        newreq.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                        LOG.info("FORCE-KeepAlive: add Connection header with KeepAlive for incoming req:\n[{}]", req);
+                        return RxNettys.wrap4release(newreq);
                     }
-                    return dwh;
-                }})
-            ;
+                }
+            }
+            return dwh;
+        });
     }
     
     private MarkableTargetImpl selectTarget() {
