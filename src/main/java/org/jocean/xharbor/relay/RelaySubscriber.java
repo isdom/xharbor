@@ -77,7 +77,7 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
 
     @Override
     public void onNext(final HttpTrade trade) {
-        final Observable<HttpObject> cached = trade.obsrequest().map(DisposableWrapperUtil.unwrap());
+        final Observable<HttpObject> cached = trade.inbound().map(DisposableWrapperUtil.unwrap());
             
         cached.subscribe(new RequestSubscriber(trade, cached));
     }

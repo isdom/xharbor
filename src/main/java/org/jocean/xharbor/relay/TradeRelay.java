@@ -85,7 +85,7 @@ public class TradeRelay extends Subscriber<HttpTrade> implements BeanHolderAware
         this._tradeReactor.react(ctx, new InOut() {
             @Override
             public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
-                return trade.obsrequest();
+                return trade.inbound();
             }
 
             @Override
@@ -98,7 +98,7 @@ public class TradeRelay extends Subscriber<HttpTrade> implements BeanHolderAware
                 if (null == io || null == io.outbound()) {
                     LOG.warn("NO_INOUT for trade({}), react io detail: {}.", trade, io);
                 }
-                trade.outbound(buildResponse(trade, trade.obsrequest(), io), outboundable -> {
+                trade.outbound(buildResponse(trade, trade.inbound(), io), outboundable -> {
                     outboundable.sended().subscribe(sended -> DisposableWrapperUtil.dispose(sended));
                 });
             }
