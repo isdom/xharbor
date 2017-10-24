@@ -24,8 +24,11 @@ import io.netty.handler.codec.redis.RedisMessage;
 import rx.Observable;
 import rx.Single;
 import rx.functions.Action1;
-import rx.functions.Func1;
 
+/**
+ * @author isdom
+ *
+ */
 public class LogAccessInfo2Redis implements TradeReactor, Ordered, BeanHolderAware {
     
     private static final Logger LOG = LoggerFactory
@@ -49,54 +52,33 @@ public class LogAccessInfo2Redis implements TradeReactor, Ordered, BeanHolderAwa
         
     }
     
-    private Single<? extends InOut> tryLogtoRedis(
-            final ReactContext ctx, 
-            final InOut io,
+    private Single<? extends InOut> tryLogtoRedis(final ReactContext ctx, final InOut io,
             final RedisClient redisclient) {
         if (null != io.inbound() && null != io.outbound()) {
-            io.inbound().map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpRequest())
-            .flatMap(new Func1<HttpRequest, Observable<Pair<HttpRequest, HttpResponse>>>() {
-                @Override
-                public Observable<Pair<HttpRequest, HttpResponse>> call(
-                        final HttpRequest req) {
-                    return io.outbound().map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpResponse())
-                        .flatMap(new Func1<HttpResponse, Observable<Pair<HttpRequest, HttpResponse>>>() {
-                        @Override
-                        public  Observable<Pair<HttpRequest, HttpResponse>> call(
-                                final HttpResponse resp) {
-                            return Observable.just(Pair.of(req, resp));
-                        }});
-                }})
-            .flatMap(new Func1<Pair<HttpRequest, HttpResponse>, Observable<RedisMessage>>() {
-                @SuppressWarnings("unchecked")
-                @Override
-                public Observable<RedisMessage> call(final Pair<HttpRequest, HttpResponse> reqAndResp) {
-                    final HttpRequest req = reqAndResp.first;
-                    final HttpResponse resp = reqAndResp.second;
-                    final String remoteip = reqAndResp.first.headers().get("remoteip");
-                    final Map<String, Object> data = Maps.newHashMap();
-                    data.put("method", req.method().name());
-                    data.put("uri", req.uri());
-                    data.put("reqContentType", req.headers().get(HttpHeaderNames.CONTENT_TYPE));
-                    data.put("reqContentLength", req.headers().get(HttpHeaderNames.CONTENT_LENGTH));
-                    data.put("status", resp.status().code());
-                    data.put("respContentType", resp.headers().get(HttpHeaderNames.CONTENT_TYPE));
-                    data.put("respContentLength", resp.headers().get(HttpHeaderNames.CONTENT_LENGTH));
-                    
-                    if (null != remoteip) {
-                        return redisclient.getConnection()
-                            .compose(RedisUtil.interactWithRedis(
-                                    RedisUtil.cmdSet(remoteip, JSON.toJSONString(data)).build() ));
-                    } else {
-                        return Observable.<RedisMessage>empty();
-                    }
-                }})
-            .subscribe(new Action1<RedisMessage>() {
-                @Override
-                public void call(final RedisMessage redismsg) {
-                    LOG.info("trade log to redis with {}", RedisUtil.dumpAggregatedRedisMessage(redismsg));
-                }})
-            ;
+            Observable.zip(
+                    io.inbound().map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpRequest()),
+                    io.outbound().map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpResponse()),
+                    (req, resp) -> Pair.of(req, resp)).<RedisMessage>flatMap(reqAndResp -> {
+                        final HttpRequest req = reqAndResp.first;
+                        final HttpResponse resp = reqAndResp.second;
+                        final String remoteip = reqAndResp.first.headers().get("remoteip");
+                        final Map<String, Object> data = Maps.newHashMap();
+                        data.put("method", req.method().name());
+                        data.put("uri", req.uri());
+                        data.put("reqContentType", req.headers().get(HttpHeaderNames.CONTENT_TYPE));
+                        data.put("reqContentLength", req.headers().get(HttpHeaderNames.CONTENT_LENGTH));
+                        data.put("status", resp.status().code());
+                        data.put("respContentType", resp.headers().get(HttpHeaderNames.CONTENT_TYPE));
+                        data.put("respContentLength", resp.headers().get(HttpHeaderNames.CONTENT_LENGTH));
+
+                        if (null != remoteip) {
+                            return redisclient.getConnection().compose(RedisUtil
+                                    .interactWithRedis(RedisUtil.cmdSet(remoteip, JSON.toJSONString(data)).build()));
+                        } else {
+                            return Observable.<RedisMessage>empty();
+                        }
+                    }).subscribe(redismsg -> LOG.info("trade log to redis with {}",
+                            RedisUtil.dumpAggregatedRedisMessage(redismsg)));
         }
         return Single.<InOut>just(null);
     }
