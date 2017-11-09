@@ -1,2 +1,0 @@
-Main-Class: org.jocean.xharbor.booter.Booter
-Class-Path: ../../etc/ 

@@ -1,4 +1,4 @@
-apply from: 'http://git.jocean.org/jocean/devconf/raw/master/devconf/build-app.gradle'
+apply from: 'http://git.jocean.org/jocean/devconf/raw/master/devconf/build-lib.gradle'
 
 configurations {
     all*.exclude group: 'org.slf4j', module: 'slf4j-log4j12'
