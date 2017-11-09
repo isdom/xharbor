@@ -1,5 +1,12 @@
 apply from: 'http://git.jocean.org/jocean/devconf/raw/master/devconf/build-lib.gradle'
 
+tasks.withType(JavaCompile) {
+    options.encoding = "UTF-8"
+    options.debug = "on"
+    sourceCompatibility = 1.8
+    targetCompatibility = 1.8
+}
+
 configurations {
     all*.exclude group: 'org.slf4j', module: 'slf4j-log4j12'
     all*.exclude group: 'log4j', module: 'log4j'
