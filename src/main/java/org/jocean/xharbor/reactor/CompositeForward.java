@@ -9,7 +9,7 @@ import java.util.concurrent.atomic.AtomicStampedReference;
 
 import javax.inject.Inject;
 
-import org.jocean.http.client.HttpClient;
+import org.jocean.idiom.BeanFinder;
 import org.jocean.idiom.Ordered;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.ServiceMemo;
@@ -76,7 +76,7 @@ public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardDat
                 ForwardTrade reactor = matcher2reactor.get(f.matcher());
                 if (null == reactor) {
                     reactor = new ForwardTrade(f.matcher(), 
-                            this._httpclient, 
+                            this._finder, 
                             this._memoBuilder, 
                             this._serviceMemo, 
                             this._timer
@@ -119,7 +119,7 @@ public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardDat
             new AtomicStampedReference<>(null, 0);
     
     @Inject
-    private HttpClient _httpclient;
+    private BeanFinder _finder;
     
     @Inject
     private RelayMemo.Builder _memoBuilder;

@@ -15,6 +15,7 @@ import org.jocean.http.TransportException;
 import org.jocean.http.client.HttpClient;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.RxNettys;
+import org.jocean.idiom.BeanFinder;
 import org.jocean.idiom.DisposableWrapper;
 import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.idiom.ExceptionUtils;
@@ -47,7 +48,6 @@ import io.netty.util.Timer;
 import io.netty.util.TimerTask;
 import rx.Observable;
 import rx.Single;
-import rx.functions.Action0;
 import rx.functions.Func0;
 import rx.functions.Func1;
 
@@ -60,13 +60,13 @@ public class ForwardTrade implements TradeReactor {
     
     public ForwardTrade(
             final MatchRule  matcher,
-            final HttpClient httpclient,
+            final BeanFinder finder,
             final RelayMemo.Builder memoBuilder, 
             final ServiceMemo serviceMemo, 
             final Timer timer
             ) {
         this._matcher = matcher;
-        this._httpclient = httpclient;
+        this._finder = finder;
         this._memoBuilder = memoBuilder;
         this._serviceMemo = serviceMemo;
         this._timer = timer;
@@ -194,8 +194,9 @@ public class ForwardTrade implements TradeReactor {
         final AtomicReference<HttpRequest> refReq = new AtomicReference<>();
         final AtomicReference<HttpResponse> refResp = new AtomicReference<>();
         
-        return this._httpclient.initiator().remoteAddress(buildAddress(target)).feature(target.features().call())
-                .build().flatMap(initiator -> {
+        return this._finder.find(HttpClient.class).flatMap(client->client.initiator()
+                        .remoteAddress(buildAddress(target)).feature(target.features().call()).build())
+                .flatMap(initiator -> {
                     // TBD: using ReadPolicies.ByOutbound
                     // ref:
                     // https://github.com/isdom/xharbor/commit/e81069dd56bfb68b08c971923d24958c438ffe2b#diff-0a4a34cc848464f04687f26d3d122a59L211
@@ -203,9 +204,7 @@ public class ForwardTrade implements TradeReactor {
                     trade.doOnTerminate(initiator.closer());
                     final TrafficCounter initiatorTraffic = initiator.traffic();
 
-                    trade.doOnTerminate(new Action0() {
-                        @Override
-                        public void call() {
+                    trade.doOnTerminate(() -> {
                             final long ttl = stopWatch.stopAndRestart();
                             final RelayMemo memo = _memoBuilder.build(target, buildRoutingInfo(refReq.get()));
                             memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
@@ -218,8 +217,7 @@ public class ForwardTrade implements TradeReactor {
                                     trade.traffic().outboundBytes(), initiatorTraffic.outboundBytes(),
                                     initiatorTraffic.inboundBytes(), trade.transport(), initiator.transport(),
                                     refReq.get(), refResp.get());
-                        }
-                    });
+                        });
 
                     final AtomicInteger sendingSize = new AtomicInteger(0);
                     return initiator.defineInteraction(
@@ -430,7 +428,7 @@ public class ForwardTrade implements TradeReactor {
     private final List<MarkableTargetImpl>  _targets = 
             Lists.newCopyOnWriteArrayList();
     
-    private final HttpClient    _httpclient;
+    private final BeanFinder    _finder;
     private final RelayMemo.Builder _memoBuilder;
     private final ServiceMemo   _serviceMemo;
     private final Timer         _timer;

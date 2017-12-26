@@ -23,7 +23,6 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.redis.RedisMessage;
 import rx.Observable;
 import rx.Single;
-import rx.functions.Action1;
 
 /**
  * @author isdom
