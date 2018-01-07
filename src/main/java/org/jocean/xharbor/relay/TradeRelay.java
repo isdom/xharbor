@@ -6,7 +6,6 @@ package org.jocean.xharbor.relay;
 import java.net.ConnectException;
 import java.nio.channels.ClosedChannelException;
 
-import org.jocean.http.ReadPolicy;
 import org.jocean.http.TransportException;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.RxNettys;
@@ -63,12 +62,13 @@ public class TradeRelay extends Subscriber<HttpTrade> implements BeanHolderAware
 
     @Override
     public void onNext(final HttpTrade trade) {
-        if (null != this._beanHolder) {
-            final ReadPolicy policy = _beanHolder.getBean(ReadPolicy.class);
-            if (null != policy) {
-                trade.setReadPolicy(policy);
-            }
-        }
+        // disable default read policy
+//        if (null != this._beanHolder) {
+//            final ReadPolicy policy = _beanHolder.getBean(ReadPolicy.class);
+//            if (null != policy) {
+//                trade.setReadPolicy(policy);
+//            }
+//        }
         final StopWatch watch4Result = new StopWatch();
         final ReactContext ctx = new ReactContext() {
             @Override
@@ -98,9 +98,8 @@ public class TradeRelay extends Subscriber<HttpTrade> implements BeanHolderAware
                 if (null == io || null == io.outbound()) {
                     LOG.warn("NO_INOUT for trade({}), react io detail: {}.", trade, io);
                 }
-                trade.outbound(buildResponse(trade, trade.inbound(), io), outboundable -> {
-                    outboundable.sended().subscribe(sended -> DisposableWrapperUtil.dispose(sended));
-                });
+                trade.writeCtrl().sended().subscribe(sended -> DisposableWrapperUtil.dispose(sended));
+                trade.outbound(buildResponse(trade, trade.inbound(), io));
             }
         }, new Action1<Throwable>() {
             @Override

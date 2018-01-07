@@ -220,28 +220,27 @@ public class ForwardTrade implements TradeReactor {
                         });
 
                     final AtomicInteger sendingSize = new AtomicInteger(0);
+                    initiator.writeCtrl().setFlushPerWrite(true);
+                    initiator.writeCtrl().sended().subscribe(sended -> {
+                        if (sendingSize.get() > MAX_RETAINED_SIZE) {
+                            if (LOG.isTraceEnabled()) {
+                                LOG.trace("sendingSize is {}, dispose sended {}", sendingSize.get(),
+                                        sended);
+                            }
+                            DisposableWrapperUtil.dispose(sended);
+                        } else {
+                            if (LOG.isTraceEnabled()) {
+                                LOG.trace("sendingSize is {}, SKIP sended {}", sendingSize.get(), sended);
+                            }
+                        }
+                    });
                     return initiator.defineInteraction(
                             buildRequest(trade, inbound, refReq, isKeepAliveFromClient).doOnNext(dwh -> {
                                 final HttpObject hobj = ((DisposableWrapper<HttpObject>) dwh).unwrap();
                                 if (hobj instanceof HttpContent) {
                                     sendingSize.addAndGet(((HttpContent) hobj).content().readableBytes());
                                 }
-                            }), outboundable -> {
-                                outboundable.setFlushPerWrite(true);
-                                outboundable.sended().subscribe(sended -> {
-                                    if (sendingSize.get() > MAX_RETAINED_SIZE) {
-                                        if (LOG.isTraceEnabled()) {
-                                            LOG.trace("sendingSize is {}, dispose sended {}", sendingSize.get(),
-                                                    sended);
-                                        }
-                                        DisposableWrapperUtil.dispose(sended);
-                                    } else {
-                                        if (LOG.isTraceEnabled()) {
-                                            LOG.trace("sendingSize is {}, SKIP sended {}", sendingSize.get(), sended);
-                                        }
-                                    }
-                                });
-                            });
+                            }));
                 }).flatMap(RxNettys.splitdwhs())
                 .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient));
     }
