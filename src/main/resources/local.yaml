@@ -1,6 +1,6 @@
 name: units
 parameters: |
-  __spring.xml=xharbor/xharbor.xml,http/httpclient.xml,http/httpserver.xml
+  __spring.xml=xharbor/xharbor.xml,http/httpclient.xml
 children:
   - name: nettystats
   - name: redisclient
@@ -27,7 +27,10 @@ children:
 #          - name: feature_logging
   - name: router.biz
     children:
-      - name: nop.httpin
+      - name: httpserver.biz
+        parameters: |
+          http.server.inbound.blocksize = 8192
+          http.server.inbound.recvbuf = 8192
         children:
           - name: httpin.8888
             parameters: |
@@ -95,11 +98,16 @@ children:
                   header.value=*
   - name: router.console
     children:
-      - name: httpin.8889
+      - name: httpserver.console
         parameters: |
-          http.port=8889
+          http.server.inbound.blocksize = 8192
+          http.server.inbound.recvbuf = 8192
         children:
-          - name: feature_logging
+          - name: httpin.8889
+            parameters: |
+              http.port=8889
+            children:
+              - name: feature_logging
       - name: rules.100
         parameters: |
           priority=100

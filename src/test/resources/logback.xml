@@ -76,7 +76,7 @@
  -->
     <logger name="io.netty" level="DEBUG"/>
     <logger name="org.jocean.http.util" level="DEBUG"/>
-    <logger name="org.jocean.http.util.RxNettys" level="TRACE"/>
+    <logger name="org.jocean.http.util.RxNettys" level="DEBUG"/>
     <logger name="org.apache.zookeeper" level="WARN"/>
     <logger name="org.jocean.xharbor" level="TRACE"/>
     <logger name="org.springframework" level="INFO"/>
