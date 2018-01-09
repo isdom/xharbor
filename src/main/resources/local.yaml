@@ -46,14 +46,19 @@ children:
         parameters: |
           priority=100
         children:
+          - name: forward.newrest
+            parameters: |
+              forward.path=/newrest/
+              forward.to=http://127.0.0.1:9090
+              features.name=default
           - name: forward.live
             parameters: |
-              forward.path=/demo/[/|\\w]*
+              forward.path=/demo/
               forward.to=http://live.iplusmed.com:80
               features.name=default
           - name: rwreq.live
             parameters: |
-              rewrite.path=/demo/[/|\\w]*
+              rewrite.path=/demo/
               rewrite.header.name=Host
               rewrite.header.value=live.iplusmed.com
           - name: forward.crossdomain
@@ -73,29 +78,37 @@ children:
               response.status=200
           - name: forward.ydd
             parameters: |
-              forward.path=/api1/[/|\\w]*\
-                    |/api2/[/|\\w]*
+              forward.path=/api1/|/api2/
               
               forward.to=http://api.iplusmed.com:80
               features.name=compress
           - name: forward.snsgw
             parameters: |
-              forward.path=/test/[/|\\w]*
+              forward.path=/test/
               
               forward.to=http://127.0.0.1:9090
               features.name=default
           - name: forward.zkwebui
             parameters: |
-              forward.path=/zkwebui/[/|\\w]*
+              forward.path=/zkwebui/
               forward.to=http://127.0.0.1:7080
           - name: rwresp.cors
             parameters: |
-              rewrite.path=/api1/(\\w)*
+              rewrite.path=/api1/
             children:
               - name: addheader.cors.basic
                 parameters: |
                   header.name=Access-Control-Allow-Origin
                   header.value=*
+      - name: rules.200
+        parameters: |
+          priority=200
+        children:
+          - name: respond.reject_missctx
+            parameters: |
+              request.path=/newrest/stream
+              request.headers=x-ctx,==null
+              response.status = 404
   - name: router.console
     children:
       - name: httpserver.console

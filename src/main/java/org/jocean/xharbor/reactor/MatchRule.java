@@ -11,6 +11,7 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 
 import io.netty.handler.codec.http.HttpRequest;
+import rx.functions.Func1;
 
 public class MatchRule implements Comparable<MatchRule> {
     
@@ -37,23 +38,32 @@ public class MatchRule implements Comparable<MatchRule> {
                 if (!iter.hasNext()) {
                     break;
                 }
-                final String pattern = iter.next();
-                this._headersPatterns.add(
-                    Pair.of(name, Regexs.safeCompilePattern(pattern)));
+                this._headersPredicates.add(Pair.of(name, buildPredicate(iter.next())));
             }
         }
     }
     
+    private Func1<String, Boolean> buildPredicate(final String expression) {
+        if ("==null".equals(expression)) {
+            return value -> null == value;
+        } else {
+            final Pattern pattern = Regexs.safeCompilePattern(expression);
+            return value -> Regexs.isMatched(pattern, value);
+        }
+    }
+
     public boolean match(final HttpRequest req) {
         final boolean matched = Regexs.isMatched(this._methodPattern, req.method().name())
             && Regexs.isMatched(this._pathPattern, req.uri());
         if (!matched) {
             return false;
-        } else if (this._headersPatterns.isEmpty()) {
+        } else if (this._headersPredicates.isEmpty()) {
             return true;
         } else {
-            for (Pair<String, Pattern> pair : this._headersPatterns) {
-                if (!Regexs.isMatched(pair.getSecond(), req.headers().get(pair.getFirst()))) {
+            for (Pair<String, Func1<String, Boolean>> pair : this._headersPredicates) {
+                final Func1<String, Boolean> predicate = pair.getSecond();
+                final String value = req.headers().get(pair.getFirst());
+                if (!predicate.call(value)) {
                     return false;
                 }
             }
@@ -153,5 +163,5 @@ public class MatchRule implements Comparable<MatchRule> {
     
     private final Pattern _methodPattern;
     private final Pattern _pathPattern;
-    private final List<Pair<String,Pattern>> _headersPatterns = Lists.newArrayList();
+    private final List<Pair<String,Func1<String, Boolean>>> _headersPredicates = Lists.newArrayList();
 }
