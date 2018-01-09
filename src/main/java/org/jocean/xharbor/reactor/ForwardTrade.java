@@ -276,7 +276,7 @@ public class ForwardTrade implements TradeReactor {
         return hobj instanceof HttpContent ? ((HttpContent) hobj).content().readableBytes() : 0;
     }
     
-    private Func1<? super DisposableWrapper<HttpObject>, ? extends Object> accumulateAndMixinSending(
+    private Func1<? super DisposableWrapper<HttpObject>, ? extends DisposableWrapper<Object>> accumulateAndMixinSending(
             final AtomicInteger sendingSize) {
         return dwh -> {
             final HttpObject hobj = dwh.unwrap();
