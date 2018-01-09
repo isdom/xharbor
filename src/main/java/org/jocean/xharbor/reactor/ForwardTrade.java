@@ -107,7 +107,7 @@ public class ForwardTrade implements TradeReactor {
     
     private Observable<InOut> io4forward(final ReactContext ctx, final InOut originalio, final MarkableTargetImpl target) {
         // TODO: hold reading
-        ctx.trade().setReadPolicy(ReadPolicy.Util.never());
+        // ctx.trade().setReadPolicy(ReadPolicy.Util.never());
         
         // outbound 可被重复订阅
         final Observable<? extends DisposableWrapper<HttpObject>> cachedOutbound = 
@@ -251,8 +251,8 @@ public class ForwardTrade implements TradeReactor {
                     initiator.writeCtrl().setFlushPerWrite(true);
                     initiator.writeCtrl().sended().subscribe(accumulateSended(up_sendedSize));
                     
-                    trade.setReadPolicy(ReadPolicy.Util.bysended(initiator.writeCtrl(), 
-                            () -> up_sendingSize.get() - up_sendedSize.get(), 0));
+//                    trade.setReadPolicy(ReadPolicy.Util.bysended(initiator.writeCtrl(), 
+//                            () -> up_sendingSize.get() - up_sendedSize.get(), 0));
                     
                     final AtomicInteger down_sendingSize = new AtomicInteger(0);
                     final AtomicInteger down_sendedSize = new AtomicInteger(0);
@@ -260,8 +260,8 @@ public class ForwardTrade implements TradeReactor {
                     trade.writeCtrl().setFlushPerWrite(true);
                     trade.writeCtrl().sended().subscribe(accumulateSended(down_sendedSize));
                     
-                    initiator.setReadPolicy(ReadPolicy.Util.bysended(trade.writeCtrl(), 
-                            () -> down_sendingSize.get() - down_sendedSize.get(), 0));
+//                    initiator.setReadPolicy(ReadPolicy.Util.bysended(trade.writeCtrl(), 
+//                            () -> down_sendingSize.get() - down_sendedSize.get(), 0));
                     
                     return initiator.defineInteraction(inbound.flatMap(RxNettys.splitdwhs())
                                 .map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient))
