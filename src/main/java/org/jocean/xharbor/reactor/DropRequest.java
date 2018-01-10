@@ -1,5 +1,6 @@
 package org.jocean.xharbor.reactor;
 
+import org.jocean.http.CloseException;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.DisposableWrapper;
 import org.jocean.idiom.DisposableWrapperUtil;
@@ -58,7 +59,7 @@ public class DropRequest implements TradeReactor {
             }
             @Override
             public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
-                return Observable.<DisposableWrapper<HttpObject>>error(new RuntimeException())
+                return Observable.<DisposableWrapper<HttpObject>>error(new CloseException())
                     .doOnCompleted(() -> {
                             if (_log) {
                                 LOG.info("Drop request directly:\nREQ\n[{}]", originalreq);

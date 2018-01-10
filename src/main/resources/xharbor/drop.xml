@@ -9,7 +9,7 @@
         destroy-method="call">
         <constructor-arg ref="drops"/>
         <constructor-arg>
-            <bean class="org.jocean.xharbor.reactor.ResponseWithHeaderonly">
+            <bean class="org.jocean.xharbor.reactor.DropRequest">
 		        <constructor-arg>
                     <bean class="org.jocean.xharbor.reactor.MatchRule">
                         <constructor-arg value="${request.method:}"/>
