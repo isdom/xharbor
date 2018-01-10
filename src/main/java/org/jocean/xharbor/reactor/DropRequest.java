@@ -60,8 +60,8 @@ public class DropRequest implements TradeReactor {
             @Override
             public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
                 return Observable.<DisposableWrapper<HttpObject>>error(new CloseException())
-                    .doOnCompleted(() -> {
-                            if (_log) {
+                    .doOnError(e -> {
+                            if (e instanceof CloseException && _log) {
                                 LOG.info("Drop request directly:\nREQ\n[{}]", originalreq);
                             }
                         })

@@ -109,6 +109,14 @@ children:
               request.path=/newrest/stream
               request.headers=x-ctx,==null
               response.status = 404
+      - name: rules.300
+        parameters: |
+          priority=300
+        children:
+          - name: drop.reject_missctx
+            parameters: |
+              request.path=/newrest/stream
+              request.headers=x-ctx,==null
   - name: router.console
     children:
       - name: httpserver.console
