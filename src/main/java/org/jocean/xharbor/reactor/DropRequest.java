@@ -1,7 +1,5 @@
 package org.jocean.xharbor.reactor;
 
-import java.util.Map;
-
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.DisposableWrapper;
 import org.jocean.idiom.DisposableWrapperUtil;
@@ -9,31 +7,22 @@ import org.jocean.xharbor.api.TradeReactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
-import io.netty.handler.codec.http.HttpResponseStatus;
 import rx.Observable;
 import rx.Single;
-import rx.functions.Action0;
 import rx.functions.Func1;
 
-public class ResponseWithHeaderonly implements TradeReactor {
+public class DropRequest implements TradeReactor {
     
     private static final Logger LOG = LoggerFactory
-            .getLogger(ResponseWithHeaderonly.class);
+            .getLogger(DropRequest.class);
 
-    public ResponseWithHeaderonly(
+    public DropRequest(
             final MatchRule matcher,
-            final int responseStatus, 
-            final Map<String, String> extraHeaders,
-            final boolean enableLogReact) {
+            final boolean enableLog) {
         this._matcher = matcher;
-        this._responseStatus = responseStatus;
-        this._extraHeaders = extraHeaders;
-        this._logReact = enableLogReact;
+        this._log = enableLog;
     }
     
     @Override
@@ -50,7 +39,7 @@ public class ResponseWithHeaderonly implements TradeReactor {
                             return null;
                         } else {
                             if (_matcher.match(req)) {
-                                return io4Response(ctx, io, req);
+                                return io4Drop(ctx, io, req);
                             } else {
                                 //  not handle this trade
                                 return null;
@@ -60,7 +49,7 @@ public class ResponseWithHeaderonly implements TradeReactor {
                 .toSingle();
     }
 
-    private InOut io4Response(final ReactContext ctx, final InOut originalio, 
+    private InOut io4Drop(final ReactContext ctx, final InOut originalio, 
             final HttpRequest originalreq) {
         return new InOut() {
             @Override
@@ -69,21 +58,10 @@ public class ResponseWithHeaderonly implements TradeReactor {
             }
             @Override
             public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
-                final FullHttpResponse response = new DefaultFullHttpResponse(
-                        originalreq.protocolVersion(), HttpResponseStatus.valueOf(_responseStatus));
-                response.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
-                if (null!=_extraHeaders) {
-                    for (Map.Entry<String, String> entry : _extraHeaders.entrySet()) {
-                        response.headers().set(entry.getKey(), entry.getValue());
-                    }
-                }
-                return Observable.<HttpObject>just(response)
-                    .map(DisposableWrapperUtil.wrap(RxNettys.disposerOf(), null != ctx ? ctx.trade() : null))
-                    .delaySubscription(originalio.inbound().ignoreElements())
+                return Observable.<DisposableWrapper<HttpObject>>error(new RuntimeException())
                     .doOnCompleted(() -> {
-                            if (_logReact) {
-                                LOG.info("RESPOND sendback response directly:\nREQ\n[{}]\nRESP\n[{}]", 
-                                    originalreq, response);
+                            if (_log) {
+                                LOG.info("Drop request directly:\nREQ\n[{}]", originalreq);
                             }
                         })
                     ;
@@ -91,7 +69,5 @@ public class ResponseWithHeaderonly implements TradeReactor {
     }
     
     private final MatchRule _matcher;
-    private final int _responseStatus;
-    private final Map<String, String> _extraHeaders;
-    private final boolean _logReact;
+    private final boolean _log;
 }

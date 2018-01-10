@@ -15,6 +15,17 @@
         <constructor-arg ref="rules"/>
     </bean>
     
+    <bean id="drops" class="org.jocean.xharbor.reactor.CompositeReactor">
+        <property name="ordinal" value="110"/>
+    </bean>
+    
+    <bean class="org.jocean.idiom.rx.RxActions"
+        factory-method="doCall"
+        destroy-method="call">
+        <constructor-arg ref="rules"/>
+        <constructor-arg ref="drops"/>
+    </bean>
+    
     <bean id="rwpaths" class="org.jocean.xharbor.reactor.CompositeReactor">
         <property name="ordinal" value="100"/>
     </bean>
