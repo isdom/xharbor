@@ -100,23 +100,23 @@ children:
                 parameters: |
                   header.name=Access-Control-Allow-Origin
                   header.value=*
-      - name: rules.200
-        parameters: |
-          priority=200
-        children:
-          - name: respond.reject_missctx
-            parameters: |
-              request.path=/newrest/stream
-              request.headers=x-ctx,==null
-              response.status = 404
-      - name: rules.300
-        parameters: |
-          priority=300
-        children:
-          - name: drop.reject_missctx
-            parameters: |
-              request.path=/newrest/stream
-              request.headers=x-ctx,==null
+#      - name: rules.200
+#        parameters: |
+#          priority=200
+#        children:
+#          - name: respond.reject_missctx
+#            parameters: |
+#              request.path=/newrest/stream
+#              request.headers=x-ctx,==null
+#              response.status = 404
+#      - name: rules.300
+#        parameters: |
+#          priority=300
+#        children:
+#          - name: drop.reject_missctx
+#            parameters: |
+#              request.path=/newrest/stream
+#              request.headers=x-ctx,==null
   - name: router.console
     children:
       - name: httpserver.console
