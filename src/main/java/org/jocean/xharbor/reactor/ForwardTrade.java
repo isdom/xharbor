@@ -4,6 +4,7 @@ import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -106,20 +107,9 @@ public class ForwardTrade implements TradeReactor {
     }
     
     private Observable<InOut> io4forward(final ReactContext ctx, final InOut originalio, final MarkableTargetImpl target) {
-        // TODO: hold reading
-         ctx.trade().setReadPolicy(ReadPolicies.never());
-        
         // outbound 可被重复订阅
         final Observable<? extends DisposableWrapper<HttpObject>> cachedOutbound = 
                 buildOutbound(ctx.trade(), originalio.inbound(), target, ctx.watch()).cache();
-                /* 不再 duplicate HttpContent
-                .map(dwh -> {
-                    if (dwh.unwrap() instanceof HttpContent) {
-                        return DisposableWrapperUtil.wrap(((HttpContent) dwh.unwrap()).duplicate(), dwh);
-                    } else {
-                        return dwh;
-                    }
-                });*/
         
         //  启动转发 (forward)
         return cachedOutbound.first().doOnError(error -> {
@@ -206,9 +196,11 @@ public class ForwardTrade implements TradeReactor {
         final AtomicReference<HttpRequest> refReq = new AtomicReference<>();
         final AtomicReference<HttpResponse> refResp = new AtomicReference<>();
         
-        return this._finder.find(HttpClient.class).flatMap(client->client.initiator()
+        return isRBS().flatMap(isrbs -> 
+            this._finder.find(HttpClient.class).flatMap(client->client.initiator()
                         .remoteAddress(buildAddress(target)).feature(target.features().call()).build())
                 .flatMap(initiator -> {
+//                    trade.setReadPolicy(ReadPolicies.never());
                     // TBD: using ReadPolicies.ByOutbound
                     // ref:
                     // https://github.com/isdom/xharbor/commit/e81069dd56bfb68b08c971923d24958c438ffe2b#diff-0a4a34cc848464f04687f26d3d122a59L211
@@ -233,6 +225,8 @@ public class ForwardTrade implements TradeReactor {
 
                     final AtomicInteger up_sendingSize = new AtomicInteger(0);
                     final AtomicInteger up_sendedSize = new AtomicInteger(0);
+                    final AtomicInteger down_sendingSize = new AtomicInteger(0);
+                    final AtomicInteger down_sendedSize = new AtomicInteger(0);
                     
                     initiator.writeCtrl().sended().subscribe(sended -> {
                         if (up_sendingSize.get() > MAX_RETAINED_SIZE) {
@@ -251,17 +245,16 @@ public class ForwardTrade implements TradeReactor {
                     initiator.writeCtrl().setFlushPerWrite(true);
                     initiator.writeCtrl().sended().subscribe(accumulateSended(up_sendedSize));
                     
-                    trade.setReadPolicy(ReadPolicies.bysended(initiator.writeCtrl(), 
-                            () -> up_sendingSize.get() - up_sendedSize.get(), 0));
-                    
-                    final AtomicInteger down_sendingSize = new AtomicInteger(0);
-                    final AtomicInteger down_sendedSize = new AtomicInteger(0);
-                    
                     trade.writeCtrl().setFlushPerWrite(true);
                     trade.writeCtrl().sended().subscribe(accumulateSended(down_sendedSize));
                     
-                    initiator.setReadPolicy(ReadPolicies.bysended(trade.writeCtrl(), 
-                            () -> down_sendingSize.get() - down_sendedSize.get(), 0));
+                    if (isrbs) {
+                        initiator.setReadPolicy(ReadPolicies.bysended(trade.writeCtrl(), 
+                                () -> down_sendingSize.get() - down_sendedSize.get(), 0));
+                        
+                        trade.setReadPolicy(ReadPolicies.bysended(initiator.writeCtrl(), 
+                                () -> up_sendingSize.get() - up_sendedSize.get(), 0));
+                    }
                     
                     return initiator.defineInteraction(inbound.flatMap(RxNettys.splitdwhs())
                                 .map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient))
@@ -269,7 +262,12 @@ public class ForwardTrade implements TradeReactor {
                             .flatMap(RxNettys.splitdwhs())
                             .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))
                             .map(accumulateAndMixinSending(down_sendingSize));
-                    });
+                    })
+                );
+    }
+
+    private Observable<Boolean> isRBS() {
+        return this._finder.find("configs", Map.class).map(conf -> conf.get(_matcher.pathPattern() + ":" + "rbs") != null);
     }
 
     private int getReadableBytes(final HttpObject hobj) {

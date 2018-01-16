@@ -8,6 +8,13 @@ children:
       redis.server.hostname=localhost
       redis.server.passwd=passwd
       redis.server.dbno=255
+  - name: conf
+    children:
+      - name: conf_setting.stream_rbs
+        parameters: |
+          path= /newrest/
+          key = rbs
+          value = true
   - name: jmxsrv
     parameters: |
       jmxmp.port = 0

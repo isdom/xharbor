@@ -15,6 +15,10 @@ import rx.functions.Func1;
 
 public class MatchRule implements Comparable<MatchRule> {
     
+    public String pathPattern() {
+        return this._pathPatternAsString;
+    }
+
     public MatchRule(
             final String methodPattern, 
             final String pathPattern,
