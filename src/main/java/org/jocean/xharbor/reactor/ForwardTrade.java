@@ -228,6 +228,11 @@ public class ForwardTrade implements TradeReactor {
                     final AtomicInteger down_sendingSize = new AtomicInteger(0);
                     final AtomicInteger down_sendedSize = new AtomicInteger(0);
                     
+                    final AtomicInteger up_sendingCount = new AtomicInteger(0);
+                    final AtomicInteger up_sendedCount = new AtomicInteger(0);
+                    final AtomicInteger down_sendingCount = new AtomicInteger(0);
+                    final AtomicInteger down_sendedCount = new AtomicInteger(0);
+                    
                     initiator.writeCtrl().sended().subscribe(sended -> {
                         if (up_sendingSize.get() > MAX_RETAINED_SIZE) {
                             if (LOG.isTraceEnabled()) {
@@ -245,22 +250,34 @@ public class ForwardTrade implements TradeReactor {
                     initiator.writeCtrl().setFlushPerWrite(true);
                     initiator.writeCtrl().sended().subscribe(accumulateSended(up_sendedSize));
                     
+                    initiator.writeCtrl().sended().subscribe(incSendedCount(up_sendedCount));
+                    
                     trade.writeCtrl().setFlushPerWrite(true);
                     trade.writeCtrl().sended().subscribe(accumulateSended(down_sendedSize));
                     
+                    trade.writeCtrl().sended().subscribe(incSendedCount(down_sendedCount));
+                    
                     if (isrbs) {
+//                        initiator.setReadPolicy(ReadPolicies.bysended(trade.writeCtrl(), 
+//                                () -> down_sendingSize.get() - down_sendedSize.get(), 0));
+//                        
+//                        trade.setReadPolicy(ReadPolicies.bysended(initiator.writeCtrl(), 
+//                                () -> up_sendingSize.get() - up_sendedSize.get(), 0));
+                        
                         initiator.setReadPolicy(ReadPolicies.bysended(trade.writeCtrl(), 
-                                () -> down_sendingSize.get() - down_sendedSize.get(), 0));
+                                () -> down_sendingCount.get() - down_sendedCount.get(), 0));
                         
                         trade.setReadPolicy(ReadPolicies.bysended(initiator.writeCtrl(), 
-                                () -> up_sendingSize.get() - up_sendedSize.get(), 0));
+                                () -> up_sendingCount.get() - up_sendedCount.get(), 0));
                     }
                     
                     return initiator.defineInteraction(inbound.flatMap(RxNettys.splitdwhs())
                                 .map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient))
+                                .doOnNext(incSendingCount(up_sendingCount))
                                 .map(accumulateAndMixinSending(up_sendingSize)))
                             .flatMap(RxNettys.splitdwhs())
                             .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))
+                            .doOnNext(incSendingCount(down_sendingCount))
                             .map(accumulateAndMixinSending(down_sendingSize));
                     })
                 );
@@ -274,6 +291,10 @@ public class ForwardTrade implements TradeReactor {
         return hobj instanceof HttpContent ? ((HttpContent) hobj).content().readableBytes() : 0;
     }
     
+    private Action1<Object> incSendingCount(final AtomicInteger sendingCount) {
+        return obj -> sendingCount.incrementAndGet();
+    }
+    
     private Func1<? super DisposableWrapper<HttpObject>, ? extends DisposableWrapper<HttpObject>> accumulateAndMixinSending(
             final AtomicInteger sendingSize) {
         return dwh -> {
@@ -285,6 +306,10 @@ public class ForwardTrade implements TradeReactor {
         };
     }
 
+    private Action1<? super Object> incSendedCount(final AtomicInteger sendedCount) {
+        return sended -> sendedCount.incrementAndGet();
+    }
+    
     private Action1<? super Object> accumulateSended(final AtomicInteger sendedSize) {
         return sended -> sendedSize.addAndGet(((Sending)sended).readableBytes());
     }
