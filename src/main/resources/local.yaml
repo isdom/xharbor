@@ -1,6 +1,6 @@
 name: units
 parameters: |
-  __spring.xml=xharbor/xharbor.xml,http/httpclient.xml
+  __spring.xml=xharbor/xharbor.xml
 children:
   - name: nettystats
   - name: redisclient
@@ -32,6 +32,14 @@ children:
           features.name=default
 #        children:
 #          - name: feature_logging
+  - name: httpclient.default
+    parameters: |
+      http.client.thread.count = 2
+      http.client.inbound.blocksize = 16384
+      http.client.inbound.recvbuf = 16384
+      http.client.outbound.sendbuf = 16384
+      http.client.outbound.lowmark = 4096
+      http.client.outbound.highmark = 16384
   - name: router.biz
     children:
       - name: httpserver.biz
