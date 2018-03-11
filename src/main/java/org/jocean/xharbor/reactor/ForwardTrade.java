@@ -242,6 +242,9 @@ public class ForwardTrade implements TradeReactor {
                         }
                     });
                     
+                    // 对已经发送成功的 DisposableWrapper<?>，及时 invoke it's dispose() 回收占用的资源 (memory, ...)
+                    trade.writeCtrl().sended().subscribe(sended -> DisposableWrapperUtil.dispose(sended));
+                    
                     initiator.writeCtrl().setFlushPerWrite(true);
                     trade.writeCtrl().setFlushPerWrite(true);
                     
