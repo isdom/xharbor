@@ -11,6 +11,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.http.Feature;
+import org.jocean.http.Inbound;
+import org.jocean.http.Outbound;
 import org.jocean.http.ReadPolicies;
 import org.jocean.http.TrafficCounter;
 import org.jocean.http.TransportException;
@@ -21,7 +23,6 @@ import org.jocean.idiom.BeanFinder;
 import org.jocean.idiom.DisposableWrapper;
 import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.idiom.ExceptionUtils;
-import org.jocean.idiom.Proxys;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxObservables;
 import org.jocean.xharbor.api.RelayMemo;
@@ -37,7 +38,6 @@ import com.google.common.collect.Lists;
 
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpResponse;
-import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpObject;
@@ -182,9 +182,9 @@ public class ForwardTrade implements TradeReactor {
         });
     }
 
-    public interface Sending {
-        public int readableBytes(); 
-    }
+//    public interface Sending {
+//        public int readableBytes(); 
+//    }
     
     private Observable<? extends DisposableWrapper<HttpObject>> buildOutbound(
             final HttpTrade trade, 
@@ -224,14 +224,9 @@ public class ForwardTrade implements TradeReactor {
                         });
 
                     final AtomicInteger up_sendingSize = new AtomicInteger(0);
-                    final AtomicInteger up_sendedSize = new AtomicInteger(0);
-                    final AtomicInteger down_sendingSize = new AtomicInteger(0);
-                    final AtomicInteger down_sendedSize = new AtomicInteger(0);
-                    
-                    final AtomicInteger up_sendingCount = new AtomicInteger(0);
-                    final AtomicInteger up_sendedCount = new AtomicInteger(0);
-                    final AtomicInteger down_sendingCount = new AtomicInteger(0);
-                    final AtomicInteger down_sendedCount = new AtomicInteger(0);
+//                    final AtomicInteger up_sendedSize = new AtomicInteger(0);
+//                    final AtomicInteger down_sendingSize = new AtomicInteger(0);
+//                    final AtomicInteger down_sendedSize = new AtomicInteger(0);
                     
                     initiator.writeCtrl().sended().subscribe(sended -> {
                         if (up_sendingSize.get() > MAX_RETAINED_SIZE) {
@@ -248,70 +243,94 @@ public class ForwardTrade implements TradeReactor {
                     });
                     
                     initiator.writeCtrl().setFlushPerWrite(true);
-                    initiator.writeCtrl().sended().subscribe(accumulateSended(up_sendedSize));
-                    
-                    initiator.writeCtrl().sended().subscribe(incSendedCount(up_sendedCount));
-                    
                     trade.writeCtrl().setFlushPerWrite(true);
-                    trade.writeCtrl().sended().subscribe(accumulateSended(down_sendedSize));
                     
-                    trade.writeCtrl().sended().subscribe(incSendedCount(down_sendedCount));
+//                    initiator.writeCtrl().sended().subscribe(accumulateSended(up_sendedSize));
+//                    trade.writeCtrl().sended().subscribe(accumulateSended(down_sendedSize));
+                    
+                    final AtomicInteger up_sendingCount = new AtomicInteger(0);
+                    final AtomicInteger down_sendingCount = new AtomicInteger(0);
                     
                     if (isrbs) {
-//                        initiator.setReadPolicy(ReadPolicies.bysended(trade.writeCtrl(), 
-//                                () -> down_sendingSize.get() - down_sendedSize.get(), 0));
+//                        final RecvBySend down_rbs = new RecvBySend();
 //                        
-//                        trade.setReadPolicy(ReadPolicies.bysended(initiator.writeCtrl(), 
-//                                () -> up_sendingSize.get() - up_sendedSize.get(), 0));
+//                        down_rbs.enableRBS(initiator, trade);
+//                        
+//                        final RecvBySend up_rbs = new RecvBySend();
+//                        
+//                        up_rbs.enableRBS(trade, initiator);
                         
-                        initiator.setReadPolicy(ReadPolicies.bysended(trade.writeCtrl(), 
-                                () -> down_sendingCount.get() - down_sendedCount.get(), 0));
+                        
+                        final AtomicInteger up_sendedCount = new AtomicInteger(0);
+                        final AtomicInteger down_sendedCount = new AtomicInteger(0);
+                        
+                        initiator.writeCtrl().sended().subscribe(incCounter(up_sendedCount));
+                        trade.writeCtrl().sended().subscribe(incCounter(down_sendedCount));
                         
                         trade.setReadPolicy(ReadPolicies.bysended(initiator.writeCtrl(), 
                                 () -> up_sendingCount.get() - up_sendedCount.get(), 0));
+                        
+                        initiator.setReadPolicy(ReadPolicies.bysended(trade.writeCtrl(), 
+                                () -> down_sendingCount.get() - down_sendedCount.get(), 0));
                     }
                     
                     return initiator.defineInteraction(inbound.flatMap(RxNettys.splitdwhs())
                                 .map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient))
-                                .doOnNext(incSendingCount(up_sendingCount))
-                                .map(accumulateAndMixinSending(up_sendingSize)))
+                                .doOnNext(incCounter(up_sendingCount))
+//                                .map(accumulateAndMixinSending(up_sendingSize)))
                             .flatMap(RxNettys.splitdwhs())
                             .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))
-                            .doOnNext(incSendingCount(down_sendingCount))
-                            .map(accumulateAndMixinSending(down_sendingSize));
+                            .doOnNext(incCounter(down_sendingCount))
+//                            .map(accumulateAndMixinSending(down_sendingSize)
+                            );
                     })
                 );
+    }
+    
+    static class RecvBySend {
+        final AtomicInteger _sendingCount = new AtomicInteger(0);
+        final AtomicInteger _sendedCount = new AtomicInteger(0);
+        
+        public Action1<Object> incSendingCount() {
+            return obj -> _sendingCount.incrementAndGet();
+        }
+        
+        public void enableRBS(final Inbound inbound, final Outbound outbound) {
+            outbound.writeCtrl().sended().subscribe(incSendedCount());
+            inbound.setReadPolicy(ReadPolicies.bysended(outbound.writeCtrl(), 
+                    () -> _sendingCount.get() - _sendedCount.get(), 0));
+        }
+        
+        private Action1<? super Object> incSendedCount() {
+            return sended -> _sendedCount.incrementAndGet();
+        }
     }
 
     private Observable<Boolean> isRBS() {
         return this._finder.find("configs", Map.class).map(conf -> conf.get(_matcher.pathPattern() + ":" + "rbs") != null);
     }
 
-    private int getReadableBytes(final HttpObject hobj) {
-        return hobj instanceof HttpContent ? ((HttpContent) hobj).content().readableBytes() : 0;
-    }
-    
-    private Action1<Object> incSendingCount(final AtomicInteger sendingCount) {
-        return obj -> sendingCount.incrementAndGet();
-    }
-    
-    private Func1<? super DisposableWrapper<HttpObject>, ? extends DisposableWrapper<HttpObject>> accumulateAndMixinSending(
-            final AtomicInteger sendingSize) {
-        return dwh -> {
-            final HttpObject hobj = dwh.unwrap();
-            final int readableBytes = getReadableBytes(hobj);
-            sendingSize.addAndGet(readableBytes);
-            return Proxys.mixin().mix(DisposableWrapper.class, dwh)
-                    .mix(Sending.class, ()->readableBytes).build();
-        };
-    }
+//  private int getReadableBytes(final HttpObject hobj) {
+//  return hobj instanceof HttpContent ? ((HttpContent) hobj).content().readableBytes() : 0;
+//}
 
-    private Action1<? super Object> incSendedCount(final AtomicInteger sendedCount) {
-        return sended -> sendedCount.incrementAndGet();
-    }
+//    private Func1<? super DisposableWrapper<HttpObject>, ? extends DisposableWrapper<HttpObject>> accumulateAndMixinSending(
+//            final AtomicInteger sendingSize) {
+//        return dwh -> {
+//            final HttpObject hobj = dwh.unwrap();
+//            final int readableBytes = getReadableBytes(hobj);
+//            sendingSize.addAndGet(readableBytes);
+//            return Proxys.mixin().mix(DisposableWrapper.class, dwh)
+//                    .mix(Sending.class, ()->readableBytes).build();
+//        };
+//    }
     
-    private Action1<? super Object> accumulateSended(final AtomicInteger sendedSize) {
-        return sended -> sendedSize.addAndGet(((Sending)sended).readableBytes());
+//  private Action1<? super Object> accumulateSended(final AtomicInteger sendedSize) {
+//  return sended -> sendedSize.addAndGet(((Sending)sended).readableBytes());
+//}
+
+    private Action1<Object> incCounter(final AtomicInteger counter) {
+        return obj -> counter.incrementAndGet();
     }
     
     private InetSocketAddress buildAddress(final Target target) {
