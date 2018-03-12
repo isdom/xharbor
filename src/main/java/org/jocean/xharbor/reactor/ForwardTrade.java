@@ -203,6 +203,8 @@ public class ForwardTrade implements TradeReactor {
                 .flatMap(initiator -> {
                     final boolean rbs = pair.first;
                     final boolean dbs = pair.second;
+                    LOG.info("forward: pathPattern {}'s rbs {} & dbs {}", _matcher.pathPattern(), rbs, dbs);
+                    
 //                    trade.setReadPolicy(ReadPolicies.never());
                     // TBD: using ReadPolicies.ByOutbound
                     // ref:
