@@ -280,12 +280,12 @@ public class ForwardTrade implements TradeReactor {
                     return initiator.defineInteraction(inbound.flatMap(RxNettys.splitdwhs())
                                 .map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient))
                                 .doOnNext(incCounter(up_sendingCount))
-//                                .map(accumulateAndMixinSending(up_sendingSize)))
+//                                .map(accumulateAndMixinSending(up_sendingSize))
+                                )
                             .flatMap(RxNettys.splitdwhs())
                             .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))
-                            .doOnNext(incCounter(down_sendingCount))
-//                            .map(accumulateAndMixinSending(down_sendingSize)
-                            );
+                            .doOnNext(incCounter(down_sendingCount));
+//                            .map(accumulateAndMixinSending(down_sendingSize))
                     })
                 );
     }
