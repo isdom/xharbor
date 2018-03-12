@@ -98,7 +98,7 @@ public class TradeRelay extends Subscriber<HttpTrade> implements BeanHolderAware
                 if (null == io || null == io.outbound()) {
                     LOG.warn("NO_INOUT for trade({}), react io detail: {}.", trade, io);
                 }
-                trade.writeCtrl().sended().subscribe(sended -> DisposableWrapperUtil.dispose(sended));
+//                trade.writeCtrl().sended().subscribe(sended -> DisposableWrapperUtil.dispose(sended));
                 trade.outbound(buildResponse(trade, trade.inbound(), io));
             }
         }, new Action1<Throwable>() {
