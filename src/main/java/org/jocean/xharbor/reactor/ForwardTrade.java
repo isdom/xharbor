@@ -23,6 +23,7 @@ import org.jocean.idiom.BeanFinder;
 import org.jocean.idiom.DisposableWrapper;
 import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.idiom.ExceptionUtils;
+import org.jocean.idiom.Pair;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxObservables;
 import org.jocean.xharbor.api.RelayMemo;
@@ -196,10 +197,12 @@ public class ForwardTrade implements TradeReactor {
         final AtomicReference<HttpRequest> refReq = new AtomicReference<>();
         final AtomicReference<HttpResponse> refResp = new AtomicReference<>();
         
-        return isRBS().flatMap(isrbs -> 
+        return Observable.zip(isRBS(), isDBS(), (rbs, dbs)->Pair.of(rbs, dbs)).flatMap(pair -> 
             this._finder.find(HttpClient.class).flatMap(client->client.initiator()
                         .remoteAddress(buildAddress(target)).feature(target.features().call()).build())
                 .flatMap(initiator -> {
+                    final boolean rbs = pair.first;
+                    final boolean dbs = pair.second;
 //                    trade.setReadPolicy(ReadPolicies.never());
                     // TBD: using ReadPolicies.ByOutbound
                     // ref:
@@ -242,8 +245,10 @@ public class ForwardTrade implements TradeReactor {
                         }
                     });
                     
-                    // 对已经发送成功的 DisposableWrapper<?>，及时 invoke it's dispose() 回收占用的资源 (memory, ...)
-                    trade.writeCtrl().sended().subscribe(sended -> DisposableWrapperUtil.dispose(sended));
+                    if (dbs) {
+                        // 对已经发送成功的 DisposableWrapper<?>，及时 invoke it's dispose() 回收占用的资源 (memory, ...)
+                        trade.writeCtrl().sended().subscribe(sended -> DisposableWrapperUtil.dispose(sended));
+                    }
                     
                     initiator.writeCtrl().setFlushPerWrite(true);
                     trade.writeCtrl().setFlushPerWrite(true);
@@ -254,7 +259,7 @@ public class ForwardTrade implements TradeReactor {
                     final AtomicInteger up_sendingCount = new AtomicInteger(0);
                     final AtomicInteger down_sendingCount = new AtomicInteger(0);
                     
-                    if (isrbs) {
+                    if (rbs) {
 //                        final RecvBySend down_rbs = new RecvBySend();
 //                        
 //                        down_rbs.enableRBS(initiator, trade);
@@ -313,6 +318,10 @@ public class ForwardTrade implements TradeReactor {
         return this._finder.find("configs", Map.class).map(conf -> conf.get(_matcher.pathPattern() + ":" + "rbs") != null);
     }
 
+    private Observable<Boolean> isDBS() {
+        return this._finder.find("configs", Map.class).map(conf -> conf.get(_matcher.pathPattern() + ":" + "dbs") != null);
+    }
+    
 //  private int getReadableBytes(final HttpObject hobj) {
 //  return hobj instanceof HttpContent ? ((HttpContent) hobj).content().readableBytes() : 0;
 //}
