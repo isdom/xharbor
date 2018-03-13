@@ -12,10 +12,10 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.http.Feature;
 import org.jocean.http.Inbound;
-import org.jocean.http.Outbound;
 import org.jocean.http.ReadPolicies;
 import org.jocean.http.TrafficCounter;
 import org.jocean.http.TransportException;
+import org.jocean.http.WriteCtrl;
 import org.jocean.http.client.HttpClient;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.RxNettys;
@@ -259,32 +259,26 @@ public class ForwardTrade implements TradeReactor {
 //                    trade.writeCtrl().sended().subscribe(accumulateSended(down_sendedSize));
                     
                     if (rbs) {
-//                        final RecvBySend down_rbs = new RecvBySend();
+                        enableRBS(trade, initiator.writeCtrl());
+                        enableRBS(initiator, trade.writeCtrl());
+                        
+//                        final AtomicInteger up_sendingCount = new AtomicInteger(0);
+//                        final AtomicInteger up_sendedCount = new AtomicInteger(0);
 //                        
-//                        down_rbs.enableRBS(initiator, trade);
+//                        initiator.writeCtrl().sending().subscribe(incCounter(up_sendingCount));
+//                        initiator.writeCtrl().sended().subscribe(incCounter(up_sendedCount));
 //                        
-//                        final RecvBySend up_rbs = new RecvBySend();
+//                        trade.setReadPolicy(ReadPolicies.bysended(initiator.writeCtrl(), 
+//                                () -> up_sendingCount.get() - up_sendedCount.get(), 0));
 //                        
-//                        up_rbs.enableRBS(trade, initiator);
-                        
-                        
-                        final AtomicInteger up_sendingCount = new AtomicInteger(0);
-                        final AtomicInteger down_sendingCount = new AtomicInteger(0);
-                        
-                        final AtomicInteger up_sendedCount = new AtomicInteger(0);
-                        final AtomicInteger down_sendedCount = new AtomicInteger(0);
-                        
-                        initiator.writeCtrl().sending().subscribe(incCounter(up_sendingCount));
-                        initiator.writeCtrl().sended().subscribe(incCounter(up_sendedCount));
-                        
-                        trade.writeCtrl().sending().subscribe(incCounter(down_sendingCount));
-                        trade.writeCtrl().sended().subscribe(incCounter(down_sendedCount));
-                        
-                        trade.setReadPolicy(ReadPolicies.bysended(initiator.writeCtrl(), 
-                                () -> up_sendingCount.get() - up_sendedCount.get(), 0));
-                        
-                        initiator.setReadPolicy(ReadPolicies.bysended(trade.writeCtrl(), 
-                                () -> down_sendingCount.get() - down_sendedCount.get(), 0));
+//                        final AtomicInteger down_sendingCount = new AtomicInteger(0);
+//                        final AtomicInteger down_sendedCount = new AtomicInteger(0);
+//                        
+//                        trade.writeCtrl().sending().subscribe(incCounter(down_sendingCount));
+//                        trade.writeCtrl().sended().subscribe(incCounter(down_sendedCount));
+//                        
+//                        initiator.setReadPolicy(ReadPolicies.bysended(trade.writeCtrl(), 
+//                                () -> down_sendingCount.get() - down_sendedCount.get(), 0));
                     }
                     
                     return initiator.defineInteraction(inbound.flatMap(RxNettys.splitdwhs())
@@ -300,25 +294,21 @@ public class ForwardTrade implements TradeReactor {
                 );
     }
     
-    static class RecvBySend {
-        final AtomicInteger _sendingCount = new AtomicInteger(0);
-        final AtomicInteger _sendedCount = new AtomicInteger(0);
+    public void enableRBS(final Inbound inbound, final WriteCtrl writeCtrl) {
+        final AtomicInteger sendingCount = new AtomicInteger(0);
+        final AtomicInteger sendedCount = new AtomicInteger(0);
         
-        public Action1<Object> incSendingCount() {
-            return obj -> _sendingCount.incrementAndGet();
-        }
+        writeCtrl.sending().subscribe(incCounter(sendingCount));
+        writeCtrl.sended().subscribe(incCounter(sendedCount));
         
-        public void enableRBS(final Inbound inbound, final Outbound outbound) {
-            outbound.writeCtrl().sended().subscribe(incSendedCount());
-            inbound.setReadPolicy(ReadPolicies.bysended(outbound.writeCtrl(), 
-                    () -> _sendingCount.get() - _sendedCount.get(), 0));
-        }
-        
-        private Action1<? super Object> incSendedCount() {
-            return sended -> _sendedCount.incrementAndGet();
-        }
+        inbound.setReadPolicy(ReadPolicies.bysended(writeCtrl, 
+                () -> sendingCount.get() - sendedCount.get(), 0));
     }
 
+    private static Action1<Object> incCounter(final AtomicInteger counter) {
+        return obj -> counter.incrementAndGet();
+    }
+    
     private Observable<Boolean> isRBS() {
         return this._finder.find("configs", Map.class).map(conf -> conf.get(_matcher.pathPattern() + ":" + "rbs") != null);
     }
@@ -346,10 +336,6 @@ public class ForwardTrade implements TradeReactor {
 //  return sended -> sendedSize.addAndGet(((Sending)sended).readableBytes());
 //}
 
-    private Action1<Object> incCounter(final AtomicInteger counter) {
-        return obj -> counter.incrementAndGet();
-    }
-    
     private InetSocketAddress buildAddress(final Target target) {
         return new InetSocketAddress(
             target.serviceUri().getHost(), 
