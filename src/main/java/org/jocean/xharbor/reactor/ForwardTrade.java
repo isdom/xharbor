@@ -258,9 +258,6 @@ public class ForwardTrade implements TradeReactor {
 //                    initiator.writeCtrl().sended().subscribe(accumulateSended(up_sendedSize));
 //                    trade.writeCtrl().sended().subscribe(accumulateSended(down_sendedSize));
                     
-                    final AtomicInteger up_sendingCount = new AtomicInteger(0);
-                    final AtomicInteger down_sendingCount = new AtomicInteger(0);
-                    
                     if (rbs) {
 //                        final RecvBySend down_rbs = new RecvBySend();
 //                        
@@ -271,10 +268,16 @@ public class ForwardTrade implements TradeReactor {
 //                        up_rbs.enableRBS(trade, initiator);
                         
                         
+                        final AtomicInteger up_sendingCount = new AtomicInteger(0);
+                        final AtomicInteger down_sendingCount = new AtomicInteger(0);
+                        
                         final AtomicInteger up_sendedCount = new AtomicInteger(0);
                         final AtomicInteger down_sendedCount = new AtomicInteger(0);
                         
+                        initiator.writeCtrl().sending().subscribe(incCounter(up_sendingCount));
                         initiator.writeCtrl().sended().subscribe(incCounter(up_sendedCount));
+                        
+                        trade.writeCtrl().sending().subscribe(incCounter(down_sendingCount));
                         trade.writeCtrl().sended().subscribe(incCounter(down_sendedCount));
                         
                         trade.setReadPolicy(ReadPolicies.bysended(initiator.writeCtrl(), 
@@ -286,12 +289,12 @@ public class ForwardTrade implements TradeReactor {
                     
                     return initiator.defineInteraction(inbound.flatMap(RxNettys.splitdwhs())
                                 .map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient))
-                                .doOnNext(incCounter(up_sendingCount))
+//                                .doOnNext(incCounter(up_sendingCount))
 //                                .map(accumulateAndMixinSending(up_sendingSize))
                                 )
                             .flatMap(RxNettys.splitdwhs())
-                            .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))
-                            .doOnNext(incCounter(down_sendingCount));
+                            .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient));
+//                            .doOnNext(incCounter(down_sendingCount));
 //                            .map(accumulateAndMixinSending(down_sendingSize))
                     })
                 );
