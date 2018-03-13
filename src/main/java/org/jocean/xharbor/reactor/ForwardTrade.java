@@ -39,6 +39,7 @@ import com.google.common.collect.Lists;
 
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpObject;
@@ -183,10 +184,6 @@ public class ForwardTrade implements TradeReactor {
         });
     }
 
-//    public interface Sending {
-//        public int readableBytes(); 
-//    }
-    
     private Observable<? extends DisposableWrapper<HttpObject>> buildOutbound(
             final HttpTrade trade, 
             final Observable<? extends DisposableWrapper<HttpObject>> inbound, 
@@ -229,10 +226,10 @@ public class ForwardTrade implements TradeReactor {
                         });
 
                     final AtomicInteger up_sendingSize = new AtomicInteger(0);
-//                    final AtomicInteger up_sendedSize = new AtomicInteger(0);
-//                    final AtomicInteger down_sendingSize = new AtomicInteger(0);
-//                    final AtomicInteger down_sendedSize = new AtomicInteger(0);
                     
+                    initiator.writeCtrl().sending().subscribe(sending->
+                        up_sendingSize.addAndGet(getReadableBytes((HttpObject)DisposableWrapperUtil.unwrap(sending)))
+                    );
                     initiator.writeCtrl().sended().subscribe(sended -> {
                         if (up_sendingSize.get() > MAX_RETAINED_SIZE) {
                             if (LOG.isTraceEnabled()) {
@@ -255,41 +252,15 @@ public class ForwardTrade implements TradeReactor {
                     initiator.writeCtrl().setFlushPerWrite(true);
                     trade.writeCtrl().setFlushPerWrite(true);
                     
-//                    initiator.writeCtrl().sended().subscribe(accumulateSended(up_sendedSize));
-//                    trade.writeCtrl().sended().subscribe(accumulateSended(down_sendedSize));
-                    
                     if (rbs) {
                         enableRBS(trade, initiator.writeCtrl());
                         enableRBS(initiator, trade.writeCtrl());
-                        
-//                        final AtomicInteger up_sendingCount = new AtomicInteger(0);
-//                        final AtomicInteger up_sendedCount = new AtomicInteger(0);
-//                        
-//                        initiator.writeCtrl().sending().subscribe(incCounter(up_sendingCount));
-//                        initiator.writeCtrl().sended().subscribe(incCounter(up_sendedCount));
-//                        
-//                        trade.setReadPolicy(ReadPolicies.bysended(initiator.writeCtrl(), 
-//                                () -> up_sendingCount.get() - up_sendedCount.get(), 0));
-//                        
-//                        final AtomicInteger down_sendingCount = new AtomicInteger(0);
-//                        final AtomicInteger down_sendedCount = new AtomicInteger(0);
-//                        
-//                        trade.writeCtrl().sending().subscribe(incCounter(down_sendingCount));
-//                        trade.writeCtrl().sended().subscribe(incCounter(down_sendedCount));
-//                        
-//                        initiator.setReadPolicy(ReadPolicies.bysended(trade.writeCtrl(), 
-//                                () -> down_sendingCount.get() - down_sendedCount.get(), 0));
                     }
                     
                     return initiator.defineInteraction(inbound.flatMap(RxNettys.splitdwhs())
-                                .map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient))
-//                                .doOnNext(incCounter(up_sendingCount))
-//                                .map(accumulateAndMixinSending(up_sendingSize))
-                                )
+                                .map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient)))
                             .flatMap(RxNettys.splitdwhs())
                             .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient));
-//                            .doOnNext(incCounter(down_sendingCount));
-//                            .map(accumulateAndMixinSending(down_sendingSize))
                     })
                 );
     }
@@ -317,24 +288,9 @@ public class ForwardTrade implements TradeReactor {
         return this._finder.find("configs", Map.class).map(conf -> conf.get(_matcher.pathPattern() + ":" + "dbs") != null);
     }
     
-//  private int getReadableBytes(final HttpObject hobj) {
-//  return hobj instanceof HttpContent ? ((HttpContent) hobj).content().readableBytes() : 0;
-//}
-
-//    private Func1<? super DisposableWrapper<HttpObject>, ? extends DisposableWrapper<HttpObject>> accumulateAndMixinSending(
-//            final AtomicInteger sendingSize) {
-//        return dwh -> {
-//            final HttpObject hobj = dwh.unwrap();
-//            final int readableBytes = getReadableBytes(hobj);
-//            sendingSize.addAndGet(readableBytes);
-//            return Proxys.mixin().mix(DisposableWrapper.class, dwh)
-//                    .mix(Sending.class, ()->readableBytes).build();
-//        };
-//    }
-    
-//  private Action1<? super Object> accumulateSended(final AtomicInteger sendedSize) {
-//  return sended -> sendedSize.addAndGet(((Sending)sended).readableBytes());
-//}
+    private int getReadableBytes(final HttpObject hobj) {
+        return hobj instanceof HttpContent ? ((HttpContent) hobj).content().readableBytes() : 0;
+    }
 
     private InetSocketAddress buildAddress(final Target target) {
         return new InetSocketAddress(
