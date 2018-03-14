@@ -11,11 +11,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.http.Feature;
-import org.jocean.http.Inbound;
 import org.jocean.http.ReadPolicies;
 import org.jocean.http.TrafficCounter;
 import org.jocean.http.TransportException;
-import org.jocean.http.WriteCtrl;
 import org.jocean.http.client.HttpClient;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.RxNettys;
@@ -53,7 +51,6 @@ import io.netty.util.Timer;
 import io.netty.util.TimerTask;
 import rx.Observable;
 import rx.Single;
-import rx.functions.Action1;
 import rx.functions.Func0;
 import rx.functions.Func1;
 
@@ -253,8 +250,8 @@ public class ForwardTrade implements TradeReactor {
                     trade.writeCtrl().setFlushPerWrite(true);
                     
                     if (rbs) {
-                        enableRBS(trade, initiator.writeCtrl());
-                        enableRBS(initiator, trade.writeCtrl());
+                        ReadPolicies.enableRBS(trade, initiator.writeCtrl());
+                        ReadPolicies.enableRBS(initiator, trade.writeCtrl());
                     }
                     
                     return initiator.defineInteraction(inbound.flatMap(RxNettys.splitdwhs())
@@ -263,21 +260,6 @@ public class ForwardTrade implements TradeReactor {
                             .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient));
                     })
                 );
-    }
-    
-    public void enableRBS(final Inbound inbound, final WriteCtrl writeCtrl) {
-        final AtomicInteger sendingCount = new AtomicInteger(0);
-        final AtomicInteger sendedCount = new AtomicInteger(0);
-        
-        writeCtrl.sending().subscribe(incCounter(sendingCount));
-        writeCtrl.sended().subscribe(incCounter(sendedCount));
-        
-        inbound.setReadPolicy(ReadPolicies.bysended(writeCtrl, 
-                () -> sendingCount.get() - sendedCount.get(), 0));
-    }
-
-    private static Action1<Object> incCounter(final AtomicInteger counter) {
-        return obj -> counter.incrementAndGet();
     }
     
     private Observable<Boolean> isRBS() {
