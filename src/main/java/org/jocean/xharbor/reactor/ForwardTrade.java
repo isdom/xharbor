@@ -14,14 +14,15 @@ import org.jocean.http.Feature;
 import org.jocean.http.ReadPolicies;
 import org.jocean.http.TrafficCounter;
 import org.jocean.http.TransportException;
+import org.jocean.http.WriteCtrl;
 import org.jocean.http.client.HttpClient;
+import org.jocean.http.client.HttpClient.HttpInitiator;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.BeanFinder;
 import org.jocean.idiom.DisposableWrapper;
 import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.idiom.ExceptionUtils;
-import org.jocean.idiom.Pair;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxObservables;
 import org.jocean.xharbor.api.RelayMemo;
@@ -51,6 +52,7 @@ import io.netty.util.Timer;
 import io.netty.util.TimerTask;
 import rx.Observable;
 import rx.Single;
+import rx.functions.Action1;
 import rx.functions.Func0;
 import rx.functions.Func1;
 
@@ -186,27 +188,21 @@ public class ForwardTrade implements TradeReactor {
             final Observable<? extends DisposableWrapper<HttpObject>> inbound, 
             final Target target,
             final StopWatch stopWatch) {
-            
-        final AtomicBoolean isKeepAliveFromClient = new AtomicBoolean(true);
-        final AtomicReference<HttpRequest> refReq = new AtomicReference<>();
-        final AtomicReference<HttpResponse> refResp = new AtomicReference<>();
-        
-        return Observable.zip(isRBS(), isDBS(), (rbs, dbs)->Pair.of(rbs, dbs)).flatMap(pair -> 
-            this._finder.find(HttpClient.class).flatMap(client->client.initiator()
-                        .remoteAddress(buildAddress(target)).feature(target.features().call()).build())
+        return forwardTo(target).doOnNext(initiator->trade.doOnTerminate(initiator.closer()))
                 .flatMap(initiator -> {
-                    final boolean rbs = pair.first;
-                    final boolean dbs = pair.second;
-                    LOG.info("forward: pathPattern {}'s rbs {} & dbs {}", _matcher.pathPattern(), rbs, dbs);
-                    
-//                    trade.setReadPolicy(ReadPolicies.never());
+                    // trade.setReadPolicy(ReadPolicies.never());
                     // TBD: using ReadPolicies.ByOutbound
                     // ref:
                     // https://github.com/isdom/xharbor/commit/e81069dd56bfb68b08c971923d24958c438ffe2b#diff-0a4a34cc848464f04687f26d3d122a59L211
 
-                    trade.doOnTerminate(initiator.closer());
+                    initiator.writeCtrl().setFlushPerWrite(true);
+                    trade.writeCtrl().setFlushPerWrite(true);
+                    
+                    final AtomicBoolean isKeepAliveFromClient = new AtomicBoolean(true);
+                    final AtomicReference<HttpRequest> refReq = new AtomicReference<>();
+                    final AtomicReference<HttpResponse> refResp = new AtomicReference<>();
+                    
                     final TrafficCounter initiatorTraffic = initiator.traffic();
-
                     trade.doOnTerminate(() -> {
                             final long ttl = stopWatch.stopAndRestart();
                             final RelayMemo memo = _memoBuilder.build(target, buildRoutingInfo(refReq.get()));
@@ -222,44 +218,61 @@ public class ForwardTrade implements TradeReactor {
                                     refReq.get(), refResp.get());
                         });
 
-                    final AtomicInteger up_sendingSize = new AtomicInteger(0);
+                    enableDisposeUtil(initiator.writeCtrl(), MAX_RETAINED_SIZE);
                     
-                    initiator.writeCtrl().sending().subscribe(sending->
-                        up_sendingSize.addAndGet(getReadableBytes((HttpObject)DisposableWrapperUtil.unwrap(sending)))
-                    );
-                    initiator.writeCtrl().sended().subscribe(sended -> {
-                        if (up_sendingSize.get() > MAX_RETAINED_SIZE) {
-                            if (LOG.isTraceEnabled()) {
-                                LOG.trace("sendingSize is {}, dispose sended {}", up_sendingSize.get(),
-                                        sended);
-                            }
-                            DisposableWrapperUtil.dispose(sended);
-                        } else {
-                            if (LOG.isTraceEnabled()) {
-                                LOG.trace("sendingSize is {}, SKIP sended {}", up_sendingSize.get(), sended);
-                            }
-                        }
-                    });
-                    
-                    if (dbs) {
-                        // 对已经发送成功的 DisposableWrapper<?>，及时 invoke it's dispose() 回收占用的资源 (memory, ...)
-                        trade.writeCtrl().sended().subscribe(sended -> DisposableWrapperUtil.dispose(sended));
-                    }
-                    
-                    initiator.writeCtrl().setFlushPerWrite(true);
-                    trade.writeCtrl().setFlushPerWrite(true);
-                    
-                    if (rbs) {
-                        ReadPolicies.enableRBS(trade, initiator.writeCtrl());
-                        ReadPolicies.enableRBS(initiator, trade.writeCtrl());
-                    }
-                    
-                    return initiator.defineInteraction(inbound.flatMap(RxNettys.splitdwhs())
-                                .map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient)))
+                    return Observable.zip(
+                                isDBS().doOnNext(configDBS(trade)), 
+                                isRBS().doOnNext(configRBS(trade, initiator)),
+                                (dbs, rbs)-> Integer.MIN_VALUE)
+                        .flatMap(any -> initiator.defineInteraction(inbound.flatMap(RxNettys.splitdwhs())
+                            .map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient)))
                             .flatMap(RxNettys.splitdwhs())
-                            .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient));
-                    })
-                );
+                            .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient)));
+                });
+    }
+
+    private Action1<? super Boolean> configRBS(final HttpTrade trade, HttpInitiator initiator) {
+        return rbs -> {
+            LOG.info("forward: pathPattern {}'s rbs {}", _matcher.pathPattern(), rbs);
+            if (rbs) {
+                ReadPolicies.enableRBS(trade, initiator.writeCtrl());
+                ReadPolicies.enableRBS(initiator, trade.writeCtrl());
+            }
+        };
+    }
+
+    private Action1<? super Boolean> configDBS(final HttpTrade trade) {
+        return dbs-> { 
+            LOG.info("forward: pathPattern {}'s dbs {}", _matcher.pathPattern(), dbs);
+            if (dbs) {
+                // 对已经发送成功的 DisposableWrapper<?>，及时 invoke it's dispose() 回收占用的资源 (memory, ...)
+                trade.writeCtrl().sended().subscribe(sended -> DisposableWrapperUtil.dispose(sended));
+            }
+        };
+    }
+
+    private Observable<? extends HttpInitiator> forwardTo(final Target target) {
+        return this._finder.find(HttpClient.class).flatMap(client->client.initiator()
+                    .remoteAddress(buildAddress(target.serviceUri()))
+                    .feature(target.features().call()).build());
+    }
+
+    private void enableDisposeUtil(final WriteCtrl writeCtrl, final int size) {
+        final AtomicInteger sendingSize = new AtomicInteger(0);
+
+        writeCtrl.sending().subscribe(sending -> sendingSize.addAndGet(getReadableBytes(sending)));
+        writeCtrl.sended().subscribe(sended -> {
+            if (sendingSize.get() > size) {
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("sendingSize is {}, dispose sended {}", sendingSize.get(), sended);
+                }
+                DisposableWrapperUtil.dispose(sended);
+            } else {
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("sendingSize is {}, SKIP sended {}", sendingSize.get(), sended);
+                }
+            }
+        });
     }
     
     private Observable<Boolean> isRBS() {
@@ -270,14 +283,13 @@ public class ForwardTrade implements TradeReactor {
         return this._finder.find("configs", Map.class).map(conf -> conf.get(_matcher.pathPattern() + ":" + "dbs") != null);
     }
     
-    private int getReadableBytes(final HttpObject hobj) {
-        return hobj instanceof HttpContent ? ((HttpContent) hobj).content().readableBytes() : 0;
+    private int getReadableBytes(final Object sending) {
+        final Object unwrap = DisposableWrapperUtil.unwrap(sending);
+        return unwrap instanceof HttpContent ? ((HttpContent) unwrap).content().readableBytes() : 0;
     }
 
-    private InetSocketAddress buildAddress(final Target target) {
-        return new InetSocketAddress(
-            target.serviceUri().getHost(), 
-            target.serviceUri().getPort());
+    private InetSocketAddress buildAddress(final URI uri) {
+        return new InetSocketAddress(uri.getHost(), uri.getPort());
     }
 
     private Func1<DisposableWrapper<HttpObject>, DisposableWrapper<HttpObject>> addKeepAliveIfNeeded(
