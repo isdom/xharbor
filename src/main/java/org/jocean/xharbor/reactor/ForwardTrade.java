@@ -276,13 +276,17 @@ public class ForwardTrade implements TradeReactor {
     }
     
     private Observable<Boolean> isRBS() {
-        return this._finder.find("configs", Map.class).map(conf -> conf.get(_matcher.pathPattern() + ":" + "rbs") != null);
+        return this._finder.find("configs", Map.class).map(conf -> !istrue(conf.get(_matcher.pathPattern() + ":" + "disable_rbs")));
     }
 
     private Observable<Boolean> isDBS() {
-        return this._finder.find("configs", Map.class).map(conf -> conf.get(_matcher.pathPattern() + ":" + "dbs") != null);
+        return this._finder.find("configs", Map.class).map(conf -> !istrue(conf.get(_matcher.pathPattern() + ":" + "disable_dbs")));
     }
     
+    private static boolean istrue(final Object value) {
+        return value == null ? false : value.toString().equals("true");
+    }
+
     private int getReadableBytes(final Object sending) {
         final Object unwrap = DisposableWrapperUtil.unwrap(sending);
         return unwrap instanceof HttpContent ? ((HttpContent) unwrap).content().readableBytes() : 0;
