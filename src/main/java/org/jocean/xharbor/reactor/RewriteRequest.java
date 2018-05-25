@@ -14,14 +14,13 @@ import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import rx.Observable;
 import rx.Single;
-import rx.functions.Func1;
 
 public class RewriteRequest implements TradeReactor {
 
     public RewriteRequest(
-            final String pathPattern, 
+            final String pathPattern,
             final String replacePathTo,
-            final String replaceHeaderName, 
+            final String replaceHeaderName,
             final String replaceHeaderValue
             ) {
         this._pathPattern = Regexs.safeCompilePattern(pathPattern);
@@ -29,16 +28,14 @@ public class RewriteRequest implements TradeReactor {
         this._replaceHeaderName = replaceHeaderName;
         this._replaceHeaderValue = replaceHeaderValue;
     }
-    
+
     @Override
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
         return io.inbound().map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpRequest())
-            .map(new Func1<HttpRequest, InOut>() {
-                @Override
-                public InOut call(final HttpRequest req) {
+            .map(req -> {
                     if (null == req) {
                         return null;
                     } else {
@@ -50,14 +47,14 @@ public class RewriteRequest implements TradeReactor {
                             return null;
                         }
                     }
-                }})
+                })
             .toSingle();
     }
 
     private HttpRequest rewriteRequest(
             final Matcher matcher,
             final HttpRequest req) {
-        final DefaultHttpRequest newreq = new DefaultHttpRequest(req.protocolVersion(), 
+        final DefaultHttpRequest newreq = new DefaultHttpRequest(req.protocolVersion(),
                 req.method(), req.uri(), true);
         newreq.headers().set(req.headers());
         if (null != this._replacePathTo
@@ -72,7 +69,7 @@ public class RewriteRequest implements TradeReactor {
         return newreq;
     }
 
-    private InOut io4rewritePath(final InOut originalio, 
+    private InOut io4rewritePath(final InOut originalio,
             final HttpRequest originalreq,
             final Matcher matcher) {
         return new InOut() {

@@ -17,17 +17,15 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import rx.Observable;
 import rx.Single;
-import rx.functions.Action0;
-import rx.functions.Func1;
 
 public class ResponseWithHeaderonly implements TradeReactor {
-    
+
     private static final Logger LOG = LoggerFactory
             .getLogger(ResponseWithHeaderonly.class);
 
     public ResponseWithHeaderonly(
             final MatchRule matcher,
-            final int responseStatus, 
+            final int responseStatus,
             final Map<String, String> extraHeaders,
             final boolean enableLogReact) {
         this._matcher = matcher;
@@ -35,16 +33,14 @@ public class ResponseWithHeaderonly implements TradeReactor {
         this._extraHeaders = extraHeaders;
         this._logReact = enableLogReact;
     }
-    
+
     @Override
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
         return io.inbound().map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpRequest())
-                .map(new Func1<HttpRequest, InOut>() {
-                    @Override
-                    public InOut call(final HttpRequest req) {
+                .map(req -> {
                         if (null == req) {
                             LOG.warn("request is null, ignore trade {}", ctx.trade());
                             return null;
@@ -56,11 +52,11 @@ public class ResponseWithHeaderonly implements TradeReactor {
                                 return null;
                             }
                         }
-                    }})
+                    })
                 .toSingle();
     }
 
-    private InOut io4Response(final ReactContext ctx, final InOut originalio, 
+    private InOut io4Response(final ReactContext ctx, final InOut originalio,
             final HttpRequest originalreq) {
         return new InOut() {
             @Override
@@ -73,7 +69,7 @@ public class ResponseWithHeaderonly implements TradeReactor {
                         originalreq.protocolVersion(), HttpResponseStatus.valueOf(_responseStatus));
                 response.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
                 if (null!=_extraHeaders) {
-                    for (Map.Entry<String, String> entry : _extraHeaders.entrySet()) {
+                    for (final Map.Entry<String, String> entry : _extraHeaders.entrySet()) {
                         response.headers().set(entry.getKey(), entry.getValue());
                     }
                 }
@@ -82,14 +78,14 @@ public class ResponseWithHeaderonly implements TradeReactor {
                     .delaySubscription(originalio.inbound().ignoreElements())
                     .doOnCompleted(() -> {
                             if (_logReact) {
-                                LOG.info("RESPOND sendback response directly:\nREQ\n[{}]\nRESP\n[{}]", 
+                                LOG.info("RESPOND sendback response directly:\nREQ\n[{}]\nRESP\n[{}]",
                                     originalreq, response);
                             }
                         })
                     ;
             }};
     }
-    
+
     private final MatchRule _matcher;
     private final int _responseStatus;
     private final Map<String, String> _extraHeaders;
