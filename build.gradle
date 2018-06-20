@@ -19,6 +19,7 @@ dependencies {
     compile 'org.jocean:jocean-idiom:0.1.4-SNAPSHOT'
     compile 'org.jocean:jocean-j2se:0.0.4-SNAPSHOT'
     compile 'org.jocean:jocean-http:0.0.2-SNAPSHOT'
+    compile 'org.jocean:jocean-redis:0.0.1-SNAPSHOT'
     compile 'org.jocean:jocean-jdmk:0.0.2'
 
     /* Log */
