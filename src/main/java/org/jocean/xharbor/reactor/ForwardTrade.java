@@ -35,6 +35,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Lists;
+import com.netflix.hystrix.HystrixCommandGroupKey;
+import com.netflix.hystrix.HystrixCommandKey;
+import com.netflix.hystrix.HystrixObservableCommand;
 
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpResponse;
@@ -57,17 +60,17 @@ import rx.functions.Func0;
 import rx.functions.Func1;
 
 public class ForwardTrade implements TradeReactor {
-    
+
     private static final int MAX_RETAINED_SIZE = 8 * 1024;
     private static final long _period = 20; // 30 seconds
     private static final Logger LOG = LoggerFactory
             .getLogger(ForwardTrade.class);
-    
+
     public ForwardTrade(
             final MatchRule  matcher,
             final BeanFinder finder,
-            final RelayMemo.Builder memoBuilder, 
-            final ServiceMemo serviceMemo, 
+            final RelayMemo.Builder memoBuilder,
+            final ServiceMemo serviceMemo,
             final Timer timer
             ) {
         this._matcher = matcher;
@@ -76,11 +79,11 @@ public class ForwardTrade implements TradeReactor {
         this._serviceMemo = serviceMemo;
         this._timer = timer;
     }
-    
+
     public void addTarget(final Target target) {
         this._targets.add(new MarkableTargetImpl(target));
     }
-    
+
     @Override
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
         if (null != io.outbound()) {
@@ -97,7 +100,7 @@ public class ForwardTrade implements TradeReactor {
                         LOG.warn("NONE_TARGET to forward for trade {}", ctx.trade());
                         return Observable.just(null);
                     } else {
-                        return io4forward(ctx, io, target);
+                        return io4forward(ctx, io, target, _matcher.summary());
                     }
                 } else {
                     // not handle this trade
@@ -106,12 +109,25 @@ public class ForwardTrade implements TradeReactor {
             }
         }).compose(RxObservables.<InOut>ensureSubscribeAtmostOnce()).toSingle();
     }
-    
-    private Observable<InOut> io4forward(final ReactContext ctx, final InOut originalio, final MarkableTargetImpl target) {
+
+    private Observable<InOut> io4forward(final ReactContext ctx,
+            final InOut originalio,
+            final MarkableTargetImpl target,
+            final String summary) {
         // outbound 可被重复订阅
-        final Observable<? extends DisposableWrapper<HttpObject>> cachedOutbound = 
-                buildOutbound(ctx.trade(), originalio.inbound(), target, ctx.watch()).cache();
-        
+        final Observable<? extends DisposableWrapper<HttpObject>> cachedOutbound =
+                new HystrixObservableCommand<DisposableWrapper<HttpObject>>(HystrixObservableCommand.Setter
+                        .withGroupKey(HystrixCommandGroupKey.Factory.asKey("forward"))
+                        .andCommandKey(HystrixCommandKey.Factory.asKey(summary))) {
+                    @SuppressWarnings("unchecked")
+                    @Override
+                    protected Observable<DisposableWrapper<HttpObject>> construct() {
+                        return (Observable<DisposableWrapper<HttpObject>>)
+                                buildOutbound(ctx.trade(), originalio.inbound(), target, ctx.watch());
+                    }
+                }.toObservable()
+                .cache();
+
         //  启动转发 (forward)
         return cachedOutbound.first().doOnError(error -> {
             // remember reset to false after a while
@@ -152,15 +168,12 @@ public class ForwardTrade implements TradeReactor {
                     target.markAPIDownStatus(true);
                     LOG.warn("SERVER_ERROR({}), so mark service [{}]'s matched {} APIs down.", resp.status(),
                             target.serviceUri(), _matcher);
-                    _timer.newTimeout(new TimerTask() {
-                        @Override
-                        public void run(final Timeout timeout) throws Exception {
-                            // reset down flag
-                            target.markAPIDownStatus(false);
-                            LOG.info(
-                                    "reset service [{}]'s matched {} APIs down to false, after {} second cause by SERVER_ERROR({}).",
-                                    target.serviceUri(), _matcher, _period, resp.status());
-                        }
+                    _timer.newTimeout(timeout -> {
+                        // reset down flag
+                        target.markAPIDownStatus(false);
+                        LOG.info(
+                                "reset service [{}]'s matched {} APIs down to false, after {} second cause by SERVER_ERROR({}).",
+                                target.serviceUri(), _matcher, _period, resp.status());
                     }, _period, TimeUnit.SECONDS);
                     return Observable.error(new TransportException("SERVER_ERROR(" + resp.status() + ")"));
                 }
@@ -184,8 +197,8 @@ public class ForwardTrade implements TradeReactor {
     }
 
     private Observable<? extends DisposableWrapper<HttpObject>> buildOutbound(
-            final HttpTrade trade, 
-            final Observable<? extends DisposableWrapper<HttpObject>> inbound, 
+            final HttpTrade trade,
+            final Observable<? extends DisposableWrapper<HttpObject>> inbound,
             final Target target,
             final StopWatch stopWatch) {
         return forwardTo(target).doOnNext(initiator->trade.doOnTerminate(initiator.closer()))
@@ -197,11 +210,11 @@ public class ForwardTrade implements TradeReactor {
 
                     initiator.writeCtrl().setFlushPerWrite(true);
                     trade.writeCtrl().setFlushPerWrite(true);
-                    
+
                     final AtomicBoolean isKeepAliveFromClient = new AtomicBoolean(true);
                     final AtomicReference<HttpRequest> refReq = new AtomicReference<>();
                     final AtomicReference<HttpResponse> refResp = new AtomicReference<>();
-                    
+
                     final TrafficCounter initiatorTraffic = initiator.traffic();
                     trade.doOnTerminate(() -> {
                             final long ttl = stopWatch.stopAndRestart();
@@ -219,9 +232,9 @@ public class ForwardTrade implements TradeReactor {
                         });
 
                     enableDisposeUtil(initiator.writeCtrl(), MAX_RETAINED_SIZE);
-                    
+
                     return Observable.zip(
-                                isDBS().doOnNext(configDBS(trade)), 
+                                isDBS().doOnNext(configDBS(trade)),
                                 isRBS().doOnNext(configRBS(trade, initiator)),
                                 (dbs, rbs)-> Integer.MIN_VALUE)
                         .flatMap(any -> initiator.defineInteraction(inbound.flatMap(RxNettys.splitdwhs())
@@ -231,7 +244,7 @@ public class ForwardTrade implements TradeReactor {
                 });
     }
 
-    private Action1<? super Boolean> configRBS(final HttpTrade trade, HttpInitiator initiator) {
+    private Action1<? super Boolean> configRBS(final HttpTrade trade, final HttpInitiator initiator) {
         return rbs -> {
             LOG.info("forward: pathPattern {}'s rbs {}", _matcher.pathPattern(), rbs);
             if (rbs) {
@@ -242,7 +255,7 @@ public class ForwardTrade implements TradeReactor {
     }
 
     private Action1<? super Boolean> configDBS(final HttpTrade trade) {
-        return dbs-> { 
+        return dbs-> {
             LOG.info("forward: pathPattern {}'s dbs {}", _matcher.pathPattern(), dbs);
             if (dbs) {
                 // 对已经发送成功的 DisposableWrapper<?>，及时 invoke it's dispose() 回收占用的资源 (memory, ...)
@@ -274,7 +287,7 @@ public class ForwardTrade implements TradeReactor {
             }
         });
     }
-    
+
     private Observable<Boolean> isRBS() {
         return this._finder.find("configs", Map.class).map(conf -> !istrue(conf.get(_matcher.pathPattern() + ":" + "disable_rbs")));
     }
@@ -282,7 +295,7 @@ public class ForwardTrade implements TradeReactor {
     private Observable<Boolean> isDBS() {
         return this._finder.find("configs", Map.class).map(conf -> !istrue(conf.get(_matcher.pathPattern() + ":" + "disable_dbs")));
     }
-    
+
     private static boolean istrue(final Object value) {
         return value == null ? false : value.toString().equals("true");
     }
@@ -297,7 +310,7 @@ public class ForwardTrade implements TradeReactor {
     }
 
     private Func1<DisposableWrapper<HttpObject>, DisposableWrapper<HttpObject>> addKeepAliveIfNeeded(
-            final AtomicReference<HttpRequest> refReq, 
+            final AtomicReference<HttpRequest> refReq,
             final AtomicBoolean isKeepAliveFromClient) {
         return dwh -> {
             if (dwh.unwrap() instanceof HttpRequest) {
@@ -321,7 +334,7 @@ public class ForwardTrade implements TradeReactor {
             return dwh;
         };
     }
-    
+
     private Func1<DisposableWrapper<HttpObject>, DisposableWrapper<HttpObject>> removeKeepAliveIfNeeded(
             final AtomicReference<HttpResponse> refResp,
             final AtomicBoolean isKeepAliveFromClient) {
@@ -349,13 +362,13 @@ public class ForwardTrade implements TradeReactor {
     private MarkableTargetImpl selectTarget() {
         int total = 0;
         MarkableTargetImpl best = null;
-        for ( MarkableTargetImpl peer : this._targets ) {
+        for ( final MarkableTargetImpl peer : this._targets ) {
             if ( isTargetActive(peer) ) {
-                // nginx C code: peer->current_weight += peer->effective_weight; 
+                // nginx C code: peer->current_weight += peer->effective_weight;
                 final int effectiveWeight = peer._effectiveWeight.get();
                 final int currentWeight = peer._currentWeight.addAndGet( effectiveWeight );
                 total += effectiveWeight;
-//  nginx C code:                 
+//  nginx C code:
 //                if (best == NULL || peer->current_weight > best->current_weight) {
 //                    best = peer;
 //                }
@@ -364,25 +377,25 @@ public class ForwardTrade implements TradeReactor {
                 }
             }
         }
-        
+
         if (null == best) {
             return null;
         }
-        
+
 // nginx C code: best->current_weight -= total;
         best._currentWeight.addAndGet(-total);
-        
+
         return best;
     }
-    
+
     private boolean isTargetActive(final MarkableTargetImpl target) {
         return !(this._serviceMemo.isServiceDown(target.serviceUri()) || target._down.get());
     }
-    
+
     private void markServiceDownStatus(final Target target, final boolean isDown) {
         this._serviceMemo.markServiceDownStatus(target.serviceUri(), isDown);
     }
-    
+
     private RoutingInfo buildRoutingInfo(final HttpRequest req) {
         final String path = pathOf(req);
         return new RoutingInfo() {
@@ -411,7 +424,7 @@ public class ForwardTrade implements TradeReactor {
     private boolean isCommunicationFailure(final Throwable error) {
         return error instanceof ConnectException;
     }
-    
+
 //    private Action1<Object> unholdInboundMessage(final HttpMessageHolder holder) {
 //        return new Action1<Object>() {
 //            @Override
@@ -430,23 +443,23 @@ public class ForwardTrade implements TradeReactor {
 //    }
 
     private class MarkableTargetImpl implements Target {
-        
+
         private static final int MAX_EFFECTIVEWEIGHT = 1000;
-        
+
         MarkableTargetImpl(final Target target) {
             this._target = target;
         }
-        
+
         @Override
         public URI serviceUri() {
             return this._target.serviceUri();
         }
-        
+
         @Override
         public Func0<Feature[]> features() {
             return this._target.features();
         }
-        
+
         @SuppressWarnings("unused")
         public int addWeight(final int deltaWeight) {
             int weight = this._effectiveWeight.addAndGet(deltaWeight);
@@ -455,21 +468,21 @@ public class ForwardTrade implements TradeReactor {
             }
             return weight;
         }
-        
+
         public void markAPIDownStatus(final boolean isDown) {
             this._down.set(isDown);
         }
-        
+
         private final Target _target;
         private final AtomicInteger _currentWeight = new AtomicInteger(1);
         private final AtomicInteger _effectiveWeight = new AtomicInteger(1);
         private final AtomicBoolean _down = new AtomicBoolean(false);
     }
-    
+
     private final MatchRule     _matcher;
-    private final List<MarkableTargetImpl>  _targets = 
+    private final List<MarkableTargetImpl>  _targets =
             Lists.newCopyOnWriteArrayList();
-    
+
     private final BeanFinder    _finder;
     private final RelayMemo.Builder _memoBuilder;
     private final ServiceMemo   _serviceMemo;

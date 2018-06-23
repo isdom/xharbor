@@ -14,29 +14,29 @@ import io.netty.handler.codec.http.HttpRequest;
 import rx.functions.Func1;
 
 public class MatchRule implements Comparable<MatchRule> {
-    
+
     public String pathPattern() {
         return this._pathPatternAsString;
     }
 
     public MatchRule(
-            final String methodPattern, 
+            final String methodPattern,
             final String pathPattern,
             final String headersPattern
             ) {
         this._methodPatternAsString = methodPattern;
         this._pathPatternAsString   = pathPattern;
         this._headersPatternAsString = headersPattern;
-        
+
         this._methodPattern = Regexs.safeCompilePattern(this._methodPatternAsString);
         this._pathPattern = Regexs.safeCompilePattern(this._pathPatternAsString);
-        
+
         if (null != headersPattern && !headersPattern.isEmpty()) {
             final Iterator<String> iter = Splitter.on(',')
                     .trimResults()
                     .split(headersPattern)
                     .iterator();
-            
+
             while (iter.hasNext()) {
                 final String name = iter.next();
                 if (!iter.hasNext()) {
@@ -46,7 +46,7 @@ public class MatchRule implements Comparable<MatchRule> {
             }
         }
     }
-    
+
     private Func1<String, Boolean> buildPredicate(final String expression) {
         if ("==null".equals(expression)) {
             return value -> null == value;
@@ -64,7 +64,7 @@ public class MatchRule implements Comparable<MatchRule> {
         } else if (this._headersPredicates.isEmpty()) {
             return true;
         } else {
-            for (Pair<String, Func1<String, Boolean>> pair : this._headersPredicates) {
+            for (final Pair<String, Func1<String, Boolean>> pair : this._headersPredicates) {
                 final Func1<String, Boolean> predicate = pair.getSecond();
                 final String value = req.headers().get(pair.getFirst());
                 if (!predicate.call(value)) {
@@ -74,7 +74,7 @@ public class MatchRule implements Comparable<MatchRule> {
             return true;
         }
     }
-    
+
     @Override
     public String toString() {
         final StringBuilder builder = new StringBuilder();
@@ -83,6 +83,14 @@ public class MatchRule implements Comparable<MatchRule> {
                 .append(", HEADERS=").append(_headersPatternAsString)
                 .append("]");
         return builder.toString();
+    }
+
+    public String summary() {
+        return new StringBuilder()
+                .append(_methodPatternAsString)
+                .append(":").append(_pathPatternAsString)
+                .append(":").append(_headersPatternAsString)
+                .toString();
     }
 
     /* (non-Javadoc)
@@ -105,14 +113,14 @@ public class MatchRule implements Comparable<MatchRule> {
      * @see java.lang.Object#equals(java.lang.Object)
      */
     @Override
-    public boolean equals(Object obj) {
+    public boolean equals(final Object obj) {
         if (this == obj)
             return true;
         if (obj == null)
             return false;
         if (getClass() != obj.getClass())
             return false;
-        MatchRule other = (MatchRule) obj;
+        final MatchRule other = (MatchRule) obj;
         if (_methodPatternAsString == null) {
             if (other._methodPatternAsString != null)
                 return false;
@@ -135,19 +143,19 @@ public class MatchRule implements Comparable<MatchRule> {
     public int compareTo(final MatchRule o) {
         if (this == o)
             return 0;
-        
+
         int order;
-        
+
         order = compareTwoString(_methodPatternAsString, o._methodPatternAsString);
         if ( 0 != order) {
             return order;
         }
-        
+
         order = compareTwoString(_pathPatternAsString, o._pathPatternAsString);
         if ( 0 != order) {
             return order;
         }
-        
+
         return compareTwoString(_headersPatternAsString, o._headersPatternAsString);
     }
 
@@ -160,11 +168,11 @@ public class MatchRule implements Comparable<MatchRule> {
         }
         return 0;
     }
-    
+
     private final String _methodPatternAsString;
     private final String _pathPatternAsString;
     private final String _headersPatternAsString;
-    
+
     private final Pattern _methodPattern;
     private final Pattern _pathPattern;
     private final List<Pair<String,Func1<String, Boolean>>> _headersPredicates = Lists.newArrayList();
