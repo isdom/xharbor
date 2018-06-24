@@ -34,6 +34,8 @@ children:
       http.client.outbound.sendbuf = 16384
       http.client.outbound.lowmark = 4096
       http.client.outbound.highmark = 16384
+    children:
+      - name: httpclient_dashboard
   - name: router.biz
     children:
       - name: httpserver.biz
@@ -166,6 +168,16 @@ children:
               auth.headers=x-jmx,jmxhtml(\\w)*
               auth.user=test
               auth.password=test
+          - name: forward.hystrix.self
+            parameters: |
+              forward.headers=x-hystrix,hystrix
+              forward.to=http://127.0.0.1:4004
+          - name: rwreq.hystrix
+            parameters: |
+              rewrite.path=/hystrix/
+              rewrite.to=/
+              rewrite.header.name=x-hystrix
+              rewrite.header.value=hystrix
   - name: httpserver
     parameters: |
       http.server.inbound.recvbuf = 8192
