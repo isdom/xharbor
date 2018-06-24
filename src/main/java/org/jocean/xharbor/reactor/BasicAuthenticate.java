@@ -16,7 +16,6 @@ import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import rx.Observable;
 import rx.Single;
-import rx.functions.Func1;
 
 public class BasicAuthenticate implements TradeReactor {
     private static final Logger LOG = LoggerFactory
@@ -24,7 +23,7 @@ public class BasicAuthenticate implements TradeReactor {
 
     public BasicAuthenticate(
             final MatchRule matcher,
-            final String user, 
+            final String user,
             final String password,
             final String strWWWAuthenticate) {
         this._matcher = matcher;
@@ -39,9 +38,7 @@ public class BasicAuthenticate implements TradeReactor {
             return Single.<InOut>just(null);
         }
         return io.inbound().map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpRequest())
-                .map(new Func1<HttpRequest, InOut>() {
-                    @Override
-                    public InOut call(final HttpRequest req) {
+                .map(req -> {
                         if (null == req) {
                             return null;
                         } else {
@@ -57,11 +54,11 @@ public class BasicAuthenticate implements TradeReactor {
                                 return null;
                             }
                         }
-                    }})
+                    })
                 .toSingle();
     }
 
-    private InOut io4Unauthorized(final ReactContext ctx, final InOut originalio, 
+    private InOut io4Unauthorized(final ReactContext ctx, final InOut originalio,
             final HttpRequest originalreq) {
         return new InOut() {
             @Override
@@ -71,16 +68,16 @@ public class BasicAuthenticate implements TradeReactor {
             @Override
             public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
                 return RxNettys.response401Unauthorized(
-                        originalreq.protocolVersion(), 
+                        originalreq.protocolVersion(),
                         "Basic realm=\"" + _strWWWAuthenticate + "\"")
                     .map(DisposableWrapperUtil.wrap(RxNettys.disposerOf(), null != ctx ? ctx.trade() : null))
                     .delaySubscription(originalio.inbound().ignoreElements());
             }};
     }
-    
+
     private boolean isAuthorizeSuccess(
-            final HttpRequest httpRequest, 
-            final String authUser, 
+            final HttpRequest httpRequest,
+            final String authUser,
             final String authPassword) {
         final String authorization = httpRequest.headers().get(HttpHeaderNames.AUTHORIZATION);
         if ( null != authorization) {
@@ -91,8 +88,8 @@ public class BasicAuthenticate implements TradeReactor {
                     final boolean ret = (userAndPass.getFirst().equals(authUser)
                             && userAndPass.getSecond().equals(authPassword));
                     if (LOG.isDebugEnabled()) {
-                        LOG.debug("httpRequest [{}] basic authorization {}, input:{}/{}, setted auth:{}/{}", 
-                                httpRequest, (ret ? "success" : "failure"), 
+                        LOG.debug("httpRequest [{}] basic authorization {}, input:{}/{}, setted auth:{}/{}",
+                                httpRequest, (ret ? "success" : "failure"),
                                 userAndPass.getFirst(), userAndPass.getSecond(),
                                 authUser, authPassword);
                     }
@@ -112,10 +109,10 @@ public class BasicAuthenticate implements TradeReactor {
         }
         return null;
     }
-    
+
     private static Pair<String, String> getUserAndPassForBasicAuth(
             final String userAndPassBase64Encoded) {
-        final String userAndPass = new String(BaseEncoding.base64().decode(userAndPassBase64Encoded), 
+        final String userAndPass = new String(BaseEncoding.base64().decode(userAndPassBase64Encoded),
                 Charsets.UTF_8);
         final String[] fields = userAndPass.split(":");
         return fields.length == 2 ? Pair.of(fields[0], fields[1]) : null;

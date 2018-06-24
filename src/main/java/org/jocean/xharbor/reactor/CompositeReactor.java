@@ -17,7 +17,7 @@ import rx.functions.Action0;
 import rx.functions.Func1;
 
 public class CompositeReactor implements TradeReactor, Ordered, Func1<TradeReactor, Action0> {
-    
+
     private static final TradeReactor[] EMPTY_REACTOR = new TradeReactor[0];
     private static final Comparator<TradeReactor> ORDER_REACTOR_DESC = new Comparator<TradeReactor>() {
         @Override
@@ -35,46 +35,42 @@ public class CompositeReactor implements TradeReactor, Ordered, Func1<TradeReact
                 return o1.hashCode() - o2.hashCode();
             }
         }};
-    
+
     private static final Logger LOG = LoggerFactory
             .getLogger(CompositeReactor.class);
-    
+
     public void setOrdinal(final int ordinal) {
         this._ordinal = ordinal;
     }
-    
+
     @Override
     public Action0 call(final TradeReactor reactor) {
         addReactor(reactor);
-        return new Action0() {
-            @Override
-            public void call() {
-                removeReactor(reactor);
-            }};
+        return () -> removeReactor(reactor);
     }
-    
+
     public void addReactor(final TradeReactor reactor) {
         this._reactors.add(reactor);
         updateStampAndRule();
     }
-    
+
     public void removeReactor(final TradeReactor reactor) {
         this._reactors.remove(reactor);
         updateStampAndRule();
     }
-    
+
     private void updateStampAndRule() {
         final int newStamp = this._stampProvider.incrementAndGet();
-        
+
         while (this._descReactorsRef.getStamp() < newStamp) {
             this._descReactorsRef.attemptStamp(this._descReactorsRef.getReference(), newStamp);
         }
-        
+
         if (this._descReactorsRef.getStamp() == newStamp) {
             // now this stamp is the newest
             final TradeReactor[] newReactors = this._reactors.toArray(EMPTY_REACTOR);
             Arrays.sort(newReactors, ORDER_REACTOR_DESC);
-            if (this._descReactorsRef.compareAndSet(this._descReactorsRef.getReference(), newReactors, 
+            if (this._descReactorsRef.compareAndSet(this._descReactorsRef.getReference(), newReactors,
                     newStamp, newStamp)) {
                 LOG.info("CompositeReactor's rule has update to stamp({}) success.", newStamp);
             } else {
@@ -102,14 +98,14 @@ public class CompositeReactor implements TradeReactor, Ordered, Func1<TradeReact
     public int ordinal() {
         return this._ordinal;
     }
-    
+
     private final AtomicInteger _stampProvider = new AtomicInteger(0);
-    
-    private final List<TradeReactor> _reactors = 
+
+    private final List<TradeReactor> _reactors =
             new CopyOnWriteArrayList<>();
-    
-    private final AtomicStampedReference<TradeReactor[]> _descReactorsRef = 
+
+    private final AtomicStampedReference<TradeReactor[]> _descReactorsRef =
             new AtomicStampedReference<>(null, 0);
-    
+
     private int _ordinal = 0;
 }

@@ -12,10 +12,9 @@ import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import rx.Observable;
 import rx.Single;
-import rx.functions.Func1;
 
 public class DropRequest implements TradeReactor {
-    
+
     private static final Logger LOG = LoggerFactory
             .getLogger(DropRequest.class);
 
@@ -25,16 +24,14 @@ public class DropRequest implements TradeReactor {
         this._matcher = matcher;
         this._log = enableLog;
     }
-    
+
     @Override
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
         return io.inbound().map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpRequest())
-                .map(new Func1<HttpRequest, InOut>() {
-                    @Override
-                    public InOut call(final HttpRequest req) {
+                .map(req -> {
                         if (null == req) {
                             LOG.warn("request is null, ignore trade {}", ctx.trade());
                             return null;
@@ -46,11 +43,11 @@ public class DropRequest implements TradeReactor {
                                 return null;
                             }
                         }
-                    }})
+                    })
                 .toSingle();
     }
 
-    private InOut io4Drop(final ReactContext ctx, final InOut originalio, 
+    private InOut io4Drop(final ReactContext ctx, final InOut originalio,
             final HttpRequest originalreq) {
         return new InOut() {
             @Override
@@ -68,7 +65,7 @@ public class DropRequest implements TradeReactor {
                     ;
             }};
     }
-    
+
     private final MatchRule _matcher;
     private final boolean _log;
 }
