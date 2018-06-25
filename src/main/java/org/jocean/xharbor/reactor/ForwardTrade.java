@@ -35,9 +35,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Lists;
-import com.netflix.hystrix.HystrixCommandGroupKey;
-import com.netflix.hystrix.HystrixCommandKey;
-import com.netflix.hystrix.HystrixObservableCommand;
 
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpResponse;
@@ -116,37 +113,21 @@ public class ForwardTrade implements TradeReactor {
             final String summary) {
         // outbound 可被重复订阅
         final Observable<? extends DisposableWrapper<HttpObject>> cachedOutbound =
-                new HystrixObservableCommand<DisposableWrapper<HttpObject>>(HystrixObservableCommand.Setter
+                /* new HystrixObservableCommand<DisposableWrapper<HttpObject>>(HystrixObservableCommand.Setter
                         .withGroupKey(HystrixCommandGroupKey.Factory.asKey("forward"))
                         .andCommandKey(HystrixCommandKey.Factory.asKey(summary))) {
                     @SuppressWarnings("unchecked")
                     @Override
                     protected Observable<DisposableWrapper<HttpObject>> construct() {
-                        return (Observable<DisposableWrapper<HttpObject>>)
-                                buildOutbound(ctx.trade(), originalio.inbound(), target, ctx.watch());
+                        return (Observable<DisposableWrapper<HttpObject>>)*/
+                                buildOutbound(ctx.trade(), originalio.inbound(), target, ctx.watch())
+                                /*;
                     }
-                }.toObservable()
+                }.toObservable()*/
                 .cache();
 
         //  启动转发 (forward)
-        return cachedOutbound.first().doOnError(error -> {
-            // remember reset to false after a while
-            if (isCommunicationFailure(error)) {
-                markServiceDownStatus(target, true);
-                LOG.warn("COMMUNICATION_FAILURE({}), so mark service [{}] down.",
-                        ExceptionUtils.exception2detail(error), target.serviceUri());
-                _timer.newTimeout(new TimerTask() {
-                    @Override
-                    public void run(final Timeout timeout) throws Exception {
-                        // reset down flag
-                        markServiceDownStatus(target, false);
-                        LOG.info(
-                                "reset service [{}] down to false, after {} second cause by COMMUNICATION_FAILURE({}).",
-                                target.serviceUri(), _period, ExceptionUtils.exception2detail(error));
-                    }
-                }, _period, TimeUnit.SECONDS);
-            }
-        }).flatMap(dwh -> {
+        return cachedOutbound.first().doOnError(onCommunicationError(target)).flatMap(dwh -> {
             if (dwh.unwrap() instanceof HttpResponse) {
                 final HttpResponse resp = (HttpResponse) dwh.unwrap();
                 if (LOG.isDebugEnabled()) {
@@ -194,6 +175,27 @@ public class ForwardTrade implements TradeReactor {
                 return Observable.error(new RuntimeException("invalid http response"));
             }
         });
+    }
+
+    private Action1<? super Throwable> onCommunicationError(final MarkableTargetImpl target) {
+        return error -> {
+            // remember reset to false after a while
+            if (isCommunicationFailure(error)) {
+                markServiceDownStatus(target, true);
+                LOG.warn("COMMUNICATION_FAILURE({}), so mark service [{}] down.",
+                        ExceptionUtils.exception2detail(error), target.serviceUri());
+                _timer.newTimeout(new TimerTask() {
+                    @Override
+                    public void run(final Timeout timeout) throws Exception {
+                        // reset down flag
+                        markServiceDownStatus(target, false);
+                        LOG.info(
+                                "reset service [{}] down to false, after {} second cause by COMMUNICATION_FAILURE({}).",
+                                target.serviceUri(), _period, ExceptionUtils.exception2detail(error));
+                    }
+                }, _period, TimeUnit.SECONDS);
+            }
+        };
     }
 
     private Observable<? extends DisposableWrapper<HttpObject>> buildOutbound(
