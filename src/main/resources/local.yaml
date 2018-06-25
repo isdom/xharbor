@@ -113,6 +113,11 @@ children:
                 parameters: |
                   header.name=Access-Control-Allow-Origin
                   header.value=*
+          - name: forward.mock
+            parameters: |
+              forward.path=/mock
+              forward.to=http://127.0.0.1:4004
+              features.name=default
 #      - name: rules.200
 #        parameters: |
 #          priority=200
@@ -187,6 +192,10 @@ children:
         parameters: |
           http.port = 4004
           http.address=0.0.0.0
-          restin.pathpattern=/hystrix.stream
+          restin.pathpattern=/hystrix.stream|/mock
           restin.category = none
   - name: hystrixstream
+  - name: mockctrl
+    parameters: |
+      timeout = 29000
+  
