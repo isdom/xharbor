@@ -35,6 +35,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Lists;
+import com.netflix.hystrix.HystrixCommandGroupKey;
+import com.netflix.hystrix.HystrixCommandKey;
+import com.netflix.hystrix.HystrixCommandProperties;
+import com.netflix.hystrix.HystrixObservableCommand;
 
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpResponse;
@@ -47,9 +51,7 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.QueryStringDecoder;
-import io.netty.util.Timeout;
 import io.netty.util.Timer;
-import io.netty.util.TimerTask;
 import rx.Observable;
 import rx.Single;
 import rx.functions.Action1;
@@ -90,14 +92,14 @@ public class ForwardTrade implements TradeReactor {
             if (null == req) {
                 return null;
             } else {
-                if (_matcher.match(req)) {
+                if (this._matcher.match(req)) {
                     final MarkableTargetImpl target = selectTarget();
                     if (null == target) {
                         // no target
                         LOG.warn("NONE_TARGET to forward for trade {}", ctx.trade());
                         return Observable.just(null);
                     } else {
-                        return io4forward(ctx, io, target, _matcher.summary());
+                        return io4forward(ctx, io, target, this._matcher.summary());
                     }
                 } else {
                     // not handle this trade
@@ -108,22 +110,28 @@ public class ForwardTrade implements TradeReactor {
     }
 
     private Observable<InOut> io4forward(final ReactContext ctx,
-            final InOut originalio,
+            final InOut orgio,
             final MarkableTargetImpl target,
             final String summary) {
         // outbound 可被重复订阅
         final Observable<? extends DisposableWrapper<HttpObject>> cachedOutbound =
-                /* new HystrixObservableCommand<DisposableWrapper<HttpObject>>(HystrixObservableCommand.Setter
+                new HystrixObservableCommand<DisposableWrapper<HttpObject>>(HystrixObservableCommand.Setter
                         .withGroupKey(HystrixCommandGroupKey.Factory.asKey("forward"))
-                        .andCommandKey(HystrixCommandKey.Factory.asKey(summary))) {
+                        .andCommandKey(HystrixCommandKey.Factory.asKey(summary))
+                        .andCommandPropertiesDefaults(HystrixCommandProperties.Setter()
+//                                .withExecutionTimeoutEnabled(false)
+                                .withExecutionTimeoutInMilliseconds(30 * 1000)
+                                .withExecutionIsolationSemaphoreMaxConcurrentRequests(10)
+                                )
+                        ) {
                     @SuppressWarnings("unchecked")
                     @Override
                     protected Observable<DisposableWrapper<HttpObject>> construct() {
-                        return (Observable<DisposableWrapper<HttpObject>>)*/
-                                buildOutbound(ctx.trade(), originalio.inbound(), target, ctx.watch())
-                                /*;
+                        return (Observable<DisposableWrapper<HttpObject>>)
+                                buildOutbound(ctx.trade(), orgio.inbound(), target, ctx.watch())
+                                ;
                     }
-                }.toObservable()*/
+                }.toObservable()
                 .cache();
 
         //  启动转发 (forward)
@@ -162,7 +170,7 @@ public class ForwardTrade implements TradeReactor {
                 return Observable.<InOut>just(new InOut() {
                     @Override
                     public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
-                        return originalio.inbound();
+                        return orgio.inbound();
                     }
 
                     @Override
@@ -184,16 +192,13 @@ public class ForwardTrade implements TradeReactor {
                 markServiceDownStatus(target, true);
                 LOG.warn("COMMUNICATION_FAILURE({}), so mark service [{}] down.",
                         ExceptionUtils.exception2detail(error), target.serviceUri());
-                _timer.newTimeout(new TimerTask() {
-                    @Override
-                    public void run(final Timeout timeout) throws Exception {
+                _timer.newTimeout(timeout -> {
                         // reset down flag
                         markServiceDownStatus(target, false);
                         LOG.info(
                                 "reset service [{}] down to false, after {} second cause by COMMUNICATION_FAILURE({}).",
                                 target.serviceUri(), _period, ExceptionUtils.exception2detail(error));
-                    }
-                }, _period, TimeUnit.SECONDS);
+                    }, _period, TimeUnit.SECONDS);
             }
         };
     }
