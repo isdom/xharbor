@@ -82,7 +82,7 @@ public class RewriteRequest implements TradeReactor {
                         .skip(1));
             }
             @Override
-            public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
+            public Observable<? extends Object> outbound() {
                 return originalio.outbound();
             }};
     }

@@ -20,27 +20,30 @@ public class ResponseWithHeaderonlyTestCase {
     @Test
     public final void testHeaderonlyResponder() {
         final ResponseWithHeaderonly responder = new ResponseWithHeaderonly(
-                new MatchRule(null, "/yourname/(\\w)*", null), 
+                new MatchRule(null, "/yourname/(\\w)*", null),
                 200, null, true);
-        
-        final DefaultFullHttpRequest request = 
-                new DefaultFullHttpRequest(HttpVersion.HTTP_1_0, HttpMethod.POST, 
+
+        final DefaultFullHttpRequest request =
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_0, HttpMethod.POST,
                 "/yourname/hi");
-        
-        final InOut io = 
+
+        final InOut io =
             responder.react(null, new InOut() {
                 @Override
                 public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
                     return Observable.just(RxNettys.wrap4release(request));
                 }
                 @Override
-                public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
+                public Observable<? extends Object> outbound() {
                     return null;
                 }})
             .toBlocking().value();
-        
-        final FullHttpResponse response = io.outbound().compose(RxNettys.message2fullresp(null)).toBlocking().single().unwrap();
-        
+
+        final FullHttpResponse response = io.outbound()
+                .map(obj -> (DisposableWrapper<HttpObject>)obj)
+                .compose(RxNettys.message2fullresp(null))
+                .toBlocking().single().unwrap();
+
         assertEquals(HttpResponseStatus.OK, response.status());
         assertEquals(HttpVersion.HTTP_1_0, response.protocolVersion());
     }

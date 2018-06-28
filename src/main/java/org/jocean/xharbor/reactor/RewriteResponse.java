@@ -50,11 +50,13 @@ public class RewriteResponse implements TradeReactor {
                 return originalio.inbound();
             }
 
+            @SuppressWarnings("unchecked")
             @Override
-            public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
-                return originalio.outbound().doOnNext(dwh -> {
-                    if (dwh.unwrap() instanceof HttpResponse) {
-                        final HttpResponse response = (HttpResponse) dwh.unwrap();
+            public Observable<? extends Object> outbound() {
+                return originalio.outbound().doOnNext(obj -> {
+                    if (obj instanceof DisposableWrapper
+                            && ((DisposableWrapper<HttpObject>)obj).unwrap() instanceof HttpResponse) {
+                        final HttpResponse response = (HttpResponse) ((DisposableWrapper<HttpObject>)obj).unwrap();
                         for (final Map.Entry<String, String> entry : _extraHeaders.entrySet()) {
                             response.headers().set(entry.getKey(), entry.getValue());
                         }

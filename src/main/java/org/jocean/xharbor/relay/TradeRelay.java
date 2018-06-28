@@ -53,6 +53,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
 
     @Override
     public void onNext(final HttpTrade trade) {
+//        trade.setAutoRead(false);
         final StopWatch watch4Result = new StopWatch();
         final ReactContext ctx = new ReactContext() {
             @Override
@@ -87,7 +88,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
             });
     }
 
-    private Observable<? extends DisposableWrapper<HttpObject>> buildResponse(
+    private Observable<? extends Object> buildResponse(
             final HttpTrade trade, final Observable<? extends DisposableWrapper<HttpObject>> originalInbound, final InOut io) {
         return (null != io && null != io.outbound())
             ? io.outbound()

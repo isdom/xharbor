@@ -3,6 +3,7 @@ package org.jocean.xharbor.reactor;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -10,7 +11,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.jocean.http.DoFlush;
 import org.jocean.http.Feature;
+import org.jocean.http.ReadComplete;
 import org.jocean.http.ReadPolicies;
 import org.jocean.http.TrafficCounter;
 import org.jocean.http.TransportException;
@@ -25,6 +28,7 @@ import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxObservables;
+import org.jocean.idiom.rx.RxSubscribers;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.RelayMemo.RESULT;
 import org.jocean.xharbor.api.RoutingInfo;
@@ -64,6 +68,9 @@ public class ForwardTrade implements TradeReactor {
     private static final long _period = 20; // 30 seconds
     private static final Logger LOG = LoggerFactory
             .getLogger(ForwardTrade.class);
+
+    static interface Flush extends DoFlush, ReadComplete {
+    }
 
     public ForwardTrade(
             final MatchRule  matcher,
@@ -113,15 +120,16 @@ public class ForwardTrade implements TradeReactor {
             final InOut orgio,
             final MarkableTargetImpl target,
             final String summary) {
-        // outbound 可被重复订阅
-        final Observable<? extends DisposableWrapper<HttpObject>> cachedOutbound =
+        final List<DisposableWrapper<HttpObject>> dwhs = new ArrayList<>();
+
+        final Observable<? extends DisposableWrapper<HttpObject>> sharedOutbound =
                 new HystrixObservableCommand<DisposableWrapper<HttpObject>>(HystrixObservableCommand.Setter
                         .withGroupKey(HystrixCommandGroupKey.Factory.asKey("forward"))
                         .andCommandKey(HystrixCommandKey.Factory.asKey(summary))
                         .andCommandPropertiesDefaults(HystrixCommandProperties.Setter()
 //                                .withExecutionTimeoutEnabled(false)
                                 .withExecutionTimeoutInMilliseconds(30 * 1000)
-                                .withExecutionIsolationSemaphoreMaxConcurrentRequests(10)
+                                .withExecutionIsolationSemaphoreMaxConcurrentRequests(1000)
                                 )
                         ) {
                     @SuppressWarnings("unchecked")
@@ -131,58 +139,113 @@ public class ForwardTrade implements TradeReactor {
                                 buildOutbound(ctx.trade(), orgio.inbound(), target, ctx.watch())
                                 ;
                     }
-                }.toObservable()
-                .cache();
+                }.toObservable().share();
 
         //  启动转发 (forward)
-        return cachedOutbound.first().doOnError(onCommunicationError(target)).flatMap(dwh -> {
-            if (dwh.unwrap() instanceof HttpResponse) {
-                final HttpResponse resp = (HttpResponse) dwh.unwrap();
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("recv first response head part {}, so push toNext valid io.", resp);
+        return sharedOutbound.doOnError(onCommunicationError(target)).flatMap(dwh -> {
+            if (dwh.unwrap() instanceof ReadComplete) {
+                if (dwhs.isEmpty()) {
+                    LOG.info("readComplete without valid http response, continue read inbound");
+                    ((ReadComplete) dwh.unwrap()).readInbound();
+                    return Observable.empty();
+                } else {
+                    LOG.info("recv part response, and try to makeio");
+                    return makeupio(sharedOutbound, orgio, target, ctx, dwhs, (ReadComplete) dwh.unwrap());
                 }
-
-                // 404 Not Found
-                if (resp.status().equals(HttpResponseStatus.NOT_FOUND)) {
-                    // Request-URI not found in target service, so try next
-                    // matched forward target
-                    LOG.info("API_NOT_SUPPORTED for target {}, so forward trade({}) to next reactor", target,
-                            ctx.trade());
-                    return Observable.<InOut>just(null);
-                }
-
-                // 5XX Server Internal Error
-                if (resp.status().code() >= 500) {
-                    // Server Internal Error
-                    target.markAPIDownStatus(true);
-                    LOG.warn("SERVER_ERROR({}), so mark service [{}]'s matched {} APIs down.", resp.status(),
-                            target.serviceUri(), _matcher);
-                    _timer.newTimeout(timeout -> {
-                        // reset down flag
-                        target.markAPIDownStatus(false);
-                        LOG.info(
-                                "reset service [{}]'s matched {} APIs down to false, after {} second cause by SERVER_ERROR({}).",
-                                target.serviceUri(), _matcher, _period, resp.status());
-                    }, _period, TimeUnit.SECONDS);
-                    return Observable.error(new TransportException("SERVER_ERROR(" + resp.status() + ")"));
-                }
-
-                return Observable.<InOut>just(new InOut() {
-                    @Override
-                    public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
-                        return orgio.inbound();
-                    }
-
-                    @Override
-                    public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
-                        return cachedOutbound;
-                    }
-                });
             } else {
-                LOG.warn("first httpobject {} is not HttpResponse, can't use as http response stream", dwh);
-                return Observable.error(new RuntimeException("invalid http response"));
+                dwhs.add(dwh);
+                LOG.info("recv valid http response content {}, wait for readComplete.", dwh);
+                return Observable.empty();
             }
-        });
+        }, e -> Observable.error(e), () -> {
+            LOG.info("recv full response, and try to makeio");
+            return makeupio(sharedOutbound, orgio, target, ctx, dwhs, null);
+        }).first();
+    }
+
+    private Observable<InOut> makeupio(
+            final Observable<? extends DisposableWrapper<HttpObject>> sharedOutbound,
+            final InOut orgio,
+            final MarkableTargetImpl target,
+            final ReactContext ctx,
+            final List<DisposableWrapper<HttpObject>> dwhs,
+            final ReadComplete readComplete) {
+        sharedOutbound.subscribe(RxSubscribers.ignoreNext(), e ->
+            LOG.warn("ForwardTrade: {}'s outbound with onError {}", target, ExceptionUtils.exception2detail(e)));
+        if (dwhs.get(0).unwrap() instanceof HttpResponse) {
+            final HttpResponse resp = (HttpResponse) dwhs.get(0).unwrap();
+            LOG.debug("recv first response head part {}, so push toNext valid io.", resp);
+
+            // 404 Not Found
+            if (resp.status().equals(HttpResponseStatus.NOT_FOUND)) {
+                // Request-URI not found in target service, so try next
+                // matched forward target
+                LOG.info("API_NOT_SUPPORTED for target {}, so forward trade({}) to next reactor", target,
+                        ctx.trade());
+                return Observable.<InOut>just(null);
+            }
+
+            // 5XX Server Internal Error
+            if (resp.status().code() >= 500) {
+                // Server Internal Error
+                target.markAPIDownStatus(true);
+                LOG.warn("SERVER_ERROR({}), so mark service [{}]'s matched {} APIs down.", resp.status(),
+                        target.serviceUri(), _matcher);
+                _timer.newTimeout(timeout -> {
+                    // reset down flag
+                    target.markAPIDownStatus(false);
+                    LOG.info(
+                            "reset service [{}]'s matched {} APIs down to false, after {} second cause by SERVER_ERROR({}).",
+                            target.serviceUri(), _matcher, _period, resp.status());
+                }, _period, TimeUnit.SECONDS);
+                return Observable.error(new TransportException("SERVER_ERROR(" + resp.status() + ")"));
+            }
+
+            LOG.debug("makeu io forward", resp);
+
+            ctx.trade().writeCtrl().sended().subscribe(obj -> {
+                if (obj instanceof Flush) {
+                    ((Flush)obj).readInbound();
+                }
+            });
+
+            return Observable.<InOut>just(new InOut() {
+                @Override
+                public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
+                    return orgio.inbound();
+                }
+
+                @Override
+                public Observable<? extends Object> outbound() {
+                    return Observable.<Object>from(dwhs)
+                            .concatWith(Observable.just(rc2flush(readComplete)))
+                            .concatWith(sharedOutbound)
+                            .map(rc2flush());
+                }
+            });
+        } else {
+            LOG.warn("first httpobject {} is not HttpResponse, can't use as http response stream", dwhs.get(0));
+            return Observable.<InOut>just(null);
+        }
+    }
+
+    private Func1<? super Object, ? extends Object> rc2flush() {
+        return obj -> {
+            if (DisposableWrapperUtil.unwrap(obj) instanceof ReadComplete) {
+                return rc2flush(((ReadComplete) DisposableWrapperUtil.unwrap(obj)));
+            } else {
+                return obj;
+            }
+        };
+    }
+
+    private Flush rc2flush(final ReadComplete readComplete) {
+        return new Flush() {
+            @Override
+            public void readInbound() {
+                readComplete.readInbound();
+            }
+        };
     }
 
     private Action1<? super Throwable> onCommunicationError(final MarkableTargetImpl target) {
@@ -216,7 +279,7 @@ public class ForwardTrade implements TradeReactor {
                     // https://github.com/isdom/xharbor/commit/e81069dd56bfb68b08c971923d24958c438ffe2b#diff-0a4a34cc848464f04687f26d3d122a59L211
 
                     initiator.writeCtrl().setFlushPerWrite(true);
-                    trade.writeCtrl().setFlushPerWrite(true);
+//                    trade.writeCtrl().setFlushPerWrite(true);
 
                     final AtomicBoolean isKeepAliveFromClient = new AtomicBoolean(true);
                     final AtomicReference<HttpRequest> refReq = new AtomicReference<>();

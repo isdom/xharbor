@@ -21,27 +21,30 @@ public class BasicAuthenticateTestCase {
     @Test
     public final void testBasicAuthorizer() {
         final BasicAuthenticate authorizer = new BasicAuthenticate(
-                new MatchRule(null, "/needauth(\\w)*", null), 
+                new MatchRule(null, "/needauth(\\w)*", null),
                 "hello", "world", "demo");
-        
-        final DefaultFullHttpRequest orgreq = 
-                new DefaultFullHttpRequest(HttpVersion.HTTP_1_0, HttpMethod.POST, 
+
+        final DefaultFullHttpRequest orgreq =
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_0, HttpMethod.POST,
                 "/needauth/xxx");
-        
-        final InOut io = 
+
+        final InOut io =
             authorizer.react(null, new InOut() {
                 @Override
                 public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
                     return Observable.just(RxNettys.wrap4release(orgreq));
                 }
                 @Override
-                public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
+                public Observable<? extends Object> outbound() {
                     return null;
                 }})
             .toBlocking().value();
-        
-        final FullHttpResponse response = io.outbound().compose(RxNettys.message2fullresp(null)).toBlocking().single().unwrap();
-        
+
+        final FullHttpResponse response = io.outbound()
+                .map(obj -> (DisposableWrapper<HttpObject>)obj)
+                .compose(RxNettys.message2fullresp(null))
+                .toBlocking().single().unwrap();
+
         assertEquals(HttpResponseStatus.UNAUTHORIZED, response.status());
         assertEquals(HttpVersion.HTTP_1_0, response.protocolVersion());
         assertEquals("Basic realm=\"demo\"", response.headers().get(HttpHeaderNames.WWW_AUTHENTICATE));

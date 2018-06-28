@@ -17,14 +17,14 @@ public interface TradeReactor {
         public HttpTrade trade();
         public StopWatch watch();
     }
-    
+
     public interface InOut {
         public Observable<? extends DisposableWrapper<HttpObject>> inbound();
-        public Observable<? extends DisposableWrapper<HttpObject>> outbound();
+        public Observable<? extends Object> outbound();
     }
-    
+
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io);
-    
+
     public static class OP {
         public static Single<? extends InOut> first(final Iterable<? extends TradeReactor> Iterable,
                 final ReactContext ctx, final InOut io) {
@@ -34,7 +34,7 @@ public interface TradeReactor {
                     reactByFirst(ctx, io, Iterable.iterator(), subscriber);
                 }});
         }
-        
+
         public static Single<? extends InOut> all(final Iterable<? extends TradeReactor> Iterable,
                 final ReactContext ctx, final InOut io) {
             return Single.create(new Single.OnSubscribe<InOut>() {
@@ -43,7 +43,7 @@ public interface TradeReactor {
                     reactAll(ctx, io, Iterable.iterator(), subscriber, false);
                 }});
         }
-        
+
         private static void reactByFirst(final ReactContext ctx, final InOut io,
                 final Iterator<? extends TradeReactor> iter,
                 final SingleSubscriber<? super InOut> subscriber) {
@@ -72,7 +72,7 @@ public interface TradeReactor {
                 }
             }
         }
-        
+
         private static void reactAll(final ReactContext ctx, final InOut io,
                 final Iterator<? extends TradeReactor> iter,
                 final SingleSubscriber<? super InOut> subscriber,
