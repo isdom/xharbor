@@ -1,5 +1,5 @@
 /**
- * 
+ *
  */
 package org.jocean.xharbor.relay;
 
@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.jocean.http.MessageUtil;
 import org.jocean.http.TransportException;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.idiom.DisposableWrapperUtil;
@@ -34,36 +35,36 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
 
     private static class RouterCtxImpl implements Router.Context {
         private final HashMap<String, Object> _map = new HashMap<String, Object>();
-        
+
         @Override
         public <V> RouterCtxImpl setProperty(final String key, final V obj) {
             _map.put(key, obj);
             return this;
         }
-        
+
         @SuppressWarnings("unchecked")
         @Override
-        public <V> V getProperty(String key) {
+        public <V> V getProperty(final String key) {
             return (V)_map.get(key);
         }
-        
+
         @Override
         public Map<String, Object> getProperties() {
             return _map;
         }
-        
+
         public void clear() {
             _map.clear();
         }
     }
-    
+
     private static final Logger LOG =
             LoggerFactory.getLogger(RelaySubscriber.class);
 
     public RelaySubscriber(final Router<HttpRequest, Dispatcher> router) {
         this._router = router;
     }
-    
+
     @Override
     public void onCompleted() {
         LOG.warn("RelaySubscriber {} onCompleted", this);
@@ -71,19 +72,21 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
 
     @Override
     public void onError(final Throwable e) {
-        LOG.warn("RelaySubscriber {} onError, detail:{}", 
+        LOG.warn("RelaySubscriber {} onError, detail:{}",
                 this, ExceptionUtils.exception2detail(e));
     }
 
     @Override
     public void onNext(final HttpTrade trade) {
-        final Observable<HttpObject> cached = trade.inbound().map(DisposableWrapperUtil.unwrap());
-            
+        final Observable<HttpObject> cached = trade.inbound()
+                .compose(MessageUtil.dwhWithAutoread())
+                .map(DisposableWrapperUtil.unwrap());
+
         cached.subscribe(new RequestSubscriber(trade, cached));
     }
-    
+
     private static Observable<HttpObject> buildHttpResponse(
-            final Dispatcher dispatcher, 
+            final Dispatcher dispatcher,
             final Object transport,
             final HttpRequest request,
             final Observable<? extends HttpObject> fullRequest,
@@ -108,7 +111,7 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
                     canRetry.set(false);
                 }});
     }
-    
+
     private static boolean isInboundCanceled(final Throwable e) {
         return e instanceof TransportException;
     }
@@ -122,37 +125,37 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
     class RequestSubscriber extends Subscriber<HttpObject> {
         private final HttpTrade _trade;
         private final Observable<HttpObject> _request;
-      
+
         RequestSubscriber(final HttpTrade trade, final Observable<HttpObject> request) {
             this._trade = trade;
             this._request = request;
         }
-        
+
         @Override
         public void onCompleted() {
         }
 
         @Override
         public void onError(final Throwable e) {
-            LOG.warn("trade({}).request().onError ({}).", 
+            LOG.warn("trade({}).request().onError ({}).",
                 this._trade, ExceptionUtils.exception2detail(e));
         }
-        
+
         @Override
         public void onNext(final HttpObject msg) {
             if (msg instanceof HttpRequest) {
                 final HttpRequest req = (HttpRequest)msg;
                 final RouterCtxImpl routectx = new RouterCtxImpl();
-                
+
                 final Dispatcher dispatcher = _router.calculateRoute(req, routectx);
                 final RoutingInfo info = routectx.getProperty("routingInfo");
                 routectx.clear();
-                
+
                 _trade.outbound(
                     buildHttpResponse(dispatcher, _trade.transport(), req, this._request, info, new AtomicBoolean(true)));
             }
         }
     };
-    
+
     private final Router<HttpRequest, Dispatcher> _router;
 }

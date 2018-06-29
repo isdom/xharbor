@@ -120,10 +120,10 @@ public class ForwardTrade implements TradeReactor {
             final InOut orgio,
             final MarkableTargetImpl target,
             final String summary) {
-        final List<DisposableWrapper<HttpObject>> dwhs = new ArrayList<>();
+        final List<Object> dwhs = new ArrayList<>();
 
-        final Observable<? extends DisposableWrapper<HttpObject>> sharedOutbound =
-                new HystrixObservableCommand<DisposableWrapper<HttpObject>>(HystrixObservableCommand.Setter
+        final Observable<? extends Object> sharedOutbound =
+                new HystrixObservableCommand<Object>(HystrixObservableCommand.Setter
                         .withGroupKey(HystrixCommandGroupKey.Factory.asKey("forward"))
                         .andCommandKey(HystrixCommandKey.Factory.asKey(summary))
                         .andCommandPropertiesDefaults(HystrixCommandProperties.Setter()
@@ -134,27 +134,25 @@ public class ForwardTrade implements TradeReactor {
                         ) {
                     @SuppressWarnings("unchecked")
                     @Override
-                    protected Observable<DisposableWrapper<HttpObject>> construct() {
-                        return (Observable<DisposableWrapper<HttpObject>>)
-                                buildOutbound(ctx.trade(), orgio.inbound(), target, ctx.watch())
-                                ;
+                    protected Observable<Object> construct() {
+                        return buildOutbound(ctx.trade(), orgio.inbound(), target, ctx.watch());
                     }
                 }.toObservable().share();
 
         //  启动转发 (forward)
-        return sharedOutbound.doOnError(onCommunicationError(target)).flatMap(dwh -> {
-            if (dwh.unwrap() instanceof ReadComplete) {
+        return sharedOutbound.doOnError(onCommunicationError(target)).flatMap(obj -> {
+            if (obj instanceof ReadComplete) {
                 if (dwhs.isEmpty()) {
                     LOG.info("readComplete without valid http response, continue read inbound");
-                    ((ReadComplete) dwh.unwrap()).readInbound();
+                    ((ReadComplete) obj).readInbound();
                     return Observable.empty();
                 } else {
                     LOG.info("recv part response, and try to makeio");
-                    return makeupio(sharedOutbound, orgio, target, ctx, dwhs, (ReadComplete) dwh.unwrap());
+                    return makeupio(sharedOutbound, orgio, target, ctx, dwhs, (ReadComplete) obj);
                 }
             } else {
-                dwhs.add(dwh);
-                LOG.info("recv valid http response content {}, wait for readComplete.", dwh);
+                dwhs.add(obj);
+                LOG.info("recv valid http response content {}, wait for readComplete.", obj);
                 return Observable.empty();
             }
         }, e -> Observable.error(e), () -> {
@@ -164,16 +162,16 @@ public class ForwardTrade implements TradeReactor {
     }
 
     private Observable<InOut> makeupio(
-            final Observable<? extends DisposableWrapper<HttpObject>> sharedOutbound,
+            final Observable<? extends Object> sharedOutbound,
             final InOut orgio,
             final MarkableTargetImpl target,
             final ReactContext ctx,
-            final List<DisposableWrapper<HttpObject>> dwhs,
+            final List<Object> dwhs,
             final ReadComplete readComplete) {
         sharedOutbound.subscribe(RxSubscribers.ignoreNext(), e ->
             LOG.warn("ForwardTrade: {}'s outbound with onError {}", target, ExceptionUtils.exception2detail(e)));
-        if (dwhs.get(0).unwrap() instanceof HttpResponse) {
-            final HttpResponse resp = (HttpResponse) dwhs.get(0).unwrap();
+        if (DisposableWrapperUtil.unwrap(dwhs.get(0)) instanceof HttpResponse) {
+            final HttpResponse resp = (HttpResponse) DisposableWrapperUtil.unwrap(dwhs.get(0));
             LOG.debug("recv first response head part {}, so push toNext valid io.", resp);
 
             // 404 Not Found
@@ -231,8 +229,8 @@ public class ForwardTrade implements TradeReactor {
 
     private Func1<? super Object, ? extends Object> rc2flush() {
         return obj -> {
-            if (DisposableWrapperUtil.unwrap(obj) instanceof ReadComplete) {
-                return rc2flush(((ReadComplete) DisposableWrapperUtil.unwrap(obj)));
+            if (obj instanceof ReadComplete) {
+                return rc2flush((ReadComplete) obj);
             } else {
                 return obj;
             }
@@ -266,7 +264,7 @@ public class ForwardTrade implements TradeReactor {
         };
     }
 
-    private Observable<? extends DisposableWrapper<HttpObject>> buildOutbound(
+    private Observable<Object> buildOutbound(
             final HttpTrade trade,
             final Observable<? extends DisposableWrapper<HttpObject>> inbound,
             final Target target,
@@ -379,12 +377,12 @@ public class ForwardTrade implements TradeReactor {
         return new InetSocketAddress(uri.getHost(), uri.getPort());
     }
 
-    private Func1<DisposableWrapper<HttpObject>, DisposableWrapper<HttpObject>> addKeepAliveIfNeeded(
+    private Func1<Object, Object> addKeepAliveIfNeeded(
             final AtomicReference<HttpRequest> refReq,
             final AtomicBoolean isKeepAliveFromClient) {
         return dwh -> {
-            if (dwh.unwrap() instanceof HttpRequest) {
-                final HttpRequest req = (HttpRequest) dwh.unwrap();
+            if (DisposableWrapperUtil.unwrap(dwh) instanceof HttpRequest) {
+                final HttpRequest req = (HttpRequest) DisposableWrapperUtil.unwrap(dwh);
                 refReq.set(req);
                 // only check first time, bcs inbound could be process many
                 // times
@@ -405,12 +403,12 @@ public class ForwardTrade implements TradeReactor {
         };
     }
 
-    private Func1<DisposableWrapper<HttpObject>, DisposableWrapper<HttpObject>> removeKeepAliveIfNeeded(
+    private Func1<Object, Object> removeKeepAliveIfNeeded(
             final AtomicReference<HttpResponse> refResp,
             final AtomicBoolean isKeepAliveFromClient) {
         return dwh -> {
-            if (dwh.unwrap() instanceof HttpResponse) {
-                final HttpResponse resp = (HttpResponse) dwh.unwrap();
+            if (DisposableWrapperUtil.unwrap(dwh) instanceof HttpResponse) {
+                final HttpResponse resp = (HttpResponse) DisposableWrapperUtil.unwrap(dwh);
                 refResp.set(resp);
                 if (!isKeepAliveFromClient.get()) {
                     if (HttpUtil.isKeepAlive(resp)) {

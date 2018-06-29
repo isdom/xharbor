@@ -1,5 +1,5 @@
 /**
- * 
+ *
  */
 package org.jocean.xharbor.router;
 
@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.http.Feature;
+import org.jocean.http.MessageUtil;
 import org.jocean.http.TransportException;
 import org.jocean.http.client.HttpClient;
 import org.jocean.http.client.HttpClient.HttpInitiator;
@@ -58,19 +59,19 @@ import rx.functions.Func1;
  *
  */
 public class DefaultDispatcher implements Dispatcher {
-    
+
     private static final Logger LOG = LoggerFactory
             .getLogger(DefaultDispatcher.class);
 
     private static final int MAX_EFFECTIVEWEIGHT = 1000;
-    
+
     public DefaultDispatcher(
-            final Target[] targets, 
-            final Action1<HttpRequest> rewriteRequest, 
-            final Action1<HttpResponse> rewriteResponse, 
-            final Func1<HttpRequest, Boolean> authorization, 
+            final Target[] targets,
+            final Action1<HttpRequest> rewriteRequest,
+            final Action1<HttpResponse> rewriteResponse,
+            final Func1<HttpRequest, Boolean> authorization,
             final Func1<HttpRequest, FullHttpResponse> responser,
-            final ServiceMemo serviceMemo, 
+            final ServiceMemo serviceMemo,
             final HttpClient httpClient,
             final RelayMemo.Builder memoBuilder,
             final RoutingInfoMemo noRoutingMemo
@@ -86,12 +87,12 @@ public class DefaultDispatcher implements Dispatcher {
         this._targets = new ArrayList<MarkableTargetImpl>() {
             private static final long serialVersionUID = 1L;
         {
-            for ( Target target : targets) {
+            for ( final Target target : targets) {
                 this.add(new MarkableTargetImpl(target));
             }
         }}.toArray(new MarkableTargetImpl[0]);
     }
-    
+
     @Override
     public String toString() {
         return Arrays.toString( new ArrayList<String>() {
@@ -99,7 +100,7 @@ public class DefaultDispatcher implements Dispatcher {
         {
             this.add("rewriteRequest:" + _rewriteRequest.toString());
             this.add("authorize:" + _authorization.toString());
-            for (MarkableTargetImpl peer : _targets) {
+            for (final MarkableTargetImpl peer : _targets) {
                 this.add(peer._target.toString() + ":active(" + isTargetActive(peer)
                         + "):effectiveWeight(" + peer._effectiveWeight.get()
                         + "):currentWeight(" + peer._currentWeight.get()
@@ -112,13 +113,13 @@ public class DefaultDispatcher implements Dispatcher {
     private MarkableTargetImpl dispatch() {
         int total = 0;
         MarkableTargetImpl best = null;
-        for ( MarkableTargetImpl peer : this._targets ) {
+        for ( final MarkableTargetImpl peer : this._targets ) {
             if ( isTargetActive(peer) ) {
-                // nginx C code: peer->current_weight += peer->effective_weight; 
+                // nginx C code: peer->current_weight += peer->effective_weight;
                 final int effectiveWeight = peer._effectiveWeight.get();
                 final int currentWeight = peer._currentWeight.addAndGet( effectiveWeight );
                 total += effectiveWeight;
-//  nginx C code:                 
+//  nginx C code:
 //                if (best == NULL || peer->current_weight > best->current_weight) {
 //                    best = peer;
 //                }
@@ -127,17 +128,17 @@ public class DefaultDispatcher implements Dispatcher {
                 }
             }
         }
-        
+
         if (null == best) {
             return null;
         }
-        
+
 // nginx C code: best->current_weight -= total;
         best._currentWeight.addAndGet(-total);
-        
+
         return best;
     }
-    
+
     @Override
     public boolean IsValid() {
         return this._targets.length > 0;
@@ -150,23 +151,23 @@ public class DefaultDispatcher implements Dispatcher {
     private boolean isTargetActive(final MarkableTargetImpl peer) {
         return !(this._serviceMemo.isServiceDown(peer._target.serviceUri()) || peer._down.get());
     }
-    
+
     private class MarkableTargetImpl implements Target {
-        
+
         MarkableTargetImpl(final Target target) {
             this._target = target;
         }
-        
+
         @Override
         public URI serviceUri() {
             return this._target.serviceUri();
         }
-        
+
         @Override
         public Func0<Feature[]> features() {
             return this._target.features();
         }
-        
+
         public int addWeight(final int deltaWeight) {
             int weight = this._effectiveWeight.addAndGet(deltaWeight);
             if ( weight > MAX_EFFECTIVEWEIGHT ) {
@@ -174,21 +175,21 @@ public class DefaultDispatcher implements Dispatcher {
             }
             return weight;
         }
-        
+
         public void markAPIDownStatus(final boolean isDown) {
             this._down.set(isDown);
         }
-        
+
         public void markServiceDownStatus(final boolean isDown) {
             _serviceMemo.markServiceDownStatus(this._target.serviceUri(), isDown);
         }
-        
+
         private final Target _target;
         private final AtomicInteger _currentWeight = new AtomicInteger(1);
         private final AtomicInteger _effectiveWeight = new AtomicInteger(1);
         private final AtomicBoolean _down = new AtomicBoolean(false);
     }
-    
+
     private final ServiceMemo _serviceMemo;
     private final Action1<HttpRequest> _rewriteRequest;
     private final Action1<HttpResponse> _rewriteResponse;
@@ -199,41 +200,41 @@ public class DefaultDispatcher implements Dispatcher {
     private FullHttpResponse tryResponse(final HttpRequest httpRequest) {
         return null!=_responser ? _responser.call(httpRequest) : null;
     }
-    
+
     private boolean isNeedAuthorization(final HttpRequest httpRequest) {
         return _authorization.call(httpRequest);
     }
-    
+
     private void rewriteRequest(final HttpRequest request) {
         _rewriteRequest.call(request);
     }
-    
+
     private void rewriteResponse(final HttpResponse response) {
         _rewriteResponse.call(response);
     }
-    
+
     @SuppressWarnings("unchecked")
     @Override
     public Observable<HttpObject> response(
             final ResponseCtx ctx,
             final RoutingInfo info,
-            final HttpRequest request, 
+            final HttpRequest request,
             final Observable<? extends HttpObject> fullRequest) {
-        
+
         final MarkableTargetImpl target = dispatch();
         if (null==target) {
-            LOG.warn("can't found matched target service for http inbound ({})\nrequest:[{}]\njust return 200 OK.", 
+            LOG.warn("can't found matched target service for http inbound ({})\nrequest:[{}]\njust return 200 OK.",
                     ctx.transport, request);
             _noRoutingMemo.incRoutingInfo(info);
             return RxObservables.delaySubscriptionUntilCompleted(
                     RxNettys.response200OK(request.protocolVersion()),
                     fullRequest);
         }
-        
+
         final RelayMemo memo = _memoBuilder.build(target, info);
         final StopWatch watch4Result = new StopWatch();
-        
-        final FullHttpResponse directResponse = 
+
+        final FullHttpResponse directResponse =
                 tryResponse(request);
         if (null != directResponse) {
             return RxObservables.delaySubscriptionUntilCompleted(
@@ -242,24 +243,24 @@ public class DefaultDispatcher implements Dispatcher {
         } else if (isNeedAuthorization(request)) {
             return RxObservables.delaySubscriptionUntilCompleted(
                     RxNettys.response401Unauthorized(
-                            request.protocolVersion(), 
+                            request.protocolVersion(),
                             "Basic realm=\"iplusmed\"")
                         .doOnCompleted(new Action0() {
                             @Override
                             public void call() {
-                                memo.incBizResult(RESULT.HTTP_UNAUTHORIZED, 
+                                memo.incBizResult(RESULT.HTTP_UNAUTHORIZED,
                                         watch4Result.stopAndRestart());
                             }}),
                     fullRequest);
         } else {
-            final StepMemo<STEP> stepmemo = 
+            final StepMemo<STEP> stepmemo =
                 BizMemo.Util.buildStepMemo(memo, new StopWatch());
             stepmemo.beginBizStep(STEP.ROUTING);
-            
+
             rewriteRequest(request);
             final AtomicReference<HttpResponse> respRef = new AtomicReference<HttpResponse>();
-            
-            final class ChannelGetter extends Feature.AbstractFeature0 
+
+            final class ChannelGetter extends Feature.AbstractFeature0
                 implements ChannelAware {
                 @Override
                 public void setChannel(final Channel channel) {
@@ -268,17 +269,17 @@ public class DefaultDispatcher implements Dispatcher {
                 private Channel _channel;
             }
             final ChannelGetter channelGetter = new ChannelGetter();
-            
+
             return (Observable<HttpObject>) _httpClient.initiator().remoteAddress(
                     new InetSocketAddress(
-                        target.serviceUri().getHost(), 
+                        target.serviceUri().getHost(),
                         target.serviceUri().getPort()))
                     .feature(target.features().call())
                     .feature(channelGetter)
                     .build()
                     .flatMap(new Func1<HttpInitiator, Observable<HttpObject>>() {
                         @Override
-                        public Observable<HttpObject> call(HttpInitiator t) {
+                        public Observable<HttpObject> call(final HttpInitiator t) {
                             return t.defineInteraction(fullRequest.doOnNext(new Action1<HttpObject>() {
                                 @Override
                                 public void call(final HttpObject httpObj) {
@@ -288,18 +289,20 @@ public class DefaultDispatcher implements Dispatcher {
                                         try {
                                             if ( isJson(request.headers().get(HttpHeaderNames.CONTENT_TYPE)) ) {
                                                 final ByteBuf content = ((HttpContent)httpObj).content();
-                                                final byte[] bytes = 
+                                                final byte[] bytes =
                                                     ByteStreams.toByteArray(new ByteBufInputStream(content.slice()));
-                                                LOG.info("DUMP CONTENT: request:[{}]'s json content is: {}", 
-                                                        request, 
+                                                LOG.info("DUMP CONTENT: request:[{}]'s json content is: {}",
+                                                        request,
                                                         new String(bytes, Charsets.UTF_8));
                                             }
-                                        } catch (Exception e) {
-                                            LOG.warn("exception when dump content, detail: {}", 
+                                        } catch (final Exception e) {
+                                            LOG.warn("exception when dump content, detail: {}",
                                                     ExceptionUtils.exception2detail(e));
                                         }
                                     }
-                                }})).map(DisposableWrapperUtil.<HttpObject>unwrap());
+                                }}))
+                                .compose(MessageUtil.dwhWithAutoread())
+                                .map(DisposableWrapperUtil.<HttpObject>unwrap());
                         }})
                     .doOnNext(new Action1<HttpObject>() {
                         @Override
@@ -323,7 +326,7 @@ public class DefaultDispatcher implements Dispatcher {
                                         ttl / (float)1000.0,
                                         ctx.transport,
                                         channelGetter._channel,
-                                        request, 
+                                        request,
                                         target.serviceUri());
                             } else if (e instanceof TransportException) {
                                 memo.incBizResult(RESULT.INBOUND_CANCELED, ttl);
@@ -331,7 +334,7 @@ public class DefaultDispatcher implements Dispatcher {
                                         ttl / (float)1000.0,
                                         ctx.transport,
                                         channelGetter._channel,
-                                        request, 
+                                        request,
                                         target.serviceUri());
                             } else {
                                 ctx.resultSetter = new Action1<RelayMemo.RESULT> () {
@@ -343,7 +346,7 @@ public class DefaultDispatcher implements Dispatcher {
                                                 ttl / (float)1000.0,
                                                 ctx.transport,
                                                 channelGetter._channel,
-                                                request, 
+                                                request,
                                                 target.serviceUri());
                                     }};
                             }
@@ -355,11 +358,11 @@ public class DefaultDispatcher implements Dispatcher {
                             final long ttl = watch4Result.stopAndRestart();
                             memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
                             LOG.info("RELAY_SUCCESS\ncost:[{}]s for http inbound ({})\nand outbound ({})\nrequest:[{}]\ndispatch to:[{}]\nresponse:[{}]",
-                                    ttl / (float)1000.0, 
-                                    ctx.transport, 
+                                    ttl / (float)1000.0,
+                                    ctx.transport,
                                     channelGetter._channel,
-                                    request, 
-                                    target.serviceUri(), 
+                                    request,
+                                    target.serviceUri(),
                                     respRef.get());
                         }});
         }

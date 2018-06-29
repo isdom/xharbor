@@ -6,6 +6,7 @@ package org.jocean.xharbor.relay;
 import java.net.ConnectException;
 import java.nio.channels.ClosedChannelException;
 
+import org.jocean.http.MessageUtil;
 import org.jocean.http.TransportException;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.RxNettys;
@@ -70,7 +71,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
         this._tradeReactor.react(ctx, new InOut() {
             @Override
             public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
-                return trade.inbound();
+                return trade.inbound().compose(MessageUtil.dwhWithAutoread());
             }
 
             @Override
@@ -89,10 +90,12 @@ public class TradeRelay extends Subscriber<HttpTrade> {
     }
 
     private Observable<? extends Object> buildResponse(
-            final HttpTrade trade, final Observable<? extends DisposableWrapper<HttpObject>> originalInbound, final InOut io) {
+            final HttpTrade trade, final Observable<? extends Object> originalInbound, final InOut io) {
         return (null != io && null != io.outbound())
             ? io.outbound()
-            : originalInbound.map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpRequest())
+            : originalInbound.compose(MessageUtil.dwhWithAutoread())
+                .map(DisposableWrapperUtil.unwrap())
+                .compose(RxNettys.asHttpRequest())
                 .map(req -> null != req ? req.protocolVersion() : HttpVersion.HTTP_1_1)
                 .flatMap(version -> RxNettys.response200OK(version) )
                 .map(DisposableWrapperUtil.wrap(RxNettys.disposerOf(), trade))

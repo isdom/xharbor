@@ -79,6 +79,7 @@ public class RewriteRequest implements TradeReactor {
                     .concatWith(
                         originalio.inbound()
                         .flatMap(RxNettys.splitdwhs())
+                        .map(obj->(DisposableWrapper<HttpObject>)obj)
                         .skip(1));
             }
             @Override
