@@ -168,11 +168,11 @@ children:
               rewrite.to=/
               rewrite.header.name=x-jmx
               rewrite.header.value=jmxhtml.self
-          - name: auth.jmxhtml
-            parameters: |
-              auth.headers=x-jmx,jmxhtml(\\w)*
-              auth.user=test
-              auth.password=test
+#          - name: auth.jmxhtml
+#            parameters: |
+#              auth.headers=x-jmx,jmxhtml(\\w)*
+#              auth.user=test
+#              auth.password=test
           - name: forward.hystrix.self
             parameters: |
               forward.headers=x-hystrix,hystrix
