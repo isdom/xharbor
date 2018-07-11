@@ -6,6 +6,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.jocean.http.HttpSlice;
 import org.jocean.idiom.DisposableWrapper;
 import org.jocean.idiom.Ordered;
 import org.jocean.xharbor.api.TradeReactor;
@@ -19,7 +20,7 @@ import rx.Single;
 import rx.functions.Func2;
 
 public class CompositeReactorTestCase {
-    
+
     class OrderedTradeReactor implements TradeReactor, Ordered {
 
         OrderedTradeReactor(final int ordinal, final Func2<ReactContext, InOut, Single<? extends InOut>> doReact) {
@@ -34,7 +35,7 @@ public class CompositeReactorTestCase {
         public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
             return this._doReact.call(ctx, io);
         }
-        
+
         private final int _ordinal;
         private final Func2<ReactContext, InOut, Single<? extends InOut>> _doReact;
     }
@@ -44,27 +45,27 @@ public class CompositeReactorTestCase {
         final CompositeReactor cr = new CompositeReactor();
         final AtomicBoolean tr1Reacted = new AtomicBoolean(false);
         final AtomicBoolean tr2Reacted = new AtomicBoolean(false);
-        
+
         cr.addReactor(new OrderedTradeReactor(1, new Func2<ReactContext, InOut, Single<? extends InOut>>() {
             @Override
-            public Single<? extends InOut> call(ReactContext ctx, InOut t2) {
+            public Single<? extends InOut> call(final ReactContext ctx, final InOut t2) {
                 tr1Reacted.set(true);
                 assertTrue(tr2Reacted.get());
                 return Single.just(null);
             }}));
-        
+
         cr.addReactor(new OrderedTradeReactor(2, new Func2<ReactContext, InOut, Single<? extends InOut>>() {
             @Override
-            public Single<? extends InOut> call(ReactContext ctx, InOut t2) {
+            public Single<? extends InOut> call(final ReactContext ctx, final InOut t2) {
                 tr2Reacted.set(true);
                 assertFalse(tr1Reacted.get());
                 return Single.just(null);
             }}));
-        
+
         final InOut io =
         cr.react(null, new InOut() {
             @Override
-            public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
+            public Observable<? extends HttpSlice> inbound() {
                 return null;
             }
             @Override
@@ -72,7 +73,7 @@ public class CompositeReactorTestCase {
                 return null;
             }})
         .toBlocking().value();
-        
+
         assertTrue(tr1Reacted.get());
         assertTrue(tr2Reacted.get());
         assertNull(io);

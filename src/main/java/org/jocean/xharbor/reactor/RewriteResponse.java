@@ -2,9 +2,9 @@ package org.jocean.xharbor.reactor;
 
 import java.util.Map;
 
-import org.jocean.http.util.RxNettys;
+import org.jocean.http.HttpSlice;
+import org.jocean.http.HttpSliceUtil;
 import org.jocean.idiom.DisposableWrapper;
-import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.xharbor.api.TradeReactor;
 
 import io.netty.handler.codec.http.HttpObject;
@@ -15,9 +15,7 @@ import rx.Single;
 
 public class RewriteResponse implements TradeReactor {
 
-    public RewriteResponse(
-            final MatchRule matcher,
-            final Map<String, String> extraHeaders) {
+    public RewriteResponse(final MatchRule matcher, final Map<String, String> extraHeaders) {
         this._matcher = matcher;
         this._extraHeaders = extraHeaders;
     }
@@ -27,33 +25,31 @@ public class RewriteResponse implements TradeReactor {
         if (null == io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpRequest())
-                .map(req -> {
-                        if (null == req) {
-                            return null;
-                        } else {
-                            if (_matcher.match(req)) {
-                                return io4rewriteResponse(io, req);
-                            } else {
-                                //  not handle this trade
-                                return null;
-                            }
-                        }
-                    })
-                .toSingle();
+        return io.inbound().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()).map(req -> {
+            if (null == req) {
+                return null;
+            } else {
+                if (_matcher.match(req)) {
+                    return io4rewriteResponse(io, req);
+                } else {
+                    // not handle this trade
+                    return null;
+                }
+            }
+        }).toSingle();
     }
 
-    private InOut io4rewriteResponse(final InOut originalio, final HttpRequest originalreq) {
+    private InOut io4rewriteResponse(final InOut orgio, final HttpRequest orgreq) {
         return new InOut() {
             @Override
-            public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
-                return originalio.inbound();
+            public Observable<? extends HttpSlice> inbound() {
+                return orgio.inbound();
             }
 
             @SuppressWarnings("unchecked")
             @Override
             public Observable<? extends Object> outbound() {
-                return originalio.outbound().doOnNext(obj -> {
+                return orgio.outbound().doOnNext(obj -> {
                     if (obj instanceof DisposableWrapper
                             && ((DisposableWrapper<HttpObject>)obj).unwrap() instanceof HttpResponse) {
                         final HttpResponse response = (HttpResponse) ((DisposableWrapper<HttpObject>)obj).unwrap();

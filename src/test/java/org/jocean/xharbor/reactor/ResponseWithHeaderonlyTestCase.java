@@ -2,6 +2,8 @@ package org.jocean.xharbor.reactor;
 
 import static org.junit.Assert.assertEquals;
 
+import org.jocean.http.HttpSlice;
+import org.jocean.http.HttpSliceUtil;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.DisposableWrapper;
 import org.jocean.xharbor.api.TradeReactor.InOut;
@@ -30,8 +32,8 @@ public class ResponseWithHeaderonlyTestCase {
         final InOut io =
             responder.react(null, new InOut() {
                 @Override
-                public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
-                    return Observable.just(RxNettys.wrap4release(request));
+                public Observable<? extends HttpSlice> inbound() {
+                    return HttpSliceUtil.single(Observable.just(RxNettys.wrap4release(request)));
                 }
                 @Override
                 public Observable<? extends Object> outbound() {

@@ -2,6 +2,7 @@ package org.jocean.xharbor.reactor;
 
 import java.util.Map;
 
+import org.jocean.http.HttpSliceUtil;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.BeanHolder;
 import org.jocean.idiom.BeanHolderAware;
@@ -57,7 +58,7 @@ public class LogAccessInfo2Redis implements TradeReactor, Ordered, BeanHolderAwa
             final RedisClient redisclient) {
         if (null != io.inbound() && null != io.outbound()) {
             Observable.zip(
-                    io.inbound().map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpRequest()),
+                    io.inbound().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()),
                     io.outbound().filter(obj -> obj instanceof DisposableWrapper)
                         .map(obj -> (DisposableWrapper<HttpObject>)obj)
                         .map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpResponse()),

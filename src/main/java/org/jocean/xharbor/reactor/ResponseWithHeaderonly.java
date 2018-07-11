@@ -2,19 +2,22 @@ package org.jocean.xharbor.reactor;
 
 import java.util.Map;
 
+import org.jocean.http.HttpSlice;
+import org.jocean.http.HttpSliceUtil;
+import org.jocean.http.MessageUtil;
 import org.jocean.http.util.RxNettys;
-import org.jocean.idiom.DisposableWrapper;
 import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.xharbor.api.TradeReactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.LastHttpContent;
 import rx.Observable;
 import rx.Single;
 
@@ -39,50 +42,45 @@ public class ResponseWithHeaderonly implements TradeReactor {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpRequest())
-                .map(req -> {
-                        if (null == req) {
-                            LOG.warn("request is null, ignore trade {}", ctx.trade());
-                            return null;
-                        } else {
-                            if (_matcher.match(req)) {
-                                return io4Response(ctx, io, req);
-                            } else {
-                                //  not handle this trade
-                                return null;
-                            }
-                        }
-                    })
-                .toSingle();
+        return io.inbound().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()).map(req -> {
+            if (null == req) {
+                LOG.warn("request is null, ignore trade {}", ctx.trade());
+                return null;
+            } else {
+                if (this._matcher.match(req)) {
+                    return io4Response(ctx, io, req);
+                } else {
+                    // not handle this trade
+                    return null;
+                }
+            }
+        }).toSingle();
     }
 
-    private InOut io4Response(final ReactContext ctx, final InOut originalio,
-            final HttpRequest originalreq) {
+    private InOut io4Response(final ReactContext ctx, final InOut orgio, final HttpRequest orgreq) {
         return new InOut() {
             @Override
-            public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
-                return originalio.inbound();
+            public Observable<? extends HttpSlice> inbound() {
+                return orgio.inbound();
             }
             @Override
-            public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
-                final FullHttpResponse response = new DefaultFullHttpResponse(
-                        originalreq.protocolVersion(), HttpResponseStatus.valueOf(_responseStatus));
+            public Observable<? extends Object> outbound() {
+                final HttpResponse response = new DefaultHttpResponse(
+                        orgreq.protocolVersion(), HttpResponseStatus.valueOf(_responseStatus));
                 response.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
                 if (null!=_extraHeaders) {
                     for (final Map.Entry<String, String> entry : _extraHeaders.entrySet()) {
                         response.headers().set(entry.getKey(), entry.getValue());
                     }
                 }
-                return Observable.<HttpObject>just(response)
+                return Observable.<HttpObject>just(response, LastHttpContent.EMPTY_LAST_CONTENT)
                     .map(DisposableWrapperUtil.wrap(RxNettys.disposerOf(), null != ctx ? ctx.trade() : null))
-                    .delaySubscription(originalio.inbound().ignoreElements())
+                    .delay(any -> orgio.inbound().compose(MessageUtil.rollout2dwhs()).last())
                     .doOnCompleted(() -> {
-                            if (_logReact) {
-                                LOG.info("RESPOND sendback response directly:\nREQ\n[{}]\nRESP\n[{}]",
-                                    originalreq, response);
-                            }
-                        })
-                    ;
+                        if (_logReact) {
+                            LOG.info("RESPOND sendback response directly:\nREQ\n[{}]\nRESP\n[{}]", orgreq, response);
+                        }
+                    });
             }};
     }
 

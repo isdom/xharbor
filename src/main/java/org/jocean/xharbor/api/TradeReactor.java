@@ -2,11 +2,10 @@ package org.jocean.xharbor.api;
 
 import java.util.Iterator;
 
+import org.jocean.http.HttpSlice;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
-import org.jocean.idiom.DisposableWrapper;
 import org.jocean.idiom.StopWatch;
 
-import io.netty.handler.codec.http.HttpObject;
 import rx.Observable;
 import rx.Single;
 import rx.SingleSubscriber;
@@ -19,7 +18,7 @@ public interface TradeReactor {
     }
 
     public interface InOut {
-        public Observable<? extends DisposableWrapper<HttpObject>> inbound();
+        public Observable<? extends HttpSlice> inbound();
         public Observable<? extends Object> outbound();
     }
 

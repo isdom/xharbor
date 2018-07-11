@@ -301,8 +301,8 @@ public class DefaultDispatcher implements Dispatcher {
                                         }
                                     }
                                 }}))
-                                .compose(MessageUtil.dwhWithAutoread())
-                                .map(DisposableWrapperUtil.<HttpObject>unwrap());
+                                .compose(MessageUtil.rollout2dwhs())
+                                .map(DisposableWrapperUtil.unwrap());
                         }})
                     .doOnNext(new Action1<HttpObject>() {
                         @Override

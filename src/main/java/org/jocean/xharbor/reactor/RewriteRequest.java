@@ -3,9 +3,10 @@ package org.jocean.xharbor.reactor;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.jocean.http.HttpSlice;
+import org.jocean.http.HttpSliceUtil;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.DisposableWrapper;
-import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.idiom.Regexs;
 import org.jocean.xharbor.api.TradeReactor;
 
@@ -34,58 +35,59 @@ public class RewriteRequest implements TradeReactor {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpRequest())
-            .map(req -> {
-                    if (null == req) {
-                        return null;
-                    } else {
-                        final Matcher matcher = _pathPattern.matcher(req.uri());
-                        if ( matcher.find() ) {
-                            return io4rewritePath(io, req, matcher);
-                        } else {
-                            //  not handle this trade
-                            return null;
-                        }
-                    }
-                })
-            .toSingle();
+        return io.inbound().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()).map(req -> {
+            if (null == req) {
+                return null;
+            } else {
+                final Matcher matcher = this._pathPattern.matcher(req.uri());
+                if (matcher.find()) {
+                    return io4rewritePath(io, req, matcher);
+                } else {
+                    // not handle this trade
+                    return null;
+                }
+            }
+        }).toSingle();
     }
 
-    private HttpRequest rewriteRequest(
-            final Matcher matcher,
-            final HttpRequest req) {
-        final DefaultHttpRequest newreq = new DefaultHttpRequest(req.protocolVersion(),
-                req.method(), req.uri(), true);
-        newreq.headers().set(req.headers());
-        if (null != this._replacePathTo
-            && !this._replacePathTo.isEmpty()) {
-            // when _replacePathTo not empty, then modify original path
-            newreq.setUri(matcher.replaceFirst(_replacePathTo));
-        }
-        if (null != this._replaceHeaderName
-            && !this._replaceHeaderName.isEmpty()) {
-            newreq.headers().set(this._replaceHeaderName, _replaceHeaderValue);
-        }
-        return newreq;
-    }
-
-    private InOut io4rewritePath(final InOut originalio,
-            final HttpRequest originalreq,
-            final Matcher matcher) {
+    private InOut io4rewritePath(final InOut orgio, final HttpRequest orgreq, final Matcher matcher) {
         return new InOut() {
             @Override
-            public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
-                return Observable.<DisposableWrapper<HttpObject>>just(RxNettys.wrap4release(rewriteRequest(matcher, originalreq)))
-                    .concatWith(
-                        originalio.inbound()
-                        .flatMap(RxNettys.splitdwhs())
-                        .map(obj->(DisposableWrapper<HttpObject>)obj)
-                        .skip(1));
+            public Observable<? extends HttpSlice> inbound() {
+                return orgio.inbound().<HttpSlice>map(slice -> new HttpSlice() {
+                    @Override
+                    public Single<Boolean> hasNext() {
+                        return slice.hasNext();
+                    }
+
+                    @Override
+                    public Observable<? extends HttpSlice> next() {
+                        return slice.next();
+                    }
+
+                    @Override
+                    public Observable<? extends DisposableWrapper<? extends HttpObject>> element() {
+                        return Observable.<DisposableWrapper<? extends HttpObject>>just(RxNettys.wrap4release(org2new(matcher, orgreq)))
+                                .concatWith(slice.element().flatMap(RxNettys.splitdwhs()).skip(1));
+                    }});
             }
             @Override
             public Observable<? extends Object> outbound() {
-                return originalio.outbound();
+                return orgio.outbound();
             }};
+    }
+
+    private HttpRequest org2new(final Matcher matcher, final HttpRequest org) {
+        final DefaultHttpRequest newreq = new DefaultHttpRequest(org.protocolVersion(), org.method(), org.uri(), true);
+        newreq.headers().set(org.headers());
+        if (null != this._replacePathTo && !this._replacePathTo.isEmpty()) {
+            // when _replacePathTo not empty, then modify original path
+            newreq.setUri(matcher.replaceFirst(this._replacePathTo));
+        }
+        if (null != this._replaceHeaderName && !this._replaceHeaderName.isEmpty()) {
+            newreq.headers().set(this._replaceHeaderName, _replaceHeaderValue);
+        }
+        return newreq;
     }
 
     private final Pattern _pathPattern;

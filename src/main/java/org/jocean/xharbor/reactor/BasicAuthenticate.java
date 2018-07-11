@@ -1,5 +1,8 @@
 package org.jocean.xharbor.reactor;
 
+import org.jocean.http.HttpSlice;
+import org.jocean.http.HttpSliceUtil;
+import org.jocean.http.MessageUtil;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.DisposableWrapper;
 import org.jocean.idiom.DisposableWrapperUtil;
@@ -37,41 +40,38 @@ public class BasicAuthenticate implements TradeReactor {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpRequest())
-                .map(req -> {
-                        if (null == req) {
-                            return null;
-                        } else {
-                            if ( _matcher.match(req) ) {
-                                if (isAuthorizeSuccess(req, _user, _password)) {
-                                    return null;
-                                } else {
-                                    // response 401 Unauthorized
-                                    return io4Unauthorized(ctx, io, req);
-                                }
-                            } else {
-                                //  not handle this trade
-                                return null;
-                            }
-                        }
-                    })
-                .toSingle();
+        return io.inbound().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()).map(req -> {
+            if (null == req) {
+                return null;
+            } else {
+                if (_matcher.match(req)) {
+                    if (isAuthorizeSuccess(req, _user, _password)) {
+                        return null;
+                    } else {
+                        // response 401 Unauthorized
+                        return io4Unauthorized(ctx, io, req);
+                    }
+                } else {
+                    // not handle this trade
+                    return null;
+                }
+            }
+        }).toSingle();
     }
 
-    private InOut io4Unauthorized(final ReactContext ctx, final InOut originalio,
-            final HttpRequest originalreq) {
+    private InOut io4Unauthorized(final ReactContext ctx, final InOut orgio, final HttpRequest orgreq) {
         return new InOut() {
             @Override
-            public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
-                return originalio.inbound();
+            public Observable<? extends HttpSlice> inbound() {
+                return orgio.inbound();
             }
             @Override
             public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
                 return RxNettys.response401Unauthorized(
-                        originalreq.protocolVersion(),
+                        orgreq.protocolVersion(),
                         "Basic realm=\"" + _strWWWAuthenticate + "\"")
                     .map(DisposableWrapperUtil.wrap(RxNettys.disposerOf(), null != ctx ? ctx.trade() : null))
-                    .delaySubscription(originalio.inbound().ignoreElements());
+                    .delay(any -> orgio.inbound().compose(MessageUtil.rollout2dwhs()).last());
             }};
     }
 

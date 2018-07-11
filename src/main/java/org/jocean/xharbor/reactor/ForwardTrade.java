@@ -3,7 +3,6 @@ package org.jocean.xharbor.reactor;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -11,10 +10,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.jocean.http.DoFlush;
 import org.jocean.http.Feature;
-import org.jocean.http.ReadComplete;
-import org.jocean.http.ReadPolicies;
+import org.jocean.http.HttpSlice;
+import org.jocean.http.HttpSliceUtil;
 import org.jocean.http.TrafficCounter;
 import org.jocean.http.TransportException;
 import org.jocean.http.WriteCtrl;
@@ -28,7 +26,7 @@ import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxObservables;
-import org.jocean.idiom.rx.RxSubscribers;
+import org.jocean.xharbor.HttpSliceX;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.RelayMemo.RESULT;
 import org.jocean.xharbor.api.RoutingInfo;
@@ -57,6 +55,7 @@ import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.util.Timer;
 import rx.Observable;
+import rx.Observable.Transformer;
 import rx.Single;
 import rx.functions.Action1;
 import rx.functions.Func0;
@@ -66,11 +65,7 @@ public class ForwardTrade implements TradeReactor {
 
     private static final int MAX_RETAINED_SIZE = 8 * 1024;
     private static final long _period = 20; // 30 seconds
-    private static final Logger LOG = LoggerFactory
-            .getLogger(ForwardTrade.class);
-
-    static interface Flush extends DoFlush, ReadComplete {
-    }
+    private static final Logger LOG = LoggerFactory.getLogger(ForwardTrade.class);
 
     public ForwardTrade(
             final MatchRule  matcher,
@@ -95,7 +90,7 @@ public class ForwardTrade implements TradeReactor {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpRequest()).flatMap(req -> {
+        return io.inbound().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()).flatMap(req -> {
             if (null == req) {
                 return null;
             } else {
@@ -120,129 +115,86 @@ public class ForwardTrade implements TradeReactor {
             final InOut orgio,
             final MarkableTargetImpl target,
             final String summary) {
-        final List<Object> dwhs = new ArrayList<>();
-
-        final Observable<? extends Object> sharedOutbound =
-                new HystrixObservableCommand<Object>(HystrixObservableCommand.Setter
+        return new HystrixObservableCommand<InOut>(HystrixObservableCommand.Setter
                         .withGroupKey(HystrixCommandGroupKey.Factory.asKey("forward"))
-                        .andCommandKey(HystrixCommandKey.Factory.asKey(summary))
+                        .andCommandKey(HystrixCommandKey.Factory.asKey(summary + "-request"))
                         .andCommandPropertiesDefaults(HystrixCommandProperties.Setter()
 //                                .withExecutionTimeoutEnabled(false)
                                 .withExecutionTimeoutInMilliseconds(30 * 1000)
                                 .withExecutionIsolationSemaphoreMaxConcurrentRequests(1000)
                                 )
                         ) {
-                    @SuppressWarnings("unchecked")
                     @Override
-                    protected Observable<Object> construct() {
-                        return buildOutbound(ctx.trade(), orgio.inbound(), target, ctx.watch());
+                    protected Observable<InOut> construct() {
+                        return buildOutbound(ctx.trade(), orgio.inbound(), target, ctx.watch())
+                            .doOnError(onCommunicationError(target)).compose(makeupio(orgio, target, ctx, summary)).first();
                     }
-                }.toObservable().share();
-
-        //  启动转发 (forward)
-        return sharedOutbound.doOnError(onCommunicationError(target)).flatMap(obj -> {
-            if (obj instanceof ReadComplete) {
-                if (dwhs.isEmpty()) {
-                    LOG.info("readComplete without valid http response, continue read inbound");
-                    ((ReadComplete) obj).readInbound();
-                    return Observable.empty();
-                } else {
-                    LOG.info("recv part response, and try to makeio");
-                    return makeupio(sharedOutbound, orgio, target, ctx, dwhs, (ReadComplete) obj);
-                }
-            } else {
-                dwhs.add(obj);
-                LOG.info("recv valid http response content {}, wait for readComplete.", obj);
-                return Observable.empty();
-            }
-        }, e -> Observable.error(e), () -> {
-            LOG.info("recv full response, and try to makeio");
-            return makeupio(sharedOutbound, orgio, target, ctx, dwhs, null);
-        }).first();
+                }.toObservable();
     }
 
-    private Observable<InOut> makeupio(
-            final Observable<? extends Object> sharedOutbound,
+    private Transformer<HttpSlice, InOut> makeupio(
             final InOut orgio,
             final MarkableTargetImpl target,
             final ReactContext ctx,
-            final List<Object> dwhs,
-            final ReadComplete readComplete) {
-        sharedOutbound.subscribe(RxSubscribers.ignoreNext(), e ->
-            LOG.warn("ForwardTrade: {}'s outbound with onError {}", target, ExceptionUtils.exception2detail(e)));
-        if (DisposableWrapperUtil.unwrap(dwhs.get(0)) instanceof HttpResponse) {
-            final HttpResponse resp = (HttpResponse) DisposableWrapperUtil.unwrap(dwhs.get(0));
-            LOG.debug("recv first response head part {}, so push toNext valid io.", resp);
+            final String summary) {
+        return slices -> {
+            final Observable<? extends HttpSlice> cached = slices.cache();
+            //  启动转发 (forward)
+            return cached.compose(HttpSliceUtil.<HttpResponse>extractHttpMessage()).flatMap(resp -> {
+                LOG.debug("recv first response head part {}.", resp);
 
-            // 404 Not Found
-            if (resp.status().equals(HttpResponseStatus.NOT_FOUND)) {
-                // Request-URI not found in target service, so try next
-                // matched forward target
-                LOG.info("API_NOT_SUPPORTED for target {}, so forward trade({}) to next reactor", target,
-                        ctx.trade());
-                return Observable.<InOut>just(null);
-            }
-
-            // 5XX Server Internal Error
-            if (resp.status().code() >= 500) {
-                // Server Internal Error
-                target.markAPIDownStatus(true);
-                LOG.warn("SERVER_ERROR({}), so mark service [{}]'s matched {} APIs down.", resp.status(),
-                        target.serviceUri(), _matcher);
-                _timer.newTimeout(timeout -> {
-                    // reset down flag
-                    target.markAPIDownStatus(false);
-                    LOG.info(
-                            "reset service [{}]'s matched {} APIs down to false, after {} second cause by SERVER_ERROR({}).",
-                            target.serviceUri(), _matcher, _period, resp.status());
-                }, _period, TimeUnit.SECONDS);
-                return Observable.error(new TransportException("SERVER_ERROR(" + resp.status() + ")"));
-            }
-
-            LOG.debug("makeu io forward", resp);
-
-            ctx.trade().writeCtrl().sended().subscribe(obj -> {
-                if (obj instanceof Flush) {
-                    ((Flush)obj).readInbound();
+                // 404 Not Found
+                if (resp.status().equals(HttpResponseStatus.NOT_FOUND)) {
+                    // Request-URI not found in target service, so try next
+                    // matched forward target
+                    LOG.info("API_NOT_SUPPORTED for target {}, so forward trade({}) to next reactor", target,
+                            ctx.trade());
+                    return Observable.<InOut>just(null);
                 }
+
+                // 5XX Server Internal Error
+                if (resp.status().code() >= 500) {
+                    // Server Internal Error
+                    target.markAPIDownStatus(true);
+                    LOG.warn("SERVER_ERROR({}), so mark service [{}]'s matched {} APIs down.", resp.status(),
+                            target.serviceUri(), _matcher);
+                    _timer.newTimeout(timeout -> {
+                        // reset down flag
+                        target.markAPIDownStatus(false);
+                        LOG.info(
+                                "reset service [{}]'s matched {} APIs down to false, after {} second cause by SERVER_ERROR({}).",
+                                target.serviceUri(), _matcher, _period, resp.status());
+                    }, _period, TimeUnit.SECONDS);
+                    return Observable.error(new TransportException("SERVER_ERROR(" + resp.status() + ")"));
+                }
+
+                ctx.trade().writeCtrl().sended().subscribe(HttpSliceX.handleAwaredFlush());
+
+                return Observable.<InOut>just(new InOut() {
+                    @Override
+                    public Observable<? extends HttpSlice> inbound() {
+                        return orgio.inbound();
+                    }
+
+                    @Override
+                    public Observable<? extends Object> outbound() {
+                        return new HystrixObservableCommand<Object>(HystrixObservableCommand.Setter
+                                .withGroupKey(HystrixCommandGroupKey.Factory.asKey("forward"))
+                                .andCommandKey(HystrixCommandKey.Factory.asKey(summary + "-response"))
+                                .andCommandPropertiesDefaults(HystrixCommandProperties.Setter()
+//                                        .withExecutionTimeoutEnabled(false)
+                                        .withExecutionTimeoutInMilliseconds(30 * 1000)
+                                        .withExecutionIsolationSemaphoreMaxConcurrentRequests(1000)
+                                        )
+                                ) {
+                            @Override
+                            protected Observable<Object> construct() {
+                                return cached.compose(HttpSliceX.advanceBySended());
+                            }
+                        }.toObservable();
+                    }
+                });
             });
-
-            return Observable.<InOut>just(new InOut() {
-                @Override
-                public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
-                    return orgio.inbound();
-                }
-
-                @Override
-                public Observable<? extends Object> outbound() {
-                    return Observable.<Object>from(dwhs)
-                            .concatWith(Observable.just(rc2flush(readComplete)))
-                            .concatWith(sharedOutbound)
-                            .map(rc2flush());
-                }
-            });
-        } else {
-            LOG.warn("first httpobject {} is not HttpResponse, can't use as http response stream", dwhs.get(0));
-            return Observable.<InOut>just(null);
-        }
-    }
-
-    private Func1<? super Object, ? extends Object> rc2flush() {
-        return obj -> {
-            if (obj instanceof ReadComplete) {
-                return rc2flush((ReadComplete) obj);
-            } else {
-                return obj;
-            }
-        };
-    }
-
-    private Flush rc2flush(final ReadComplete readComplete) {
-        return new Flush() {
-            @Override
-            public void readInbound() {
-                readComplete.readInbound();
-            }
         };
     }
 
@@ -264,60 +216,99 @@ public class ForwardTrade implements TradeReactor {
         };
     }
 
-    private Observable<Object> buildOutbound(
+    private Observable<? extends HttpSlice> buildOutbound(
             final HttpTrade trade,
-            final Observable<? extends DisposableWrapper<HttpObject>> inbound,
+            final Observable<? extends HttpSlice> inbound,
             final Target target,
             final StopWatch stopWatch) {
-        return forwardTo(target).doOnNext(initiator->trade.doOnTerminate(initiator.closer()))
-                .flatMap(initiator -> {
-                    // trade.setReadPolicy(ReadPolicies.never());
-                    // TBD: using ReadPolicies.ByOutbound
-                    // ref:
-                    // https://github.com/isdom/xharbor/commit/e81069dd56bfb68b08c971923d24958c438ffe2b#diff-0a4a34cc848464f04687f26d3d122a59L211
-
-                    initiator.writeCtrl().setFlushPerWrite(true);
-//                    trade.writeCtrl().setFlushPerWrite(true);
-
+        return forwardTo(target).doOnNext(upstream->trade.doOnTerminate(upstream.closer()))
+                .flatMap(upstream -> {
                     final AtomicBoolean isKeepAliveFromClient = new AtomicBoolean(true);
                     final AtomicReference<HttpRequest> refReq = new AtomicReference<>();
                     final AtomicReference<HttpResponse> refResp = new AtomicReference<>();
 
-                    final TrafficCounter initiatorTraffic = initiator.traffic();
+                    final TrafficCounter upstreamTraffic = upstream.traffic();
                     trade.doOnTerminate(() -> {
                             final long ttl = stopWatch.stopAndRestart();
                             final RelayMemo memo = _memoBuilder.build(target, buildRoutingInfo(refReq.get()));
                             memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
-                            LOG.info(
-                                    "FORWARD_SUCCESS" + "\ncost:[{}]s,forward_to:[{}]"
-                                            + "\nFROM:inbound:[{}]bytes,outbound:[{}]bytes"
-                                            + "\nTO:upload:[{}]bytes,download:[{}]bytes"
-                                            + "\nin-channel:{}\nout-channel:{}" + "\nREQ\n[{}]\nsendback\nRESP\n[{}]",
-                                    ttl / (float) 1000.0, target.serviceUri(), trade.traffic().inboundBytes(),
-                                    trade.traffic().outboundBytes(), initiatorTraffic.outboundBytes(),
-                                    initiatorTraffic.inboundBytes(), trade.transport(), initiator.transport(),
-                                    refReq.get(), refResp.get());
+                            LOG.info("FORWARD_SUCCESS" + "\ncost:[{}]s,forward_to:[{}]"
+                                            + "\nINCOME:channel:{},request:[{}]bytes,response:[{}]bytes"
+                                            + "\nUPSTREAM:channel:{},request:[{}]bytes,response:[{}]bytes"
+                                            + "\nREQ\n[{}]\nsendback\nRESP\n[{}]",
+                                    ttl / (float) 1000.0,
+                                    target.serviceUri(),
+                                    trade.transport(),
+                                    trade.traffic().inboundBytes(),
+                                    trade.traffic().outboundBytes(),
+                                    upstream.transport(),
+                                    upstreamTraffic.outboundBytes(),
+                                    upstreamTraffic.inboundBytes(),
+                                    refReq.get(),
+                                    refResp.get());
                         });
 
-                    enableDisposeUtil(initiator.writeCtrl(), MAX_RETAINED_SIZE);
+                    enableDisposeSended(upstream.writeCtrl(), MAX_RETAINED_SIZE);
 
-                    return Observable.zip(
-                                isDBS().doOnNext(configDBS(trade)),
-                                isRBS().doOnNext(configRBS(trade, initiator)),
-                                (dbs, rbs)-> Integer.MIN_VALUE)
-                        .flatMap(any -> initiator.defineInteraction(inbound.flatMap(RxNettys.splitdwhs())
-                            .map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient)))
-                            .flatMap(RxNettys.splitdwhs())
-                            .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient)));
+                    upstream.writeCtrl().sended().subscribe(HttpSliceX.handleAwaredFlush());
+
+                    return Observable
+                            .zip(isDBS().doOnNext(configDBS(trade)), isRBS().doOnNext(configRBS(trade, upstream)),
+                                    (dbs, rbs) -> Integer.MIN_VALUE)
+                            .flatMap(any -> upstream.defineInteraction(
+                                    inbound.map(holdRequestAndProcessKeepAlive(refReq, isKeepAliveFromClient))
+                                            .compose(HttpSliceX.advanceBySended())))
+                            .map(holdResponseAndProcessKeepAlive(refResp, isKeepAliveFromClient));
                 });
+    }
+
+    private Func1<HttpSlice, ? extends HttpSlice> holdRequestAndProcessKeepAlive(
+            final AtomicReference<HttpRequest> refReq, final AtomicBoolean isKeepAliveFromClient) {
+        return slice -> new HttpSlice() {
+            @Override
+            public Single<Boolean> hasNext() {
+                return slice.hasNext();
+            }
+            @Override
+            public Observable<? extends DisposableWrapper<? extends HttpObject>> element() {
+                return slice.element().flatMap(RxNettys.splitdwhs())
+                        .map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient));
+            }
+            @Override
+            public Observable<? extends HttpSlice> next() {
+                return slice.next();
+            }
+        };
+    }
+
+    private Func1<HttpSlice, ? extends HttpSlice> holdResponseAndProcessKeepAlive(
+            final AtomicReference<HttpResponse> refResp, final AtomicBoolean isKeepAliveFromClient) {
+        return slice -> new HttpSlice() {
+
+            @Override
+            public Single<Boolean> hasNext() {
+                return slice.hasNext();
+            }
+
+            @Override
+            public Observable<? extends DisposableWrapper<? extends HttpObject>> element() {
+                return slice.element().flatMap(RxNettys.splitdwhs())
+                        .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient));
+            }
+
+            @Override
+            public Observable<? extends HttpSlice> next() {
+                return slice.next();
+            }
+        };
     }
 
     private Action1<? super Boolean> configRBS(final HttpTrade trade, final HttpInitiator initiator) {
         return rbs -> {
             LOG.info("forward: pathPattern {}'s rbs {}", _matcher.pathPattern(), rbs);
             if (rbs) {
-                ReadPolicies.enableRBS(trade, initiator.writeCtrl());
-                ReadPolicies.enableRBS(initiator, trade.writeCtrl());
+//                ReadPolicies.enableRBS(trade, initiator.writeCtrl());
+//                ReadPolicies.enableRBS(initiator, trade.writeCtrl());
             }
         };
     }
@@ -333,25 +324,20 @@ public class ForwardTrade implements TradeReactor {
     }
 
     private Observable<? extends HttpInitiator> forwardTo(final Target target) {
-        return this._finder.find(HttpClient.class).flatMap(client->client.initiator()
-                    .remoteAddress(buildAddress(target.serviceUri()))
-                    .feature(target.features().call()).build());
+        return this._finder.find(HttpClient.class).flatMap(client -> client.initiator()
+                .remoteAddress(buildAddress(target.serviceUri())).feature(target.features().call()).build());
     }
 
-    private void enableDisposeUtil(final WriteCtrl writeCtrl, final int size) {
+    private void enableDisposeSended(final WriteCtrl writeCtrl, final int size) {
         final AtomicInteger sendingSize = new AtomicInteger(0);
 
         writeCtrl.sending().subscribe(sending -> sendingSize.addAndGet(getReadableBytes(sending)));
         writeCtrl.sended().subscribe(sended -> {
             if (sendingSize.get() > size) {
-                if (LOG.isTraceEnabled()) {
-                    LOG.trace("sendingSize is {}, dispose sended {}", sendingSize.get(), sended);
-                }
+                LOG.trace("sendingSize is {}, dispose sended {}", sendingSize.get(), sended);
                 DisposableWrapperUtil.dispose(sended);
             } else {
-                if (LOG.isTraceEnabled()) {
-                    LOG.trace("sendingSize is {}, SKIP sended {}", sendingSize.get(), sended);
-                }
+                LOG.trace("sendingSize is {}, SKIP sended {}", sendingSize.get(), sended);
             }
         });
     }
@@ -377,7 +363,7 @@ public class ForwardTrade implements TradeReactor {
         return new InetSocketAddress(uri.getHost(), uri.getPort());
     }
 
-    private Func1<Object, Object> addKeepAliveIfNeeded(
+    private <T> Func1<T, T> addKeepAliveIfNeeded(
             final AtomicReference<HttpRequest> refReq,
             final AtomicBoolean isKeepAliveFromClient) {
         return dwh -> {
@@ -395,7 +381,7 @@ public class ForwardTrade implements TradeReactor {
                         newreq.headers().add(req.headers());
                         newreq.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
                         LOG.info("FORCE-KeepAlive: add Connection header with KeepAlive for incoming req:\n[{}]", req);
-                        return RxNettys.wrap4release(newreq);
+                        return (T)RxNettys.wrap4release(newreq);
                     }
                 }
             }
@@ -403,7 +389,7 @@ public class ForwardTrade implements TradeReactor {
         };
     }
 
-    private Func1<Object, Object> removeKeepAliveIfNeeded(
+    private <T> Func1<T, T> removeKeepAliveIfNeeded(
             final AtomicReference<HttpResponse> refResp,
             final AtomicBoolean isKeepAliveFromClient) {
         return dwh -> {
@@ -419,7 +405,7 @@ public class ForwardTrade implements TradeReactor {
                         newresp.headers().add(resp.headers());
                         newresp.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
                         LOG.info("FORCE-KeepAlive: set Connection header with Close for sendback resp:\n[{}]", resp);
-                        return RxNettys.wrap4release(newresp);
+                        return (T)RxNettys.wrap4release(newresp);
                     }
                 }
             }
@@ -492,23 +478,6 @@ public class ForwardTrade implements TradeReactor {
     private boolean isCommunicationFailure(final Throwable error) {
         return error instanceof ConnectException;
     }
-
-//    private Action1<Object> unholdInboundMessage(final HttpMessageHolder holder) {
-//        return new Action1<Object>() {
-//            @Override
-//            public void call(final Object msg) {
-//                if (msg instanceof HttpContent) {
-//                    if (holder.isFragmented()
-//                        || holder.retainedByteBufSize() > MAX_RETAINED_SIZE) {
-//                        LOG.info("holder({}) BEGIN_RELEASE msg({}), now it's retained size: {}",
-//                                holder, msg, holder.retainedByteBufSize());
-//                        holder.releaseHttpContent((HttpContent)msg);
-//                        LOG.info("holder({}) ENDOF_RELEASE msg({}), now it's retained size: {}",
-//                                holder, msg, holder.retainedByteBufSize());
-//                    }
-//                }
-//            }};
-//    }
 
     private class MarkableTargetImpl implements Target {
 

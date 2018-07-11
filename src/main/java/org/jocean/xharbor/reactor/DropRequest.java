@@ -1,9 +1,9 @@
 package org.jocean.xharbor.reactor;
 
 import org.jocean.http.CloseException;
-import org.jocean.http.util.RxNettys;
+import org.jocean.http.HttpSlice;
+import org.jocean.http.HttpSliceUtil;
 import org.jocean.idiom.DisposableWrapper;
-import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.xharbor.api.TradeReactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,32 +30,30 @@ public class DropRequest implements TradeReactor {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().map(DisposableWrapperUtil.unwrap()).compose(RxNettys.asHttpRequest())
-                .map(req -> {
-                        if (null == req) {
-                            LOG.warn("request is null, ignore trade {}", ctx.trade());
-                            return null;
-                        } else {
-                            if (_matcher.match(req)) {
-                                return io4Drop(ctx, io, req);
-                            } else {
-                                //  not handle this trade
-                                return null;
-                            }
-                        }
-                    })
-                .toSingle();
+        return io.inbound().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()).map(req -> {
+            if (null == req) {
+                LOG.warn("request is null, ignore trade {}", ctx.trade());
+                return null;
+            } else {
+                if (_matcher.match(req)) {
+                    return io4Drop(ctx, io, req);
+                } else {
+                    // not handle this trade
+                    return null;
+                }
+            }
+        }).toSingle();
     }
 
     private InOut io4Drop(final ReactContext ctx, final InOut originalio,
             final HttpRequest originalreq) {
         return new InOut() {
             @Override
-            public Observable<? extends DisposableWrapper<HttpObject>> inbound() {
+            public Observable<? extends HttpSlice> inbound() {
                 return originalio.inbound();
             }
             @Override
-            public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
+            public Observable<? extends Object> outbound() {
                 return Observable.<DisposableWrapper<HttpObject>>error(new CloseException())
                     .doOnError(e -> {
                             if (e instanceof CloseException && _log) {
