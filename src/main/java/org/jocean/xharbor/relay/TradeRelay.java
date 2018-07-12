@@ -7,11 +7,11 @@ import java.net.ConnectException;
 import java.nio.channels.ClosedChannelException;
 
 import org.jocean.http.HttpSlice;
+import org.jocean.http.HttpSliceUtil;
 import org.jocean.http.MessageUtil;
 import org.jocean.http.TransportException;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.RxNettys;
-import org.jocean.idiom.DisposableWrapper;
 import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
@@ -23,7 +23,6 @@ import org.jocean.xharbor.api.TradeReactor.ReactContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.netty.handler.codec.http.HttpObject;
 import rx.Observable;
 import rx.Subscriber;
 import rx.functions.Func1;
@@ -74,25 +73,25 @@ public class TradeRelay extends Subscriber<HttpTrade> {
             }
 
             @Override
-            public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
+            public Observable<? extends HttpSlice> outbound() {
                 return null;
             }
         }).retryWhen(retryPolicy(trade)).subscribe(io -> {
                 if (null == io || null == io.outbound()) {
                     LOG.warn("NO_INOUT for trade({}), react io detail: {}.", trade, io);
                 }
-                trade.outbound(buildResponse(trade, io));
+                trade.outbound2(buildResponse(trade, io));
             }, error -> {
                 LOG.warn("Trade {} react with error, detail:{}", trade, ExceptionUtils.exception2detail(error));
                 trade.close();
             });
     }
 
-    private Observable<? extends Object> buildResponse(final HttpTrade trade, final InOut io) {
+    private Observable<? extends HttpSlice> buildResponse(final HttpTrade trade, final InOut io) {
         return (null != io && null != io.outbound())
             ? io.outbound()
-            : trade.request().flatMap(req -> RxNettys.response200OK(req.protocolVersion()) )
-                .map(DisposableWrapperUtil.wrap(RxNettys.disposerOf(), trade))
+            : HttpSliceUtil.single(trade.request().flatMap(req -> RxNettys.response200OK(req.protocolVersion()))
+                .map(DisposableWrapperUtil.wrap(RxNettys.disposerOf(), trade)))
                 // response when request send completed
                 .delay(obj -> trade.inbound().compose(MessageUtil.rollout2dwhs()).last());
     }

@@ -53,14 +53,13 @@ public class DropRequest implements TradeReactor {
                 return originalio.inbound();
             }
             @Override
-            public Observable<? extends Object> outbound() {
-                return Observable.<DisposableWrapper<HttpObject>>error(new CloseException())
+            public Observable<? extends HttpSlice> outbound() {
+                return HttpSliceUtil.single(Observable.<DisposableWrapper<HttpObject>>error(new CloseException())
                     .doOnError(e -> {
                             if (e instanceof CloseException && _log) {
                                 LOG.info("Drop request directly:\nREQ\n[{}]", originalreq);
                             }
-                        })
-                    ;
+                        }));
             }};
     }
 

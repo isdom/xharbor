@@ -64,7 +64,7 @@ public class ResponseWithHeaderonly implements TradeReactor {
                 return orgio.inbound();
             }
             @Override
-            public Observable<? extends Object> outbound() {
+            public Observable<? extends HttpSlice> outbound() {
                 final HttpResponse response = new DefaultHttpResponse(
                         orgreq.protocolVersion(), HttpResponseStatus.valueOf(_responseStatus));
                 response.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
@@ -73,14 +73,13 @@ public class ResponseWithHeaderonly implements TradeReactor {
                         response.headers().set(entry.getKey(), entry.getValue());
                     }
                 }
-                return Observable.<HttpObject>just(response, LastHttpContent.EMPTY_LAST_CONTENT)
+                return HttpSliceUtil.single(Observable.<HttpObject>just(response, LastHttpContent.EMPTY_LAST_CONTENT)
                     .map(DisposableWrapperUtil.wrap(RxNettys.disposerOf(), null != ctx ? ctx.trade() : null))
-                    .delay(any -> orgio.inbound().compose(MessageUtil.rollout2dwhs()).last())
                     .doOnCompleted(() -> {
                         if (_logReact) {
                             LOG.info("RESPOND sendback response directly:\nREQ\n[{}]\nRESP\n[{}]", orgreq, response);
                         }
-                    });
+                    })).delay(any -> orgio.inbound().compose(MessageUtil.rollout2dwhs()).last());
             }};
     }
 

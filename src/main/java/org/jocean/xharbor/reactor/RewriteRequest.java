@@ -72,7 +72,7 @@ public class RewriteRequest implements TradeReactor {
                     }});
             }
             @Override
-            public Observable<? extends Object> outbound() {
+            public Observable<? extends HttpSlice> outbound() {
                 return orgio.outbound();
             }};
     }

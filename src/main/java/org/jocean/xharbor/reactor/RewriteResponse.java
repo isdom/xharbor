@@ -4,10 +4,8 @@ import java.util.Map;
 
 import org.jocean.http.HttpSlice;
 import org.jocean.http.HttpSliceUtil;
-import org.jocean.idiom.DisposableWrapper;
 import org.jocean.xharbor.api.TradeReactor;
 
-import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import rx.Observable;
@@ -46,18 +44,16 @@ public class RewriteResponse implements TradeReactor {
                 return orgio.inbound();
             }
 
-            @SuppressWarnings("unchecked")
             @Override
-            public Observable<? extends Object> outbound() {
-                return orgio.outbound().doOnNext(obj -> {
-                    if (obj instanceof DisposableWrapper
-                            && ((DisposableWrapper<HttpObject>)obj).unwrap() instanceof HttpResponse) {
-                        final HttpResponse response = (HttpResponse) ((DisposableWrapper<HttpObject>)obj).unwrap();
+            public Observable<? extends HttpSlice> outbound() {
+                return orgio.outbound().map(HttpSliceUtil.transformElement(element -> element.doOnNext(dwh -> {
+                    if (dwh.unwrap() instanceof HttpResponse) {
+                        final HttpResponse response = (HttpResponse) dwh.unwrap();
                         for (final Map.Entry<String, String> entry : _extraHeaders.entrySet()) {
                             response.headers().set(entry.getKey(), entry.getValue());
                         }
                     }
-                });
+                })));
             }
         };
     }

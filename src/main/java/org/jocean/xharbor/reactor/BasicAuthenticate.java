@@ -4,7 +4,6 @@ import org.jocean.http.HttpSlice;
 import org.jocean.http.HttpSliceUtil;
 import org.jocean.http.MessageUtil;
 import org.jocean.http.util.RxNettys;
-import org.jocean.idiom.DisposableWrapper;
 import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.idiom.Pair;
 import org.jocean.xharbor.api.TradeReactor;
@@ -15,7 +14,6 @@ import com.google.common.base.Charsets;
 import com.google.common.io.BaseEncoding;
 
 import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import rx.Observable;
 import rx.Single;
@@ -65,14 +63,15 @@ public class BasicAuthenticate implements TradeReactor {
             public Observable<? extends HttpSlice> inbound() {
                 return orgio.inbound();
             }
+
             @Override
-            public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
-                return RxNettys.response401Unauthorized(
-                        orgreq.protocolVersion(),
-                        "Basic realm=\"" + _strWWWAuthenticate + "\"")
-                    .map(DisposableWrapperUtil.wrap(RxNettys.disposerOf(), null != ctx ? ctx.trade() : null))
+            public Observable<? extends HttpSlice> outbound() {
+                return HttpSliceUtil.single(RxNettys
+                        .response401Unauthorized(orgreq.protocolVersion(), "Basic realm=\"" + _strWWWAuthenticate + "\"")
+                        .map(DisposableWrapperUtil.wrap(RxNettys.disposerOf(), null != ctx ? ctx.trade() : null)))
                     .delay(any -> orgio.inbound().compose(MessageUtil.rollout2dwhs()).last());
-            }};
+            }
+        };
     }
 
     private boolean isAuthorizeSuccess(

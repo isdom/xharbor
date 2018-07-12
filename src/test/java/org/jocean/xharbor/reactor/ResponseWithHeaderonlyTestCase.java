@@ -4,15 +4,14 @@ import static org.junit.Assert.assertEquals;
 
 import org.jocean.http.HttpSlice;
 import org.jocean.http.HttpSliceUtil;
+import org.jocean.http.MessageUtil;
 import org.jocean.http.util.RxNettys;
-import org.jocean.idiom.DisposableWrapper;
 import org.jocean.xharbor.api.TradeReactor.InOut;
 import org.junit.Test;
 
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpMethod;
-import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import rx.Observable;
@@ -36,13 +35,13 @@ public class ResponseWithHeaderonlyTestCase {
                     return HttpSliceUtil.single(Observable.just(RxNettys.wrap4release(request)));
                 }
                 @Override
-                public Observable<? extends Object> outbound() {
+                public Observable<? extends HttpSlice> outbound() {
                     return null;
                 }})
             .toBlocking().value();
 
         final FullHttpResponse response = io.outbound()
-                .map(obj -> (DisposableWrapper<HttpObject>)obj)
+                .compose(MessageUtil.rollout2dwhs())
                 .compose(RxNettys.message2fullresp(null))
                 .toBlocking().single().unwrap();
 

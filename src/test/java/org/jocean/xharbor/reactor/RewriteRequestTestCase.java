@@ -12,7 +12,6 @@ import org.jocean.http.HttpSliceUtil;
 import org.jocean.http.MessageUtil;
 import org.jocean.http.util.Nettys;
 import org.jocean.http.util.RxNettys;
-import org.jocean.idiom.DisposableWrapper;
 import org.jocean.xharbor.api.TradeReactor;
 import org.jocean.xharbor.api.TradeReactor.InOut;
 import org.junit.Test;
@@ -21,7 +20,6 @@ import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpMethod;
-import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpVersion;
 import rx.Observable;
 
@@ -44,7 +42,7 @@ public class RewriteRequestTestCase {
                     return HttpSliceUtil.single(Observable.just(RxNettys.wrap4release(orgreq)));
                 }
                 @Override
-                public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
+                public Observable<? extends HttpSlice> outbound() {
                     return null;
                 }})
             .toBlocking().value();
@@ -71,7 +69,7 @@ public class RewriteRequestTestCase {
                     return HttpSliceUtil.single(Observable.just(RxNettys.wrap4release(orgreq)));
                 }
                 @Override
-                public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
+                public Observable<? extends HttpSlice> outbound() {
                     return null;
                 }})
             .toBlocking().value();
@@ -95,7 +93,7 @@ public class RewriteRequestTestCase {
                     return HttpSliceUtil.single(Observable.just(RxNettys.wrap4release(orgreq)));
                 }
                 @Override
-                public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
+                public Observable<? extends HttpSlice> outbound() {
                     return null;
                 }})
             .toBlocking().value();

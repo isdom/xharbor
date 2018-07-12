@@ -21,12 +21,10 @@ import org.jocean.http.client.HttpClient.HttpInitiator;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.BeanFinder;
-import org.jocean.idiom.DisposableWrapper;
 import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxObservables;
-import org.jocean.xharbor.HttpSliceX;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.RelayMemo.RESULT;
 import org.jocean.xharbor.api.RoutingInfo;
@@ -47,7 +45,6 @@ import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
-import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -138,7 +135,7 @@ public class ForwardTrade implements TradeReactor {
             final ReactContext ctx,
             final String summary) {
         return slices -> {
-            final Observable<? extends HttpSlice> cached = slices.cache();
+            final Observable<HttpSlice> cached = slices.cache();
             //  启动转发 (forward)
             return cached.compose(HttpSliceUtil.<HttpResponse>extractHttpMessage()).flatMap(resp -> {
                 LOG.debug("recv first response head part {}.", resp);
@@ -168,8 +165,6 @@ public class ForwardTrade implements TradeReactor {
                     return Observable.error(new TransportException("SERVER_ERROR(" + resp.status() + ")"));
                 }
 
-                ctx.trade().writeCtrl().sended().subscribe(HttpSliceX.handleAwaredFlush());
-
                 return Observable.<InOut>just(new InOut() {
                     @Override
                     public Observable<? extends HttpSlice> inbound() {
@@ -177,8 +172,8 @@ public class ForwardTrade implements TradeReactor {
                     }
 
                     @Override
-                    public Observable<? extends Object> outbound() {
-                        return new HystrixObservableCommand<Object>(HystrixObservableCommand.Setter
+                    public Observable<? extends HttpSlice> outbound() {
+                        return new HystrixObservableCommand<HttpSlice>(HystrixObservableCommand.Setter
                                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey("forward"))
                                 .andCommandKey(HystrixCommandKey.Factory.asKey(summary + "-response"))
                                 .andCommandPropertiesDefaults(HystrixCommandProperties.Setter()
@@ -188,8 +183,8 @@ public class ForwardTrade implements TradeReactor {
                                         )
                                 ) {
                             @Override
-                            protected Observable<Object> construct() {
-                                return cached.compose(HttpSliceX.advanceBySended());
+                            protected Observable<HttpSlice> construct() {
+                                return cached;
                             }
                         }.toObservable();
                     }
@@ -250,57 +245,18 @@ public class ForwardTrade implements TradeReactor {
 
                     enableDisposeSended(upstream.writeCtrl(), MAX_RETAINED_SIZE);
 
-                    upstream.writeCtrl().sended().subscribe(HttpSliceX.handleAwaredFlush());
-
                     return Observable
                             .zip(isDBS().doOnNext(configDBS(trade)), isRBS().doOnNext(configRBS(trade, upstream)),
                                     (dbs, rbs) -> Integer.MIN_VALUE)
-                            .flatMap(any -> upstream.defineInteraction(
-                                    inbound.map(holdRequestAndProcessKeepAlive(refReq, isKeepAliveFromClient))
-                                            .compose(HttpSliceX.advanceBySended())))
-                            .map(holdResponseAndProcessKeepAlive(refResp, isKeepAliveFromClient));
+                            .flatMap(any -> upstream.defineInteraction2(
+                                    inbound.map(HttpSliceUtil.transformElement(element->
+                                        element.flatMap(RxNettys.splitdwhs())
+                                            .map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient))))
+                                        ))
+                            .map(HttpSliceUtil.transformElement(element->
+                                element.flatMap(RxNettys.splitdwhs())
+                                    .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))));
                 });
-    }
-
-    private Func1<HttpSlice, ? extends HttpSlice> holdRequestAndProcessKeepAlive(
-            final AtomicReference<HttpRequest> refReq, final AtomicBoolean isKeepAliveFromClient) {
-        return slice -> new HttpSlice() {
-            @Override
-            public Single<Boolean> hasNext() {
-                return slice.hasNext();
-            }
-            @Override
-            public Observable<? extends DisposableWrapper<? extends HttpObject>> element() {
-                return slice.element().flatMap(RxNettys.splitdwhs())
-                        .map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient));
-            }
-            @Override
-            public Observable<? extends HttpSlice> next() {
-                return slice.next();
-            }
-        };
-    }
-
-    private Func1<HttpSlice, ? extends HttpSlice> holdResponseAndProcessKeepAlive(
-            final AtomicReference<HttpResponse> refResp, final AtomicBoolean isKeepAliveFromClient) {
-        return slice -> new HttpSlice() {
-
-            @Override
-            public Single<Boolean> hasNext() {
-                return slice.hasNext();
-            }
-
-            @Override
-            public Observable<? extends DisposableWrapper<? extends HttpObject>> element() {
-                return slice.element().flatMap(RxNettys.splitdwhs())
-                        .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient));
-            }
-
-            @Override
-            public Observable<? extends HttpSlice> next() {
-                return slice.next();
-            }
-        };
     }
 
     private Action1<? super Boolean> configRBS(final HttpTrade trade, final HttpInitiator initiator) {

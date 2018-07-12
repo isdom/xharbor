@@ -7,14 +7,12 @@ import static org.junit.Assert.assertTrue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jocean.http.HttpSlice;
-import org.jocean.idiom.DisposableWrapper;
 import org.jocean.idiom.Ordered;
 import org.jocean.xharbor.api.TradeReactor;
 import org.jocean.xharbor.api.TradeReactor.InOut;
 import org.jocean.xharbor.api.TradeReactor.ReactContext;
 import org.junit.Test;
 
-import io.netty.handler.codec.http.HttpObject;
 import rx.Observable;
 import rx.Single;
 import rx.functions.Func2;
@@ -69,7 +67,7 @@ public class CompositeReactorTestCase {
                 return null;
             }
             @Override
-            public Observable<? extends DisposableWrapper<HttpObject>> outbound() {
+            public Observable<? extends HttpSlice> outbound() {
                 return null;
             }})
         .toBlocking().value();

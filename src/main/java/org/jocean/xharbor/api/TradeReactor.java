@@ -19,7 +19,7 @@ public interface TradeReactor {
 
     public interface InOut {
         public Observable<? extends HttpSlice> inbound();
-        public Observable<? extends Object> outbound();
+        public Observable<? extends HttpSlice> outbound();
     }
 
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io);
