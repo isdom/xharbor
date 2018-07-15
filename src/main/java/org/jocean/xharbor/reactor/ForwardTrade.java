@@ -87,7 +87,7 @@ public class ForwardTrade implements TradeReactor {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()).flatMap(req -> {
+        return io.inbound().first().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()).flatMap(req -> {
             if (null == req) {
                 return null;
             } else {
@@ -135,7 +135,11 @@ public class ForwardTrade implements TradeReactor {
             final ReactContext ctx,
             final String summary) {
         return slices -> {
-            final Observable<HttpSlice> cached = slices.cache();
+            final Observable<HttpSlice> shared = slices.share();
+
+            shared.subscribe(slice -> LOG.debug("shared onNext: {}", slice));
+
+            final Observable<HttpSlice> cached = shared.first().cache();
             //  启动转发 (forward)
             return cached.compose(HttpSliceUtil.<HttpResponse>extractHttpMessage()).flatMap(resp -> {
                 LOG.debug("recv first response head part {}.", resp);
@@ -173,20 +177,7 @@ public class ForwardTrade implements TradeReactor {
 
                     @Override
                     public Observable<? extends HttpSlice> outbound() {
-                        return new HystrixObservableCommand<HttpSlice>(HystrixObservableCommand.Setter
-                                .withGroupKey(HystrixCommandGroupKey.Factory.asKey("forward"))
-                                .andCommandKey(HystrixCommandKey.Factory.asKey(summary + "-response"))
-                                .andCommandPropertiesDefaults(HystrixCommandProperties.Setter()
-//                                        .withExecutionTimeoutEnabled(false)
-                                        .withExecutionTimeoutInMilliseconds(30 * 1000)
-                                        .withExecutionIsolationSemaphoreMaxConcurrentRequests(1000)
-                                        )
-                                ) {
-                            @Override
-                            protected Observable<HttpSlice> construct() {
-                                return cached;
-                            }
-                        }.toObservable();
+                        return cached.concatWith(shared);
                     }
                 });
             });
@@ -240,7 +231,8 @@ public class ForwardTrade implements TradeReactor {
                                     upstreamTraffic.outboundBytes(),
                                     upstreamTraffic.inboundBytes(),
                                     refReq.get(),
-                                    refResp.get());
+                                    refResp.get()
+                                    );
                         });
 
                     enableDisposeSended(upstream.writeCtrl(), MAX_RETAINED_SIZE);
@@ -248,14 +240,16 @@ public class ForwardTrade implements TradeReactor {
                     return Observable
                             .zip(isDBS().doOnNext(configDBS(trade)), isRBS().doOnNext(configRBS(trade, upstream)),
                                     (dbs, rbs) -> Integer.MIN_VALUE)
-                            .flatMap(any -> upstream.defineInteraction2(
-                                    inbound.map(HttpSliceUtil.transformElement(element->
+                            .flatMap(any -> upstream.defineInteraction(
+                                    //  TODO
+                                    inbound.first().map(HttpSliceUtil.transformElement(element->
                                         element.flatMap(RxNettys.splitdwhs())
                                             .map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient))))
-                                        ))
-                            .map(HttpSliceUtil.transformElement(element->
-                                element.flatMap(RxNettys.splitdwhs())
-                                    .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))));
+                                        )).concatWith(inbound.skip(1))
+//                            .map(HttpSliceUtil.transformElement(element->
+//                                element.flatMap(RxNettys.splitdwhs())
+//                                    .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))))
+                            ;
                 });
     }
 
@@ -281,7 +275,9 @@ public class ForwardTrade implements TradeReactor {
 
     private Observable<? extends HttpInitiator> forwardTo(final Target target) {
         return this._finder.find(HttpClient.class).flatMap(client -> client.initiator()
-                .remoteAddress(buildAddress(target.serviceUri())).feature(target.features().call()).build());
+                .remoteAddress(buildAddress(target.serviceUri())).feature(target.features().call())
+                .feature(Feature.ENABLE_LOGGING_OVER_SSL)
+                .build());
     }
 
     private void enableDisposeSended(final WriteCtrl writeCtrl, final int size) {

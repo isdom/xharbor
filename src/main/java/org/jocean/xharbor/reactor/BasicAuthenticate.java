@@ -38,7 +38,7 @@ public class BasicAuthenticate implements TradeReactor {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()).map(req -> {
+        return io.inbound().first().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()).map(req -> {
             if (null == req) {
                 return null;
             } else {

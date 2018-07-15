@@ -13,7 +13,6 @@ import org.slf4j.LoggerFactory;
 
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -42,7 +41,7 @@ public class ResponseWithHeaderonly implements TradeReactor {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()).map(req -> {
+        return io.inbound().first().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()).map(req -> {
             if (null == req) {
                 LOG.warn("request is null, ignore trade {}", ctx.trade());
                 return null;
@@ -73,7 +72,7 @@ public class ResponseWithHeaderonly implements TradeReactor {
                         response.headers().set(entry.getKey(), entry.getValue());
                     }
                 }
-                return HttpSliceUtil.single(Observable.<HttpObject>just(response, LastHttpContent.EMPTY_LAST_CONTENT)
+                return HttpSliceUtil.single(Observable.just(response, LastHttpContent.EMPTY_LAST_CONTENT)
                     .map(DisposableWrapperUtil.wrap(RxNettys.disposerOf(), null != ctx ? ctx.trade() : null))
                     .doOnCompleted(() -> {
                         if (_logReact) {

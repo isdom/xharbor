@@ -35,7 +35,7 @@ public class RewriteRequest implements TradeReactor {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()).map(req -> {
+        return io.inbound().first().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()).map(req -> {
             if (null == req) {
                 return null;
             } else {
@@ -54,22 +54,10 @@ public class RewriteRequest implements TradeReactor {
         return new InOut() {
             @Override
             public Observable<? extends HttpSlice> inbound() {
-                return orgio.inbound().<HttpSlice>map(slice -> new HttpSlice() {
-                    @Override
-                    public Single<Boolean> hasNext() {
-                        return slice.hasNext();
-                    }
-
-                    @Override
-                    public Observable<? extends HttpSlice> next() {
-                        return slice.next();
-                    }
-
-                    @Override
-                    public Observable<? extends DisposableWrapper<? extends HttpObject>> element() {
-                        return Observable.<DisposableWrapper<? extends HttpObject>>just(RxNettys.wrap4release(org2new(matcher, orgreq)))
-                                .concatWith(slice.element().flatMap(RxNettys.splitdwhs()).skip(1));
-                    }});
+                return orgio.inbound().first().map(HttpSliceUtil.transformElement(element ->
+                    Observable.<DisposableWrapper<? extends HttpObject>>just(RxNettys.wrap4release(org2new(matcher, orgreq)))
+                    .concatWith(element.flatMap(RxNettys.splitdwhs()).skip(1))
+                )).concatWith(orgio.inbound().skip(1));
             }
             @Override
             public Observable<? extends HttpSlice> outbound() {

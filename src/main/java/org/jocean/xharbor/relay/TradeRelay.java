@@ -80,7 +80,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                 if (null == io || null == io.outbound()) {
                     LOG.warn("NO_INOUT for trade({}), react io detail: {}.", trade, io);
                 }
-                trade.outbound2(buildResponse(trade, io));
+                trade.outbound(buildResponse(trade, io));
             }, error -> {
                 LOG.warn("Trade {} react with error, detail:{}", trade, ExceptionUtils.exception2detail(error));
                 trade.close();

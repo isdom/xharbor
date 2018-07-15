@@ -30,7 +30,7 @@ public class DropRequest implements TradeReactor {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()).map(req -> {
+        return io.inbound().first().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()).map(req -> {
             if (null == req) {
                 LOG.warn("request is null, ignore trade {}", ctx.trade());
                 return null;
