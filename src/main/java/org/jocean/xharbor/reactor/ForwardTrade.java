@@ -177,7 +177,7 @@ public class ForwardTrade implements TradeReactor {
 
                     @Override
                     public Observable<? extends HttpSlice> outbound() {
-                        return cached.concatWith(shared);
+                        return cached.concatWith(shared).doOnCompleted(()-> LOG.info("forward outbound completed"));
                     }
                 });
             });
@@ -245,7 +245,8 @@ public class ForwardTrade implements TradeReactor {
                                     inbound.first().map(HttpSliceUtil.transformElement(element->
                                         element.flatMap(RxNettys.splitdwhs())
                                             .map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient))))
-                                        )).concatWith(inbound.skip(1))
+                                    .concatWith(inbound.skip(1))
+                                        ))
 //                            .map(HttpSliceUtil.transformElement(element->
 //                                element.flatMap(RxNettys.splitdwhs())
 //                                    .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))))

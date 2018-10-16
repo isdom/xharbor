@@ -16,7 +16,6 @@ import org.jocean.http.Feature;
 import org.jocean.http.MessageUtil;
 import org.jocean.http.TransportException;
 import org.jocean.http.client.HttpClient;
-import org.jocean.http.client.HttpClient.HttpInitiator;
 import org.jocean.http.util.Nettys.ChannelAware;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.DisposableWrapperUtil;
@@ -277,9 +276,7 @@ public class DefaultDispatcher implements Dispatcher {
                     .feature(target.features().call())
                     .feature(channelGetter)
                     .build()
-                    .flatMap(new Func1<HttpInitiator, Observable<HttpObject>>() {
-                        @Override
-                        public Observable<HttpObject> call(final HttpInitiator t) {
+                    .<HttpObject>flatMap( t -> {
                             return t.defineInteraction(fullRequest.doOnNext(new Action1<HttpObject>() {
                                 @Override
                                 public void call(final HttpObject httpObj) {
@@ -301,21 +298,16 @@ public class DefaultDispatcher implements Dispatcher {
                                         }
                                     }
                                 }}))
-                                .compose(MessageUtil.rollout2dwhs())
+                                .flatMap( fullmsg -> Observable.<HttpObject>just( fullmsg.message()).concatWith(t1)
+                                .compose(MessageUtil.AUTOSTEP2DWH)
                                 .map(DisposableWrapperUtil.unwrap());
-                        }})
-                    .doOnNext(new Action1<HttpObject>() {
-                        @Override
-                        public void call(final HttpObject httpObj) {
+                    }).doOnNext( httpObj -> {
                             if (httpObj instanceof HttpResponse) {
                                 respRef.set((HttpResponse)httpObj);
                                 stepmemo.beginBizStep(STEP.RECV_RESP);
                                 rewriteResponse((HttpResponse)httpObj);
                             }
-                        }})
-                    .doOnError(new Action1<Throwable>() {
-                        @Override
-                        public void call(final Throwable e) {
+                    }).doOnError(e -> {
                             stepmemo.endBizStep();
                             final long ttl = watch4Result.stopAndRestart();
                             LOG.error("exception when transfer, detail: {}",
@@ -350,10 +342,7 @@ public class DefaultDispatcher implements Dispatcher {
                                                 target.serviceUri());
                                     }};
                             }
-                        }})
-                    .doOnCompleted(new Action0() {
-                        @Override
-                        public void call() {
+                    }).doOnCompleted(() -> {
                             stepmemo.endBizStep();
                             final long ttl = watch4Result.stopAndRestart();
                             memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
@@ -364,7 +353,7 @@ public class DefaultDispatcher implements Dispatcher {
                                     request,
                                     target.serviceUri(),
                                     respRef.get());
-                        }});
+                    });
         }
     }
 
