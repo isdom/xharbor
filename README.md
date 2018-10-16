@@ -54,6 +54,8 @@ TODO:
      
   18、~~从 netty 接收到 http request 即开始计时(StopWatch)，逼近 ROUTING 耗时统计的起始时间点~~
   
+  19、适配 jocean-http 俢改，FullMessage like
+  
   19、从 xharbor 通过 REST API的方式下载各类统计信息的 Excel(CSV)，统计内容可以包括：接口调用时长、次数、noRouting URI，流量大小 等
   
   20、~~将RulesZKUpdater & AUPZKUpdater 的实现抽象出公共 ZK's Updater with CopyOnWrite。~~ (done)
