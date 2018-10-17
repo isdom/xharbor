@@ -31,5 +31,5 @@ dependencies {
 
     testCompile 'junit:junit:4.12'
     /* testCompile 'org.jmockit:jmockit:1.15' */
-    testCompile 'org.jmock:jmock:2.8.3'
+    testCompile 'org.jmock:jmock:2.9.0'
 }
