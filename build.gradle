@@ -30,6 +30,6 @@ dependencies {
     /* compile('org.logback-extensions:logback-ext-spring:0.1.2') { transitive = false } */
 
     testCompile 'junit:junit:4.12'
-    /* testCompile 'org.jmockit:jmockit:1.15' */
+    testCompile 'org.jmockit:jmockit:1.43'
     testCompile 'org.jmock:jmock:2.9.0'
 }
