@@ -42,7 +42,7 @@ public class BasicAuthenticateTestCase {
             .toBlocking().value();
 
         final FullHttpResponse response = io.outbound()
-                .compose(MessageUtil.rollout2dwhs())
+                .compose(MessageUtil.AUTOSTEP2DWH)
                 .compose(RxNettys.message2fullresp(null))
                 .toBlocking().single().unwrap();
 

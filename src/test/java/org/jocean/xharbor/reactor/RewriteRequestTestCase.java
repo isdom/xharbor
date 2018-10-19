@@ -47,7 +47,8 @@ public class RewriteRequestTestCase {
                 }})
             .toBlocking().value();
 
-        final FullHttpRequest rwreq = io.inbound().compose(MessageUtil.rollout2dwhs())
+        final FullHttpRequest rwreq = io.inbound()
+                .compose(MessageUtil.AUTOSTEP2DWH)
                 .compose(RxNettys.message2fullreq(null)).toBlocking().single().unwrap();
 
         assertEquals("/yjy_psm/fetchMetadata", orgreq.uri());
@@ -98,7 +99,8 @@ public class RewriteRequestTestCase {
                 }})
             .toBlocking().value();
 
-        final FullHttpRequest rwreq = io.inbound().compose(MessageUtil.rollout2dwhs())
+        final FullHttpRequest rwreq = io.inbound()
+                .compose(MessageUtil.AUTOSTEP2DWH)
                 .compose(RxNettys.message2fullreq(null)).toBlocking().single().unwrap();
 
         assertEquals("/yjy_psm/fetchMetadata", orgreq.uri());
