@@ -79,7 +79,7 @@ public class RelaySubscriber extends Subscriber<HttpTrade> {
     @Override
     public void onNext(final HttpTrade trade) {
         final Observable<HttpObject> cached = trade.inbound()
-                .compose(MessageUtil.rollout2dwhs())
+                .compose(MessageUtil.AUTOSTEP2DWH)
                 .map(DisposableWrapperUtil.unwrap());
 
         cached.subscribe(new RequestSubscriber(trade, cached));

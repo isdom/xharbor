@@ -93,7 +93,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
             : HttpSliceUtil.single(trade.request().flatMap(req -> RxNettys.response200OK(req.protocolVersion()))
                 .map(DisposableWrapperUtil.wrap(RxNettys.disposerOf(), trade)))
                 // response when request send completed
-                .delay(obj -> trade.inbound().compose(MessageUtil.rollout2dwhs()).last());
+                .delay(obj -> trade.inbound().compose(MessageUtil.AUTOSTEP2DWH).last());
     }
 
     @SuppressWarnings("unchecked")
