@@ -4,42 +4,6 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
     
-    <!-- bean id="defaultRouter" class="org.jocean.xharbor.router.DefaultRouter">
-        <constructor-arg ref="serviceMemo"/>
-        <constructor-arg ref="httpClient"/>
-        <constructor-arg ref="noRoutingMemo" />
-        <constructor-arg ref="memoBuilder" />
-    </bean>
-    
-    <bean id="cachedRouter" class="org.jocean.xharbor.router.CachedRouter" 
-        init-method="start"
-        destroy-method="destroy">
-        <constructor-arg ref="defaultRouter"/>
-    </bean>
-    
-    <bean id="resetAction" factory-bean="cachedRouter"
-        factory-method="resetAction" />
-    
-    <bean class="org.jocean.xharbor.router.CahcedRouterMBeanSetter" >
-        <constructor-arg ref="cachedRouter"/>
-        <constructor-arg>
-            <bean class="org.jocean.xharbor.router.RouteObjectNameMaker" />
-        </constructor-arg>
-    </bean>
-        
-    <bean id="router" class="org.jocean.xharbor.router.RouteUtils" 
-        factory-method="compositeRouter">
-        <constructor-arg value="org.jocean.xharbor.api.Dispatcher"/>
-        <constructor-arg>
-            <bean class="org.jocean.xharbor.router.Request2RoutingInfo"/>
-        </constructor-arg>
-        <constructor-arg>
-            <array>
-                <ref bean="cachedRouter"/>
-            </array>
-        </constructor-arg>
-    </bean -->
-    
     <bean id="router" class="org.jocean.xharbor.reactor.CompositeReactor"/>
     
 </beans>
