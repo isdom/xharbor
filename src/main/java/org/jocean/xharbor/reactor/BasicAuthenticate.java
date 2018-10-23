@@ -69,7 +69,7 @@ public class BasicAuthenticate implements TradeReactor {
                 return HttpSliceUtil.single(RxNettys
                         .response401Unauthorized(orgreq.protocolVersion(), "Basic realm=\"" + _strWWWAuthenticate + "\"")
                         .map(DisposableWrapperUtil.wrap(RxNettys.disposerOf(), null != ctx ? ctx.trade() : null)))
-                    .delay(any -> orgio.inbound().compose(MessageUtil.rollout2dwhs()).last());
+                    .delay(any -> orgio.inbound().compose(MessageUtil.AUTOSTEP2DWH).last());
             }
         };
     }

@@ -1,17 +1,10 @@
 package org.jocean.xharbor;
 
-import org.jocean.http.DoFlush;
-
-import rx.Completable;
-import rx.Observable;
-import rx.functions.Action1;
-import rx.subscriptions.CompositeSubscription;
-import rx.subscriptions.Subscriptions;
-
 public class HttpSliceX {
 //    static final Func1<HttpSlice, Observable<DisposableWrapper<? extends HttpObject>>> elementAndSucceed = slice -> Observable
 //            .concat(slice.element(), slice.next().flatMap(next -> HttpSliceX.elementAndSucceed.call(next)));
 
+    /*
     public static interface AwaredFlush extends DoFlush {
         public void onCompleted();
     }
@@ -47,6 +40,7 @@ public class HttpSliceX {
 
         private final CompositeSubscription _completed = new CompositeSubscription();
     }
+    */
 
 //    public static Observable<? extends Object> advanceByCompleted(final HttpSlice slice,
 //            final Func1<HttpSlice, CompletableSource<Object>> slice2completable) {

@@ -78,7 +78,7 @@ public class ResponseWithHeaderonly implements TradeReactor {
                         if (_logReact) {
                             LOG.info("RESPOND sendback response directly:\nREQ\n[{}]\nRESP\n[{}]", orgreq, response);
                         }
-                    })).delay(any -> orgio.inbound().compose(MessageUtil.rollout2dwhs()).last());
+                    })).delay(any -> orgio.inbound().compose(MessageUtil.AUTOSTEP2DWH).last());
             }};
     }
 
