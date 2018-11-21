@@ -240,7 +240,7 @@ public class ForwardTrade implements TradeReactor {
                     return Observable
                             .zip(isDBS().doOnNext(configDBS(trade)), isRBS().doOnNext(configRBS(trade, upstream)),
                                     (dbs, rbs) -> Integer.MIN_VALUE)
-                            .flatMap(any -> upstream.defineInteraction(
+                            .<HttpSlice>flatMap(any -> upstream.defineInteraction(
                                     //  TODO
                                     inbound.first().map(HttpSliceUtil.transformElement(element->
                                         element.flatMap(RxNettys.splitdwhs())
