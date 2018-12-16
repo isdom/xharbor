@@ -1,15 +1,13 @@
 package org.jocean.xharbor.reactor;
 
 import org.jocean.http.CloseException;
-import org.jocean.http.HttpSlice;
-import org.jocean.http.HttpSliceUtil;
-import org.jocean.idiom.DisposableWrapper;
+import org.jocean.http.FullMessage;
 import org.jocean.xharbor.api.TradeReactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponse;
 import rx.Observable;
 import rx.Single;
 
@@ -30,36 +28,31 @@ public class DropRequest implements TradeReactor {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().first().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()).map(req -> {
-            if (null == req) {
-                LOG.warn("request is null, ignore trade {}", ctx.trade());
-                return null;
+        return io.inbound().map(fullreq -> {
+            if (_matcher.match(fullreq.message())) {
+                return io4Drop(ctx, io, fullreq);
             } else {
-                if (_matcher.match(req)) {
-                    return io4Drop(ctx, io, req);
-                } else {
-                    // not handle this trade
-                    return null;
-                }
+                // not handle this trade
+                return null;
             }
         }).toSingle();
     }
 
     private InOut io4Drop(final ReactContext ctx, final InOut originalio,
-            final HttpRequest originalreq) {
+            final FullMessage<HttpRequest> orgreq) {
         return new InOut() {
             @Override
-            public Observable<? extends HttpSlice> inbound() {
+            public Observable<FullMessage<HttpRequest>> inbound() {
                 return originalio.inbound();
             }
             @Override
-            public Observable<? extends HttpSlice> outbound() {
-                return HttpSliceUtil.single(Observable.<DisposableWrapper<HttpObject>>error(new CloseException())
+            public Observable<FullMessage<HttpResponse>> outbound() {
+                return Observable.<FullMessage<HttpResponse>>error(new CloseException())
                     .doOnError(e -> {
                             if (e instanceof CloseException && _log) {
-                                LOG.info("Drop request directly:\nREQ\n[{}]", originalreq);
+                                LOG.info("Drop request directly:\nREQ\n[{}]", orgreq.message());
                             }
-                        }));
+                        });
             }};
     }
 

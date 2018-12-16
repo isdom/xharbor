@@ -1,11 +1,9 @@
 package org.jocean.xharbor.reactor;
 
-import org.jocean.http.HttpSlice;
-import org.jocean.http.HttpSliceUtil;
-import org.jocean.http.MessageUtil;
-import org.jocean.http.util.RxNettys;
-import org.jocean.idiom.DisposableWrapperUtil;
+import org.jocean.http.FullMessage;
+import org.jocean.http.MessageBody;
 import org.jocean.idiom.Pair;
+import org.jocean.idiom.StepableUtil;
 import org.jocean.xharbor.api.TradeReactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,8 +11,11 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Charsets;
 import com.google.common.io.BaseEncoding;
 
+import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import rx.Observable;
 import rx.Single;
 
@@ -38,38 +39,45 @@ public class BasicAuthenticate implements TradeReactor {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().first().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()).map(req -> {
-            if (null == req) {
-                return null;
-            } else {
-                if (_matcher.match(req)) {
-                    if (isAuthorizeSuccess(req, _user, _password)) {
-                        return null;
-                    } else {
-                        // response 401 Unauthorized
-                        return io4Unauthorized(ctx, io, req);
-                    }
-                } else {
-                    // not handle this trade
+        return io.inbound().map(fullreq -> {
+            if (_matcher.match(fullreq.message())) {
+                if (isAuthorizeSuccess(fullreq.message(), _user, _password)) {
                     return null;
+                } else {
+                    // response 401 Unauthorized
+                    return io4Unauthorized(ctx, io, fullreq);
                 }
+            } else {
+                // not handle this trade
+                return null;
             }
         }).toSingle();
     }
 
-    private InOut io4Unauthorized(final ReactContext ctx, final InOut orgio, final HttpRequest orgreq) {
+    private InOut io4Unauthorized(final ReactContext ctx, final InOut orgio, final FullMessage<HttpRequest> orgfullreq) {
         return new InOut() {
             @Override
-            public Observable<? extends HttpSlice> inbound() {
+            public Observable<FullMessage<HttpRequest>> inbound() {
                 return orgio.inbound();
             }
 
             @Override
-            public Observable<? extends HttpSlice> outbound() {
-                return HttpSliceUtil.single(RxNettys
-                        .response401Unauthorized(orgreq.protocolVersion(), "Basic realm=\"" + _strWWWAuthenticate + "\"")
-                        .map(DisposableWrapperUtil.wrap(RxNettys.disposerOf(), null != ctx ? ctx.trade() : null)))
-                    .delay(any -> orgio.inbound().compose(MessageUtil.AUTOSTEP2DWH).last());
+            public Observable<FullMessage<HttpResponse>> outbound() {
+                return Observable.<FullMessage<HttpResponse>>just(new FullMessage<HttpResponse>() {
+                    @Override
+                    public HttpResponse message() {
+                        final HttpResponse response = new DefaultHttpResponse(
+                                orgfullreq.message().protocolVersion(), HttpResponseStatus.UNAUTHORIZED);
+                        response.headers().set(HttpHeaderNames.WWW_AUTHENTICATE,  "Basic realm=\"" + _strWWWAuthenticate + "\"");
+                        response.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
+
+                        return response;
+                    }
+                    @Override
+                    public Observable<? extends MessageBody> body() {
+                        return Observable.empty();
+                    }}).delaySubscription(orgio.inbound().flatMap(fullmsg -> fullmsg.body()).flatMap(body -> body.content())
+                        .compose(StepableUtil.autostep2element2()).doOnNext(bbs -> bbs.dispose()).ignoreElements());
             }
         };
     }

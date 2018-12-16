@@ -2,11 +2,9 @@ package org.jocean.xharbor.reactor;
 
 import java.util.Map;
 
-import org.jocean.http.HttpSlice;
-import org.jocean.http.HttpSliceUtil;
-import org.jocean.http.MessageUtil;
-import org.jocean.http.util.RxNettys;
-import org.jocean.idiom.DisposableWrapperUtil;
+import org.jocean.http.FullMessage;
+import org.jocean.http.MessageBody;
+import org.jocean.idiom.StepableUtil;
 import org.jocean.xharbor.api.TradeReactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,7 +14,6 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.LastHttpContent;
 import rx.Observable;
 import rx.Single;
 
@@ -41,44 +38,47 @@ public class ResponseWithHeaderonly implements TradeReactor {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().first().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()).map(req -> {
-            if (null == req) {
-                LOG.warn("request is null, ignore trade {}", ctx.trade());
-                return null;
+        return io.inbound().map(fullreq -> {
+            if (this._matcher.match(fullreq.message())) {
+                return io4Response(ctx, io, fullreq);
             } else {
-                if (this._matcher.match(req)) {
-                    return io4Response(ctx, io, req);
-                } else {
-                    // not handle this trade
-                    return null;
-                }
+                // not handle this trade
+                return null;
             }
         }).toSingle();
     }
 
-    private InOut io4Response(final ReactContext ctx, final InOut orgio, final HttpRequest orgreq) {
+    private InOut io4Response(final ReactContext ctx, final InOut orgio, final FullMessage<HttpRequest> orgfullreq) {
         return new InOut() {
             @Override
-            public Observable<? extends HttpSlice> inbound() {
+            public Observable<FullMessage<HttpRequest>> inbound() {
                 return orgio.inbound();
             }
             @Override
-            public Observable<? extends HttpSlice> outbound() {
+            public Observable<FullMessage<HttpResponse>> outbound() {
                 final HttpResponse response = new DefaultHttpResponse(
-                        orgreq.protocolVersion(), HttpResponseStatus.valueOf(_responseStatus));
+                        orgfullreq.message().protocolVersion(), HttpResponseStatus.valueOf(_responseStatus));
                 response.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
                 if (null!=_extraHeaders) {
                     for (final Map.Entry<String, String> entry : _extraHeaders.entrySet()) {
                         response.headers().set(entry.getKey(), entry.getValue());
                     }
                 }
-                return HttpSliceUtil.single(Observable.just(response, LastHttpContent.EMPTY_LAST_CONTENT)
-                    .map(DisposableWrapperUtil.wrap(RxNettys.disposerOf(), null != ctx ? ctx.trade() : null))
+                return Observable.<FullMessage<HttpResponse>>just(new FullMessage<HttpResponse>() {
+                    @Override
+                    public HttpResponse message() {
+                        return response;
+                    }
+                    @Override
+                    public Observable<? extends MessageBody> body() {
+                        return Observable.empty();
+                    }})
                     .doOnCompleted(() -> {
                         if (_logReact) {
-                            LOG.info("RESPOND sendback response directly:\nREQ\n[{}]\nRESP\n[{}]", orgreq, response);
+                            LOG.info("RESPOND sendback response directly:\nREQ\n[{}]\nRESP\n[{}]", orgfullreq.message(), response);
                         }
-                    })).delay(any -> orgio.inbound().compose(MessageUtil.AUTOSTEP2DWH).last());
+                    }).delaySubscription(orgio.inbound().flatMap(fullmsg -> fullmsg.body()).flatMap(body -> body.content())
+                            .compose(StepableUtil.autostep2element2()).doOnNext(bbs -> bbs.dispose()).ignoreElements());
             }};
     }
 

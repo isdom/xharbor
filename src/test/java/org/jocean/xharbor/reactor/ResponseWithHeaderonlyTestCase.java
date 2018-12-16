@@ -2,16 +2,15 @@ package org.jocean.xharbor.reactor;
 
 import static org.junit.Assert.assertEquals;
 
-import org.jocean.http.HttpSlice;
-import org.jocean.http.HttpSliceUtil;
-import org.jocean.http.MessageUtil;
-import org.jocean.http.util.RxNettys;
+import org.jocean.http.FullMessage;
+import org.jocean.http.MessageBody;
 import org.jocean.xharbor.api.TradeReactor.InOut;
 import org.junit.Test;
 
-import io.netty.handler.codec.http.DefaultFullHttpRequest;
-import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import rx.Observable;
@@ -24,26 +23,26 @@ public class ResponseWithHeaderonlyTestCase {
                 new MatchRule(null, "/yourname/(\\w)*", null),
                 200, null, true);
 
-        final DefaultFullHttpRequest request =
-                new DefaultFullHttpRequest(HttpVersion.HTTP_1_0, HttpMethod.POST,
-                "/yourname/hi");
-
-        final InOut io =
-            responder.react(null, new InOut() {
+        final InOut io = responder.react(null, new InOut() {
                 @Override
-                public Observable<? extends HttpSlice> inbound() {
-                    return HttpSliceUtil.single(Observable.just(RxNettys.wrap4release(request)));
+                public Observable<FullMessage<HttpRequest>> inbound() {
+                    return Observable.just(new FullMessage<HttpRequest>() {
+                        @Override
+                        public HttpRequest message() {
+                            return new DefaultHttpRequest(HttpVersion.HTTP_1_0, HttpMethod.POST, "/yourname/hi");
+                        }
+                        @Override
+                        public Observable<? extends MessageBody> body() {
+                            return Observable.empty();
+                        }});
                 }
                 @Override
-                public Observable<? extends HttpSlice> outbound() {
+                public Observable<FullMessage<HttpResponse>> outbound() {
                     return null;
                 }})
             .toBlocking().value();
 
-        final FullHttpResponse response = io.outbound()
-                .compose(MessageUtil.AUTOSTEP2DWH)
-                .compose(RxNettys.message2fullresp(null))
-                .toBlocking().single().unwrap();
+        final HttpResponse response = io.outbound().toBlocking().single().message();
 
         assertEquals(HttpResponseStatus.OK, response.status());
         assertEquals(HttpVersion.HTTP_1_0, response.protocolVersion());

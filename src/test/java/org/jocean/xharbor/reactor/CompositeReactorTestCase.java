@@ -6,13 +6,15 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.jocean.http.HttpSlice;
+import org.jocean.http.FullMessage;
 import org.jocean.idiom.Ordered;
 import org.jocean.xharbor.api.TradeReactor;
 import org.jocean.xharbor.api.TradeReactor.InOut;
 import org.jocean.xharbor.api.TradeReactor.ReactContext;
 import org.junit.Test;
 
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponse;
 import rx.Observable;
 import rx.Single;
 import rx.functions.Func2;
@@ -63,11 +65,11 @@ public class CompositeReactorTestCase {
         final InOut io =
         cr.react(null, new InOut() {
             @Override
-            public Observable<? extends HttpSlice> inbound() {
+            public Observable<FullMessage<HttpRequest>> inbound() {
                 return null;
             }
             @Override
-            public Observable<? extends HttpSlice> outbound() {
+            public Observable<FullMessage<HttpResponse>> outbound() {
                 return null;
             }})
         .toBlocking().value();

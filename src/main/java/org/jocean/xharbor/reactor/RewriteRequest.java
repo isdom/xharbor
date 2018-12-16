@@ -3,16 +3,14 @@ package org.jocean.xharbor.reactor;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.jocean.http.HttpSlice;
-import org.jocean.http.HttpSliceUtil;
-import org.jocean.http.util.RxNettys;
-import org.jocean.idiom.DisposableWrapper;
+import org.jocean.http.FullMessage;
+import org.jocean.http.MessageBody;
 import org.jocean.idiom.Regexs;
 import org.jocean.xharbor.api.TradeReactor;
 
 import io.netty.handler.codec.http.DefaultHttpRequest;
-import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponse;
 import rx.Observable;
 import rx.Single;
 
@@ -35,38 +33,39 @@ public class RewriteRequest implements TradeReactor {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().first().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()).map(req -> {
-            if (null == req) {
-                return null;
+        return io.inbound().map(fullreq -> {
+            final Matcher matcher = this._pathPattern.matcher(fullreq.message().uri());
+            if (matcher.find()) {
+                return io4rewritePath(io, fullreq, matcher);
             } else {
-                final Matcher matcher = this._pathPattern.matcher(req.uri());
-                if (matcher.find()) {
-                    return io4rewritePath(io, req, matcher);
-                } else {
-                    // not handle this trade
-                    return null;
-                }
+                // not handle this trade
+                return null;
             }
         }).toSingle();
     }
 
-    private InOut io4rewritePath(final InOut orgio, final HttpRequest orgreq, final Matcher matcher) {
+    private InOut io4rewritePath(final InOut orgio, final FullMessage<HttpRequest> orgfullreq, final Matcher matcher) {
         return new InOut() {
             @Override
-            public Observable<? extends HttpSlice> inbound() {
-                return orgio.inbound().first().map(HttpSliceUtil.transformElement(element ->
-                    Observable.<DisposableWrapper<? extends HttpObject>>just(RxNettys.wrap4release(org2new(matcher, orgreq)))
-                    .concatWith(element.flatMap(RxNettys.splitdwhs()).skip(1))
-                )).concatWith(orgio.inbound().skip(1));
+            public Observable<FullMessage<HttpRequest>> inbound() {
+                return Observable.just(new FullMessage<HttpRequest>() {
+                    @Override
+                    public HttpRequest message() {
+                        return org2new(matcher, orgfullreq.message());
+                    }
+                    @Override
+                    public Observable<? extends MessageBody> body() {
+                        return orgfullreq.body();
+                    }});
             }
             @Override
-            public Observable<? extends HttpSlice> outbound() {
+            public Observable<FullMessage<HttpResponse>> outbound() {
                 return orgio.outbound();
             }};
     }
 
     private HttpRequest org2new(final Matcher matcher, final HttpRequest org) {
-        final DefaultHttpRequest newreq = new DefaultHttpRequest(org.protocolVersion(), org.method(), org.uri(), true);
+        final HttpRequest newreq = new DefaultHttpRequest(org.protocolVersion(), org.method(), org.uri(), true);
         newreq.headers().set(org.headers());
         if (null != this._replacePathTo && !this._replacePathTo.isEmpty()) {
             // when _replacePathTo not empty, then modify original path

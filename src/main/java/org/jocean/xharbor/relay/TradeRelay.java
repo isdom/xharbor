@@ -6,14 +6,12 @@ package org.jocean.xharbor.relay;
 import java.net.ConnectException;
 import java.nio.channels.ClosedChannelException;
 
-import org.jocean.http.HttpSlice;
-import org.jocean.http.HttpSliceUtil;
-import org.jocean.http.MessageUtil;
+import org.jocean.http.FullMessage;
+import org.jocean.http.MessageBody;
 import org.jocean.http.TransportException;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
-import org.jocean.http.util.RxNettys;
-import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.idiom.ExceptionUtils;
+import org.jocean.idiom.StepableUtil;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxObservables;
 import org.jocean.idiom.rx.RxObservables.RetryPolicy;
@@ -23,6 +21,12 @@ import org.jocean.xharbor.api.TradeReactor.ReactContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.LastHttpContent;
 import rx.Observable;
 import rx.Subscriber;
 import rx.functions.Func1;
@@ -68,32 +72,50 @@ public class TradeRelay extends Subscriber<HttpTrade> {
 
         this._tradeReactor.react(ctx, new InOut() {
             @Override
-            public Observable<? extends HttpSlice> inbound() {
+            public Observable<FullMessage<HttpRequest>> inbound() {
                 return trade.inbound();
             }
 
             @Override
-            public Observable<? extends HttpSlice> outbound() {
+            public Observable<FullMessage<HttpResponse>> outbound() {
                 return null;
             }
         }).retryWhen(retryPolicy(trade)).subscribe(io -> {
                 if (null == io || null == io.outbound()) {
                     LOG.warn("NO_INOUT for trade({}), react io detail: {}.", trade, io);
                 }
-                trade.outbound(buildResponse(trade, io));
+                trade.outbound(buildResponse(trade, io).flatMap(fullresp -> fullresp2objs(fullresp)));
             }, error -> {
                 LOG.warn("Trade {} react with error, detail:{}", trade, ExceptionUtils.exception2detail(error));
                 trade.close();
             });
     }
 
-    private Observable<? extends HttpSlice> buildResponse(final HttpTrade trade, final InOut io) {
-        return (null != io && null != io.outbound())
-            ? io.outbound()
-            : HttpSliceUtil.single(trade.request().flatMap(req -> RxNettys.response200OK(req.protocolVersion()))
-                .map(DisposableWrapperUtil.wrap(RxNettys.disposerOf(), trade)))
-                // response when request send completed
-                .delay(obj -> trade.inbound().compose(MessageUtil.AUTOSTEP2DWH).last());
+    private Observable<Object> fullresp2objs(final FullMessage<HttpResponse> fullresp) {
+        return Observable.<Object>just(fullresp.message()).concatWith(fullresp.body().concatMap(body -> body.content()))
+                .concatWith(Observable.just(LastHttpContent.EMPTY_LAST_CONTENT));
+    }
+
+    private Observable<FullMessage<HttpResponse>> buildResponse(final HttpTrade trade, final InOut io) {
+        return (null != io && null != io.outbound()) ? io.outbound() : defaultResponse200(trade);
+    }
+
+    private Observable<FullMessage<HttpResponse>> defaultResponse200(final HttpTrade trade) {
+        return trade.inbound().map(fullreq -> (FullMessage<HttpResponse>)new FullMessage<HttpResponse>() {
+            @Override
+            public HttpResponse message() {
+                final HttpResponse response = new DefaultHttpResponse(
+                        fullreq.message().protocolVersion(), HttpResponseStatus.OK);
+                response.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
+                return response;
+            }
+            @Override
+            public Observable<? extends MessageBody> body() {
+                return Observable.empty();
+            }} )
+            // response when request send completed
+            .delaySubscription(trade.inbound().flatMap(fullmsg -> fullmsg.body()).flatMap(body -> body.content())
+                .compose(StepableUtil.autostep2element2()).doOnNext(bbs -> bbs.dispose()).ignoreElements());
     }
 
     @SuppressWarnings("unchecked")

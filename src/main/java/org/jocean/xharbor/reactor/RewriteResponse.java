@@ -2,8 +2,7 @@ package org.jocean.xharbor.reactor;
 
 import java.util.Map;
 
-import org.jocean.http.HttpSlice;
-import org.jocean.http.HttpSliceUtil;
+import org.jocean.http.FullMessage;
 import org.jocean.xharbor.api.TradeReactor;
 
 import io.netty.handler.codec.http.HttpRequest;
@@ -23,37 +22,31 @@ public class RewriteResponse implements TradeReactor {
         if (null == io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()).map(req -> {
-            if (null == req) {
-                return null;
+        return io.inbound().map(fullreq -> {
+            if (_matcher.match(fullreq.message())) {
+                return io4rewriteResponse(io, fullreq);
             } else {
-                if (_matcher.match(req)) {
-                    return io4rewriteResponse(io, req);
-                } else {
-                    // not handle this trade
-                    return null;
-                }
+                // not handle this trade
+                return null;
             }
         }).toSingle();
     }
 
-    private InOut io4rewriteResponse(final InOut orgio, final HttpRequest orgreq) {
+    private InOut io4rewriteResponse(final InOut orgio, final FullMessage<HttpRequest> orgreq) {
         return new InOut() {
             @Override
-            public Observable<? extends HttpSlice> inbound() {
+            public Observable<FullMessage<HttpRequest>> inbound() {
                 return orgio.inbound();
             }
 
             @Override
-            public Observable<? extends HttpSlice> outbound() {
-                return orgio.outbound().map(HttpSliceUtil.transformElement(element -> element.doOnNext(dwh -> {
-                    if (dwh.unwrap() instanceof HttpResponse) {
-                        final HttpResponse response = (HttpResponse) dwh.unwrap();
+            public Observable<FullMessage<HttpResponse>> outbound() {
+                return orgio.outbound().doOnNext(fullresp -> {
+                        final HttpResponse response = (HttpResponse) fullresp.message();
                         for (final Map.Entry<String, String> entry : _extraHeaders.entrySet()) {
                             response.headers().set(entry.getKey(), entry.getValue());
                         }
-                    }
-                })));
+                });
             }
         };
     }

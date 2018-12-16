@@ -11,15 +11,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.jocean.http.Feature;
-import org.jocean.http.HttpSlice;
-import org.jocean.http.HttpSliceUtil;
+import org.jocean.http.FullMessage;
+import org.jocean.http.MessageBody;
 import org.jocean.http.TrafficCounter;
 import org.jocean.http.TransportException;
 import org.jocean.http.WriteCtrl;
 import org.jocean.http.client.HttpClient;
 import org.jocean.http.client.HttpClient.HttpInitiator;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
-import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.BeanFinder;
 import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.idiom.ExceptionUtils;
@@ -49,6 +48,7 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
+import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.util.Timer;
 import rx.Observable;
@@ -87,23 +87,19 @@ public class ForwardTrade implements TradeReactor {
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().first().compose(HttpSliceUtil.<HttpRequest>extractHttpMessage()).flatMap(req -> {
-            if (null == req) {
-                return null;
-            } else {
-                if (this._matcher.match(req)) {
-                    final MarkableTargetImpl target = selectTarget();
-                    if (null == target) {
-                        // no target
-                        LOG.warn("NONE_TARGET to forward for trade {}", ctx.trade());
-                        return Observable.just(null);
-                    } else {
-                        return io4forward(ctx, io, target, this._matcher.summary());
-                    }
-                } else {
-                    // not handle this trade
+        return io.inbound().flatMap(fullreq -> {
+            if (this._matcher.match(fullreq.message())) {
+                final MarkableTargetImpl target = selectTarget();
+                if (null == target) {
+                    // no target
+                    LOG.warn("NONE_TARGET to forward for trade {}", ctx.trade());
                     return Observable.just(null);
+                } else {
+                    return io4forward(ctx, io, target, this._matcher.summary());
                 }
+            } else {
+                // not handle this trade
+                return Observable.just(null);
             }
         }).compose(RxObservables.<InOut>ensureSubscribeAtmostOnce()).toSingle();
     }
@@ -129,23 +125,22 @@ public class ForwardTrade implements TradeReactor {
                 }.toObservable();
     }
 
-    private Transformer<HttpSlice, InOut> makeupio(
+    private Transformer<FullMessage<HttpResponse>, InOut> makeupio(
             final InOut orgio,
             final MarkableTargetImpl target,
             final ReactContext ctx,
             final String summary) {
-        return slices -> {
-            final Observable<HttpSlice> shared = slices.share();
+        return getfullresp -> {
+            final Observable<FullMessage<HttpResponse>> cached = getfullresp.cache();
 
-            shared.subscribe(slice -> LOG.debug("shared onNext: {}", slice));
+            cached.subscribe(fullresp -> LOG.debug("try get resp: {}", fullresp.message()));
 
-            final Observable<HttpSlice> cached = shared.first().cache();
             //  启动转发 (forward)
-            return cached.compose(HttpSliceUtil.<HttpResponse>extractHttpMessage()).flatMap(resp -> {
-                LOG.debug("recv first response head part {}.", resp);
+            return cached.flatMap(fullresp -> {
+                LOG.debug("recv response head part {}.", fullresp.message());
 
                 // 404 Not Found
-                if (resp.status().equals(HttpResponseStatus.NOT_FOUND)) {
+                if (fullresp.message().status().equals(HttpResponseStatus.NOT_FOUND)) {
                     // Request-URI not found in target service, so try next
                     // matched forward target
                     LOG.info("API_NOT_SUPPORTED for target {}, so forward trade({}) to next reactor", target,
@@ -154,30 +149,30 @@ public class ForwardTrade implements TradeReactor {
                 }
 
                 // 5XX Server Internal Error
-                if (resp.status().code() >= 500) {
+                if (fullresp.message().status().code() >= 500) {
                     // Server Internal Error
                     target.markAPIDownStatus(true);
-                    LOG.warn("SERVER_ERROR({}), so mark service [{}]'s matched {} APIs down.", resp.status(),
+                    LOG.warn("SERVER_ERROR({}), so mark service [{}]'s matched {} APIs down.", fullresp.message().status(),
                             target.serviceUri(), _matcher);
                     _timer.newTimeout(timeout -> {
                         // reset down flag
                         target.markAPIDownStatus(false);
                         LOG.info(
                                 "reset service [{}]'s matched {} APIs down to false, after {} second cause by SERVER_ERROR({}).",
-                                target.serviceUri(), _matcher, _period, resp.status());
+                                target.serviceUri(), _matcher, _period, fullresp.message().status());
                     }, _period, TimeUnit.SECONDS);
-                    return Observable.error(new TransportException("SERVER_ERROR(" + resp.status() + ")"));
+                    return Observable.error(new TransportException("SERVER_ERROR(" + fullresp.message().status() + ")"));
                 }
 
                 return Observable.<InOut>just(new InOut() {
                     @Override
-                    public Observable<? extends HttpSlice> inbound() {
+                    public Observable<FullMessage<HttpRequest>> inbound() {
                         return orgio.inbound();
                     }
 
                     @Override
-                    public Observable<? extends HttpSlice> outbound() {
-                        return cached.concatWith(shared).doOnCompleted(()-> LOG.info("forward outbound completed"));
+                    public Observable<FullMessage<HttpResponse>> outbound() {
+                        return cached.doOnCompleted(()-> LOG.info("forward outbound completed"));
                     }
                 });
             });
@@ -202,9 +197,9 @@ public class ForwardTrade implements TradeReactor {
         };
     }
 
-    private Observable<? extends HttpSlice> buildOutbound(
+    private Observable<FullMessage<HttpResponse>> buildOutbound(
             final HttpTrade trade,
-            final Observable<? extends HttpSlice> inbound,
+            final Observable<FullMessage<HttpRequest>> inbound,
             final Target target,
             final StopWatch stopWatch) {
         return forwardTo(target).doOnNext(upstream->trade.doOnTerminate(upstream.closer()))
@@ -237,21 +232,18 @@ public class ForwardTrade implements TradeReactor {
 
                     enableDisposeSended(upstream.writeCtrl(), MAX_RETAINED_SIZE);
 
-                    return Observable
-                            .zip(isDBS().doOnNext(configDBS(trade)), isRBS().doOnNext(configRBS(trade, upstream)),
+                    return Observable.zip(isDBS().doOnNext(configDBS(trade)), isRBS().doOnNext(configRBS(trade, upstream)),
                                     (dbs, rbs) -> Integer.MIN_VALUE)
-                            .<HttpSlice>flatMap(any -> upstream.defineInteraction(
-                                    //  TODO
-                                    inbound.first().map(HttpSliceUtil.transformElement(element->
-                                        element.flatMap(RxNettys.splitdwhs())
-                                            .map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient))))
-                                    .concatWith(inbound.skip(1))
-                                        ))
-//                            .map(HttpSliceUtil.transformElement(element->
-//                                element.flatMap(RxNettys.splitdwhs())
-//                                    .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))))
+                            .flatMap(any -> upstream.defineInteraction(
+                                    inbound.map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient)).compose(fullreq2objs())))
+                            .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))
                             ;
                 });
+    }
+
+    private Transformer<FullMessage<HttpRequest>, Object> fullreq2objs() {
+        return getfullreq -> getfullreq.flatMap(fullreq -> Observable.<Object>just(fullreq.message()).concatWith(fullreq.body().concatMap(body -> body.content()))
+                .concatWith(Observable.just(LastHttpContent.EMPTY_LAST_CONTENT)));
     }
 
     private Action1<? super Boolean> configRBS(final HttpTrade trade, final HttpInitiator initiator) {
@@ -316,53 +308,65 @@ public class ForwardTrade implements TradeReactor {
         return new InetSocketAddress(uri.getHost(), uri.getPort());
     }
 
-    private <T> Func1<T, T> addKeepAliveIfNeeded(
+    private  Func1<FullMessage<HttpRequest>, FullMessage<HttpRequest>> addKeepAliveIfNeeded(
             final AtomicReference<HttpRequest> refReq,
             final AtomicBoolean isKeepAliveFromClient) {
-        return dwh -> {
-            if (DisposableWrapperUtil.unwrap(dwh) instanceof HttpRequest) {
-                final HttpRequest req = (HttpRequest) DisposableWrapperUtil.unwrap(dwh);
-                refReq.set(req);
-                // only check first time, bcs inbound could be process many
-                // times
-                if (isKeepAliveFromClient.get()) {
-                    isKeepAliveFromClient.set(HttpUtil.isKeepAlive(req));
-                    if (!isKeepAliveFromClient.get()) {
-                        // if NOT keep alive, force it
-                        final DefaultHttpRequest newreq = new DefaultHttpRequest(req.protocolVersion(), req.method(),
-                                req.uri());
-                        newreq.headers().add(req.headers());
-                        newreq.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
-                        LOG.info("FORCE-KeepAlive: add Connection header with KeepAlive for incoming req:\n[{}]", req);
-                        return (T)RxNettys.wrap4release(newreq);
-                    }
+        return fullreq -> {
+            refReq.set(fullreq.message());
+            // only check first time, bcs inbound could be process many
+            // times
+            if (isKeepAliveFromClient.get()) {
+                isKeepAliveFromClient.set(HttpUtil.isKeepAlive(fullreq.message()));
+                if (!isKeepAliveFromClient.get()) {
+                    // if NOT keep alive, force it
+                    final HttpRequest newreq = new DefaultHttpRequest(
+                            fullreq.message().protocolVersion(),
+                            fullreq.message().method(),
+                            fullreq.message().uri());
+                    newreq.headers().add(fullreq.message().headers());
+                    newreq.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                    LOG.info("FORCE-KeepAlive: add Connection header with KeepAlive for incoming req:\n[{}]", fullreq.message());
+                    return new FullMessage<HttpRequest>() {
+                        @Override
+                        public HttpRequest message() {
+                            return newreq;
+                        }
+                        @Override
+                        public Observable<? extends MessageBody> body() {
+                            return fullreq.body();
+                        }};
                 }
             }
-            return dwh;
+            return fullreq;
         };
     }
 
-    private <T> Func1<T, T> removeKeepAliveIfNeeded(
+    private Func1<FullMessage<HttpResponse>, FullMessage<HttpResponse>> removeKeepAliveIfNeeded(
             final AtomicReference<HttpResponse> refResp,
             final AtomicBoolean isKeepAliveFromClient) {
-        return dwh -> {
-            if (DisposableWrapperUtil.unwrap(dwh) instanceof HttpResponse) {
-                final HttpResponse resp = (HttpResponse) DisposableWrapperUtil.unwrap(dwh);
-                refResp.set(resp);
-                if (!isKeepAliveFromClient.get()) {
-                    if (HttpUtil.isKeepAlive(resp)) {
-                        // if NOT keep alive from client, remove keepalive
-                        // header
-                        final DefaultHttpResponse newresp = new DefaultHttpResponse(resp.protocolVersion(),
-                                resp.status());
-                        newresp.headers().add(resp.headers());
-                        newresp.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-                        LOG.info("FORCE-KeepAlive: set Connection header with Close for sendback resp:\n[{}]", resp);
-                        return (T)RxNettys.wrap4release(newresp);
-                    }
+        return fullresp -> {
+            refResp.set(fullresp.message());
+            if (!isKeepAliveFromClient.get()) {
+                if (HttpUtil.isKeepAlive(fullresp.message())) {
+                    // if NOT keep alive from client, remove keepalive
+                    // header
+                    final HttpResponse newresp = new DefaultHttpResponse(fullresp.message().protocolVersion(),
+                            fullresp.message().status());
+                    newresp.headers().add(fullresp.message().headers());
+                    newresp.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+                    LOG.info("FORCE-KeepAlive: set Connection header with Close for sendback resp:\n[{}]", fullresp.message());
+                    return new FullMessage<HttpResponse>() {
+                        @Override
+                        public HttpResponse message() {
+                            return newresp;
+                        }
+                        @Override
+                        public Observable<? extends MessageBody> body() {
+                            return fullresp.body();
+                        }};
                 }
             }
-            return dwh;
+            return fullresp;
         };
     }
 
