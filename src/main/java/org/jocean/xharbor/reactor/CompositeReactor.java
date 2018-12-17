@@ -95,7 +95,9 @@ public class CompositeReactor implements TradeReactor, Ordered, Func1<TradeReact
 
     @Override
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
-        LOG.trace("try {} for trade {}", this, ctx.trade());
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("try {} for trade {}", this, ctx.trade());
+        }
         final TradeReactor[] reactors = this._descReactorsRef.getReference();
         if (null == reactors ||
             (null != reactors && reactors.length == 0)) {

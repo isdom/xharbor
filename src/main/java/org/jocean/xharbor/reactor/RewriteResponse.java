@@ -46,7 +46,9 @@ public class RewriteResponse implements TradeReactor {
 
     @Override
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
-        LOG.trace("try {} for trade {}", this, ctx.trade());
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("try {} for trade {}", this, ctx.trade());
+        }
         if (null == io.outbound()) {
             return Single.<InOut>just(null);
         }

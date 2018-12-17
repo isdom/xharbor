@@ -107,7 +107,9 @@ public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardDat
 
     @Override
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
-        LOG.trace("try {} for trade {}", this, ctx.trade());
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("try {} for trade {}", this, ctx.trade());
+        }
         final ForwardTrade[] reactors = this._reactorsRef.getReference();
         if (null == reactors ||
             (null != reactors && reactors.length == 0)) {
