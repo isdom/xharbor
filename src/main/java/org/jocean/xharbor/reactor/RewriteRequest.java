@@ -7,6 +7,8 @@ import org.jocean.http.FullMessage;
 import org.jocean.http.MessageBody;
 import org.jocean.idiom.Regexs;
 import org.jocean.xharbor.api.TradeReactor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.HttpRequest;
@@ -15,6 +17,7 @@ import rx.Observable;
 import rx.Single;
 
 public class RewriteRequest implements TradeReactor {
+    private static final Logger LOG = LoggerFactory.getLogger(RewriteRequest.class);
 
     public RewriteRequest(
             final String pathPattern,
@@ -29,11 +32,21 @@ public class RewriteRequest implements TradeReactor {
     }
 
     @Override
+    public String toString() {
+        final StringBuilder builder = new StringBuilder();
+        builder.append("RewriteRequest [pathPattern=").append(_pathPattern).append(", replacePathTo=")
+                .append(_replacePathTo).append(", replaceHeaderName=").append(_replaceHeaderName)
+                .append(", replaceHeaderValue=").append(_replaceHeaderValue).append("]");
+        return builder.toString();
+    }
+
+    @Override
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
+        LOG.trace("try {} for trade {}", this, ctx.trade());
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().map(fullreq -> {
+        return io.inbound().first().map(fullreq -> {
             final Matcher matcher = this._pathPattern.matcher(fullreq.message().uri());
             if (matcher.find()) {
                 return io4rewritePath(io, fullreq, matcher);

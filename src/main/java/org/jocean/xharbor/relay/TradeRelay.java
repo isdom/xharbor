@@ -28,6 +28,7 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.LastHttpContent;
 import rx.Observable;
+import rx.Observable.Transformer;
 import rx.Subscriber;
 import rx.functions.Func1;
 
@@ -51,12 +52,12 @@ public class TradeRelay extends Subscriber<HttpTrade> {
 
     @Override
     public void onError(final Throwable e) {
-        LOG.warn("TradeRelay {} onError, detail:{}",
-                this, ExceptionUtils.exception2detail(e));
+        LOG.warn("TradeRelay {} onError, detail:{}", this, ExceptionUtils.exception2detail(e));
     }
 
     @Override
     public void onNext(final HttpTrade trade) {
+        LOG.debug("TradeRelay {} onNext, trade {}", this, trade);
         final StopWatch watch4Result = new StopWatch();
         final ReactContext ctx = new ReactContext() {
             @Override
@@ -84,16 +85,17 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                 if (null == io || null == io.outbound()) {
                     LOG.warn("NO_INOUT for trade({}), react io detail: {}.", trade, io);
                 }
-                trade.outbound(buildResponse(trade, io).flatMap(fullresp -> fullresp2objs(fullresp)));
+                trade.outbound(buildResponse(trade, io).compose(fullresp2objs()));
             }, error -> {
                 LOG.warn("Trade {} react with error, detail:{}", trade, ExceptionUtils.exception2detail(error));
                 trade.close();
             });
     }
 
-    private Observable<Object> fullresp2objs(final FullMessage<HttpResponse> fullresp) {
-        return Observable.<Object>just(fullresp.message()).concatWith(fullresp.body().concatMap(body -> body.content()))
-                .concatWith(Observable.just(LastHttpContent.EMPTY_LAST_CONTENT));
+    private Transformer<FullMessage<HttpResponse>, Object> fullresp2objs() {
+        return getfullresp -> getfullresp.flatMap(fullresp ->
+            Observable.<Object>just(fullresp.message()).concatWith(fullresp.body().concatMap(body -> body.content()))
+                .concatWith(Observable.just(LastHttpContent.EMPTY_LAST_CONTENT)));
     }
 
     private Observable<FullMessage<HttpResponse>> buildResponse(final HttpTrade trade, final InOut io) {

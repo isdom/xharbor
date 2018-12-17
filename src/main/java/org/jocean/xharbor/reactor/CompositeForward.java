@@ -33,6 +33,16 @@ public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardDat
             .getLogger(CompositeForward.class);
 
     @Override
+    public String toString() {
+        final int maxLen = 10;
+        final StringBuilder builder = new StringBuilder();
+        builder.append("CompositeForward [forwards=")
+                .append(_forwards != null ? _forwards.subList(0, Math.min(_forwards.size(), maxLen)) : null)
+                .append(", ordinal=").append(_ordinal).append("]");
+        return builder.toString();
+    }
+
+    @Override
     public Action0 call(final ForwardData data) {
         addForward(data);
         return () -> removeForward(data);
@@ -97,6 +107,7 @@ public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardDat
 
     @Override
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
+        LOG.trace("try {} for trade {}", this, ctx.trade());
         final ForwardTrade[] reactors = this._reactorsRef.getReference();
         if (null == reactors ||
             (null != reactors && reactors.length == 0)) {

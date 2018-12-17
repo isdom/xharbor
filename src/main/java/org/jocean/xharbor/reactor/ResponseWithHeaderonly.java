@@ -1,5 +1,7 @@
 package org.jocean.xharbor.reactor;
 
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.Map;
 
 import org.jocean.http.FullMessage;
@@ -19,8 +21,7 @@ import rx.Single;
 
 public class ResponseWithHeaderonly implements TradeReactor {
 
-    private static final Logger LOG = LoggerFactory
-            .getLogger(ResponseWithHeaderonly.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ResponseWithHeaderonly.class);
 
     public ResponseWithHeaderonly(
             final MatchRule matcher,
@@ -34,15 +35,41 @@ public class ResponseWithHeaderonly implements TradeReactor {
     }
 
     @Override
+    public String toString() {
+        final int maxLen = 10;
+        final StringBuilder builder = new StringBuilder();
+        builder.append("ResponseWithHeaderonly [matcher=").append(_matcher).append(", responseStatus=")
+                .append(_responseStatus).append(", extraHeaders=")
+                .append(_extraHeaders != null ? toString(_extraHeaders.entrySet(), maxLen) : null).append("]");
+        return builder.toString();
+    }
+
+    private String toString(final Collection<?> collection, final int maxLen) {
+        final StringBuilder builder = new StringBuilder();
+        builder.append("[");
+        int i = 0;
+        for (final Iterator<?> iterator = collection.iterator(); iterator.hasNext() && i < maxLen; i++) {
+            if (i > 0)
+                builder.append(", ");
+            builder.append(iterator.next());
+        }
+        builder.append("]");
+        return builder.toString();
+    }
+
+    @Override
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
+        LOG.trace("try {} for trade {}", this, ctx.trade());
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().map(fullreq -> {
+        return io.inbound().first().map(fullreq -> {
             if (this._matcher.match(fullreq.message())) {
+                LOG.trace("ResponseWithHeaderonly.react {} matched", fullreq.message());
                 return io4Response(ctx, io, fullreq);
             } else {
                 // not handle this trade
+                LOG.trace("ResponseWithHeaderonly.react {} !NOT! matched", fullreq.message());
                 return null;
             }
         }).toSingle();

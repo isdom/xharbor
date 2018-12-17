@@ -18,6 +18,16 @@ import rx.functions.Func1;
 
 public class CompositeReactor implements TradeReactor, Ordered, Func1<TradeReactor, Action0> {
 
+    @Override
+    public String toString() {
+        final int maxLen = 10;
+        final StringBuilder builder = new StringBuilder();
+        builder.append("CompositeReactor [reactors=")
+                .append(_reactors != null ? _reactors.subList(0, Math.min(_reactors.size(), maxLen)) : null)
+                .append(", ordinal=").append(_ordinal).append("]");
+        return builder.toString();
+    }
+
     private static final TradeReactor[] EMPTY_REACTOR = new TradeReactor[0];
     private static final Comparator<TradeReactor> ORDER_REACTOR_DESC = new Comparator<TradeReactor>() {
         @Override
@@ -85,6 +95,7 @@ public class CompositeReactor implements TradeReactor, Ordered, Func1<TradeReact
 
     @Override
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
+        LOG.trace("try {} for trade {}", this, ctx.trade());
         final TradeReactor[] reactors = this._descReactorsRef.getReference();
         if (null == reactors ||
             (null != reactors && reactors.length == 0)) {

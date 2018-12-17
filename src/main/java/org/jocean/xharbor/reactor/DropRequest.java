@@ -24,11 +24,19 @@ public class DropRequest implements TradeReactor {
     }
 
     @Override
+    public String toString() {
+        final StringBuilder builder = new StringBuilder();
+        builder.append("DropRequest [matcher=").append(_matcher).append("]");
+        return builder.toString();
+    }
+
+    @Override
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
+        LOG.trace("try {} for trade {}", this, ctx.trade());
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().map(fullreq -> {
+        return io.inbound().first().map(fullreq -> {
             if (_matcher.match(fullreq.message())) {
                 return io4Drop(ctx, io, fullreq);
             } else {

@@ -78,16 +78,26 @@ public class ForwardTrade implements TradeReactor {
         this._timer = timer;
     }
 
+    @Override
+    public String toString() {
+        final int maxLen = 10;
+        final StringBuilder builder = new StringBuilder();
+        builder.append("ForwardTrade [matcher=").append(_matcher).append(", targets=")
+                .append(_targets != null ? _targets.subList(0, Math.min(_targets.size(), maxLen)) : null).append("]");
+        return builder.toString();
+    }
+
     public void addTarget(final Target target) {
         this._targets.add(new MarkableTargetImpl(target));
     }
 
     @Override
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
+        LOG.trace("try {} for trade {}", this, ctx.trade());
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().flatMap(fullreq -> {
+        return io.inbound().first().flatMap(fullreq -> {
             if (this._matcher.match(fullreq.message())) {
                 final MarkableTargetImpl target = selectTarget();
                 if (null == target) {
@@ -95,6 +105,7 @@ public class ForwardTrade implements TradeReactor {
                     LOG.warn("NONE_TARGET to forward for trade {}", ctx.trade());
                     return Observable.just(null);
                 } else {
+                    LOG.debug("forward to {} for trade {}", target, ctx.trade());
                     return io4forward(ctx, io, target, this._matcher.summary());
                 }
             } else {
@@ -232,8 +243,7 @@ public class ForwardTrade implements TradeReactor {
 
                     enableDisposeSended(upstream.writeCtrl(), MAX_RETAINED_SIZE);
 
-                    return Observable.zip(isDBS().doOnNext(configDBS(trade)), isRBS().doOnNext(configRBS(trade, upstream)),
-                                    (dbs, rbs) -> Integer.MIN_VALUE)
+                    return isDBS().doOnNext(configDBS(trade))
                             .flatMap(any -> upstream.defineInteraction(
                                     inbound.map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient)).compose(fullreq2objs())))
                             .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))
@@ -244,16 +254,6 @@ public class ForwardTrade implements TradeReactor {
     private Transformer<FullMessage<HttpRequest>, Object> fullreq2objs() {
         return getfullreq -> getfullreq.flatMap(fullreq -> Observable.<Object>just(fullreq.message()).concatWith(fullreq.body().concatMap(body -> body.content()))
                 .concatWith(Observable.just(LastHttpContent.EMPTY_LAST_CONTENT)));
-    }
-
-    private Action1<? super Boolean> configRBS(final HttpTrade trade, final HttpInitiator initiator) {
-        return rbs -> {
-            LOG.info("forward: pathPattern {}'s rbs {}", _matcher.pathPattern(), rbs);
-            if (rbs) {
-//                ReadPolicies.enableRBS(trade, initiator.writeCtrl());
-//                ReadPolicies.enableRBS(initiator, trade.writeCtrl());
-            }
-        };
     }
 
     private Action1<? super Boolean> configDBS(final HttpTrade trade) {
@@ -287,9 +287,9 @@ public class ForwardTrade implements TradeReactor {
         });
     }
 
-    private Observable<Boolean> isRBS() {
-        return this._finder.find("configs", Map.class).map(conf -> !istrue(conf.get(_matcher.pathPattern() + ":" + "disable_rbs")));
-    }
+//    private Observable<Boolean> isRBS() {
+//        return this._finder.find("configs", Map.class).map(conf -> !istrue(conf.get(_matcher.pathPattern() + ":" + "disable_rbs")));
+//    }
 
     private Observable<Boolean> isDBS() {
         return this._finder.find("configs", Map.class).map(conf -> !istrue(conf.get(_matcher.pathPattern() + ":" + "disable_dbs")));

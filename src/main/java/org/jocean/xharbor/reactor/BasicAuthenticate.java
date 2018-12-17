@@ -20,8 +20,14 @@ import rx.Observable;
 import rx.Single;
 
 public class BasicAuthenticate implements TradeReactor {
-    private static final Logger LOG = LoggerFactory
-            .getLogger(BasicAuthenticate.class);
+    private static final Logger LOG = LoggerFactory.getLogger(BasicAuthenticate.class);
+
+    @Override
+    public String toString() {
+        final StringBuilder builder = new StringBuilder();
+        builder.append("BasicAuthenticate [matcher=").append(_matcher).append("]");
+        return builder.toString();
+    }
 
     public BasicAuthenticate(
             final MatchRule matcher,
@@ -36,10 +42,11 @@ public class BasicAuthenticate implements TradeReactor {
 
     @Override
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
+        LOG.trace("try {} for trade {}", this, ctx.trade());
         if (null != io.outbound()) {
             return Single.<InOut>just(null);
         }
-        return io.inbound().map(fullreq -> {
+        return io.inbound().first().map(fullreq -> {
             if (_matcher.match(fullreq.message())) {
                 if (isAuthorizeSuccess(fullreq.message(), _user, _password)) {
                     return null;

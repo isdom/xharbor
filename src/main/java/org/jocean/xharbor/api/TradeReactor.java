@@ -4,14 +4,16 @@ import java.util.Iterator;
 
 import org.jocean.http.FullMessage;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
+import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import rx.Observable;
 import rx.Single;
 import rx.SingleSubscriber;
-import rx.functions.Action1;
 
 public interface TradeReactor {
     public interface ReactContext {
@@ -27,22 +29,15 @@ public interface TradeReactor {
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io);
 
     public static class OP {
+        private static final Logger LOG = LoggerFactory.getLogger(TradeReactor.class);
         public static Single<? extends InOut> first(final Iterable<? extends TradeReactor> Iterable,
                 final ReactContext ctx, final InOut io) {
-            return Single.create(new Single.OnSubscribe<InOut>() {
-                @Override
-                public void call(final SingleSubscriber<? super InOut> subscriber) {
-                    reactByFirst(ctx, io, Iterable.iterator(), subscriber);
-                }});
+            return Single.create(subscriber -> reactByFirst(ctx, io, Iterable.iterator(), subscriber));
         }
 
         public static Single<? extends InOut> all(final Iterable<? extends TradeReactor> Iterable,
                 final ReactContext ctx, final InOut io) {
-            return Single.create(new Single.OnSubscribe<InOut>() {
-                @Override
-                public void call(final SingleSubscriber<? super InOut> subscriber) {
-                    reactAll(ctx, io, Iterable.iterator(), subscriber, false);
-                }});
+            return Single.create(subscriber -> reactAll(ctx, io, Iterable.iterator(), subscriber, false));
         }
 
         private static void reactByFirst(final ReactContext ctx, final InOut io,
@@ -51,23 +46,24 @@ public interface TradeReactor {
             if (!subscriber.isUnsubscribed()) {
                 if (iter.hasNext()) {
                     final TradeReactor reactor = iter.next();
-                    reactor.react(ctx, io).subscribe(new Action1<InOut>() {
-                        @Override
-                        public void call(final InOut newio) {
+                    LOG.trace("before {} react for {}", reactor, ctx.trade());
+                    reactor.react(ctx, io).subscribe(newio -> {
+                        LOG.trace("after {} react for {}", reactor, ctx.trade());
                             if (!subscriber.isUnsubscribed()) {
                                 if (null != newio) {
+                                    LOG.trace("invoke onSuccess with newio {} for {}", newio, ctx.trade());
                                     subscriber.onSuccess(newio);
                                 } else {
+                                    LOG.trace("invoke reactByFirst with orgio {} for {}", io, ctx.trade());
                                     reactByFirst(ctx, io, iter, subscriber);
                                 }
                             }
-                        }}, new Action1<Throwable>() {
-                            @Override
-                            public void call(final Throwable error) {
-                                if (!subscriber.isUnsubscribed()) {
-                                    subscriber.onError(error);
-                                }
-                            }});
+                        },  e -> {
+                            LOG.trace("invoke onError {} for {}", ExceptionUtils.exception2detail(e), ctx.trade());
+                            if (!subscriber.isUnsubscribed()) {
+                                subscriber.onError(e);
+                            }
+                        });
                 } else {
                     subscriber.onSuccess(null);
                 }
@@ -81,24 +77,25 @@ public interface TradeReactor {
             if (!subscriber.isUnsubscribed()) {
                 if (iter.hasNext()) {
                     final TradeReactor reactor = iter.next();
-                    reactor.react(ctx, io).subscribe(new Action1<InOut>() {
-                        @Override
-                        public void call(final InOut newio) {
+                    LOG.trace("before {} react for {}", reactor, ctx.trade());
+                    reactor.react(ctx, io).subscribe(newio -> {
+                            LOG.trace("after {} react for {}", reactor, ctx.trade());
                             if (!subscriber.isUnsubscribed()) {
                                 if (null != newio) {
                                     //  trade handled
+                                    LOG.trace("invoke reactAll with newio {} for {}", newio, ctx.trade());
                                     reactAll(ctx, newio, iter, subscriber, true);
                                 } else {
+                                    LOG.trace("invoke reactAll with orgio {} for {}", io, ctx.trade());
                                     reactAll(ctx, io, iter, subscriber, handled);
                                 }
                             }
-                        }}, new Action1<Throwable>() {
-                            @Override
-                            public void call(final Throwable error) {
-                                if (!subscriber.isUnsubscribed()) {
-                                    subscriber.onError(error);
-                                }
-                            }});
+                        },  e -> {
+                            LOG.trace("invoke onError {} for {}", ExceptionUtils.exception2detail(e), ctx.trade());
+                            if (!subscriber.isUnsubscribed()) {
+                                subscriber.onError(e);
+                            }
+                        });
                 } else {
                     subscriber.onSuccess(handled ? io : null);
                 }
