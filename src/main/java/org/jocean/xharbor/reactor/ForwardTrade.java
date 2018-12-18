@@ -51,6 +51,9 @@ import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.util.Timer;
+import io.opentracing.Span;
+import io.opentracing.Tracer;
+import io.opentracing.util.GlobalTracer;
 import rx.Observable;
 import rx.Observable.Transformer;
 import rx.Single;
@@ -245,9 +248,24 @@ public class ForwardTrade implements TradeReactor {
 
                     enableDisposeSended(upstream.writeCtrl(), MAX_RETAINED_SIZE);
 
+                    final Tracer tracer = GlobalTracer.get();
+                    final AtomicReference<Span> spanRef = new AtomicReference<>();
+
+                    trade.doOnTerminate(() -> {
+                        if (null != spanRef.get()) {
+                            spanRef.get().finish();
+                        }
+                    });
+
                     return isDBS().doOnNext(configDBS(trade))
                             .flatMap(any -> upstream.defineInteraction(
-                                    inbound.map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient)).compose(fullreq2objs())))
+                                    inbound.map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient))
+                                    .doOnNext(fullreq -> {
+                                        final Span span = tracer.buildSpan(fullreq.message().uri()).start();
+                                        tracer.scopeManager().activate(span, false);
+                                        spanRef.set(span);
+                                    })
+                                    .compose(fullreq2objs())))
                             .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))
                             ;
                 });

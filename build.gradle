@@ -23,6 +23,8 @@ dependencies {
     compile 'org.jocean:jocean-svr:0.0.1-SNAPSHOT'
     compile 'org.jocean:jocean-jdmk:0.0.2'
 
+    compile 'io.jaegertracing:jaeger-client:0.32.0'
+    
     /* Log */
     runtime 'org.slf4j:jcl-over-slf4j:1.7.25'
     runtime 'org.slf4j:log4j-over-slf4j:1.7.25'
