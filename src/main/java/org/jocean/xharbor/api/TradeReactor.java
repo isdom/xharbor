@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
+import io.opentracing.Span;
 import rx.Observable;
 import rx.Single;
 import rx.SingleSubscriber;
@@ -19,6 +20,7 @@ public interface TradeReactor {
     public interface ReactContext {
         public HttpTrade trade();
         public StopWatch watch();
+        public Span span();
     }
 
     public interface InOut {

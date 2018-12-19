@@ -2,9 +2,9 @@ package org.jocean.xharbor.util;
 
 import org.springframework.beans.factory.annotation.Value;
 
-import io.opentracing.util.GlobalTracer;
+import io.opentracing.Tracer;
 
-public class JaegerBuilder {
+public class JaegerTracerBuilder {
 
     @Value("${servicename}")
     String _serviceName;
@@ -18,7 +18,7 @@ public class JaegerBuilder {
     @Value("${password}")
     String _password;
 
-    public void start() {
+    public Tracer build() {
         final io.jaegertracing.Configuration config = new io.jaegertracing.Configuration(_serviceName);
         final io.jaegertracing.Configuration.SenderConfiguration sender = new io.jaegertracing.Configuration.SenderConfiguration();
         /**
@@ -33,6 +33,6 @@ public class JaegerBuilder {
 
         config.withSampler(new io.jaegertracing.Configuration.SamplerConfiguration().withType("const").withParam(1));
         config.withReporter(new io.jaegertracing.Configuration.ReporterConfiguration().withSender(sender).withMaxQueueSize(10000));
-        GlobalTracer.register(config.getTracer());
+        return config.getTracer();
     }
 }

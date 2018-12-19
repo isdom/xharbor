@@ -4,7 +4,8 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
     
-    <bean class="org.jocean.xharbor.util.JaegerBuilder"
-        init-method="start" />
+    <bean id="builder" class="org.jocean.xharbor.util.JaegerTracerBuilder"/>
+    
+    <bean factory-bean="builder" factory-method="build"/>
     
 </beans>

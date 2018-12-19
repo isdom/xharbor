@@ -3,8 +3,10 @@ package org.jocean.xharbor.reactor;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -44,6 +46,7 @@ import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
+import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -53,7 +56,9 @@ import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.util.Timer;
 import io.opentracing.Span;
 import io.opentracing.Tracer;
-import io.opentracing.util.GlobalTracer;
+import io.opentracing.propagation.Format;
+import io.opentracing.propagation.TextMap;
+import io.opentracing.tag.Tags;
 import rx.Observable;
 import rx.Observable.Transformer;
 import rx.Single;
@@ -135,7 +140,7 @@ public class ForwardTrade implements TradeReactor {
                         ) {
                     @Override
                     protected Observable<InOut> construct() {
-                        return buildOutbound(ctx.trade(), orgio.inbound(), target, ctx.watch())
+                        return buildOutbound(ctx, orgio.inbound(), target)
                             .doOnError(onCommunicationError(target)).compose(makeupio(orgio, target, ctx, summary)).first();
                     }
                 }.toObservable();
@@ -180,6 +185,8 @@ public class ForwardTrade implements TradeReactor {
                     return Observable.error(new TransportException("SERVER_ERROR(" + fullresp.message().status() + ")"));
                 }
 
+                ctx.span().setOperationName(this._matcher.summary());
+
                 return Observable.<InOut>just(new InOut() {
                     @Override
                     public Observable<FullMessage<HttpRequest>> inbound() {
@@ -214,10 +221,12 @@ public class ForwardTrade implements TradeReactor {
     }
 
     private Observable<FullMessage<HttpResponse>> buildOutbound(
-            final HttpTrade trade,
+            final ReactContext ctx,
             final Observable<FullMessage<HttpRequest>> inbound,
-            final Target target,
-            final StopWatch stopWatch) {
+            final Target target) {
+        final HttpTrade trade = ctx.trade();
+        final StopWatch stopWatch = ctx.watch();
+
         return forwardTo(target).doOnNext(upstream->trade.doOnTerminate(upstream.closer()))
                 .flatMap(upstream -> {
                     final AtomicBoolean isKeepAliveFromClient = new AtomicBoolean(true);
@@ -248,27 +257,46 @@ public class ForwardTrade implements TradeReactor {
 
                     enableDisposeSended(upstream.writeCtrl(), MAX_RETAINED_SIZE);
 
-                    final Tracer tracer = GlobalTracer.get();
-                    final AtomicReference<Span> spanRef = new AtomicReference<>();
-
-                    trade.doOnTerminate(() -> {
-                        if (null != spanRef.get()) {
-                            spanRef.get().finish();
-                        }
-                    });
-
-                    return isDBS().doOnNext(configDBS(trade))
+                    return ctx2span(ctx, target)
+                            .flatMap(span ->  isDBS().doOnNext(configDBS(trade))
                             .flatMap(any -> upstream.defineInteraction(
                                     inbound.map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient))
-                                    .doOnNext(fullreq -> {
-                                        final Span span = tracer.buildSpan(fullreq.message().uri()).start();
-                                        tracer.scopeManager().activate(span, false);
-                                        spanRef.set(span);
-                                    })
+                                    .flatMap(fullreq ->
+                                        this._finder.find(Tracer.class).map(tracer -> {
+                                            tracer.inject(span.context(), Format.Builtin.HTTP_HEADERS, message2textmap(fullreq.message()));
+                                            return fullreq;
+                                        }))
                                     .compose(fullreq2objs())))
-                            .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))
-                            ;
+                                .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))
+                                .doOnNext(fullresp -> span.setTag(Tags.HTTP_STATUS.getKey(), fullresp.message().status().code()))
+                                .doOnTerminate(() -> span.finish())
+                            );
                 });
+    }
+
+    private Observable<Span> ctx2span(final ReactContext ctx, final Target target) {
+        return this._finder.find(Tracer.class).map(tracer -> tracer.buildSpan(this._matcher.summary())
+            .withTag(Tags.COMPONENT.getKey(), "jocean-http")
+            .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_CLIENT)
+    //                    .withTag(Tags.HTTP_URL.getKey(), request.uri())
+    //                    .withTag(Tags.HTTP_METHOD.getKey(), request.method().name())
+            .withTag(Tags.PEER_HOST_IPV4.getKey(), target.serviceUri().getHost())
+            .withTag(Tags.PEER_PORT.getKey(), target.serviceUri().getPort()) // TODO add service
+            .asChildOf(ctx.span())
+            .start());
+    }
+
+    private static TextMap message2textmap(final HttpMessage message) {
+        return new TextMap() {
+            @Override
+            public Iterator<Entry<String, String>> iterator() {
+                return message.headers().iteratorAsString();
+            }
+
+            @Override
+            public void put(final String key, final String value) {
+                message.headers().set(key, value);
+            }};
     }
 
     private Transformer<FullMessage<HttpRequest>, Object> fullreq2objs() {

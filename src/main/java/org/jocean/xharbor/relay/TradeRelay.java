@@ -6,10 +6,13 @@ package org.jocean.xharbor.relay;
 import java.net.ConnectException;
 import java.nio.channels.ClosedChannelException;
 
+import javax.inject.Inject;
+
 import org.jocean.http.FullMessage;
 import org.jocean.http.MessageBody;
 import org.jocean.http.TransportException;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
+import org.jocean.idiom.BeanFinder;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StepableUtil;
 import org.jocean.idiom.StopWatch;
@@ -20,6 +23,7 @@ import org.jocean.xharbor.api.TradeReactor.InOut;
 import org.jocean.xharbor.api.TradeReactor.ReactContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
@@ -27,6 +31,9 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.LastHttpContent;
+import io.opentracing.Span;
+import io.opentracing.Tracer;
+import io.opentracing.tag.Tags;
 import rx.Observable;
 import rx.Observable.Transformer;
 import rx.Subscriber;
@@ -55,9 +62,52 @@ public class TradeRelay extends Subscriber<HttpTrade> {
         LOG.warn("TradeRelay {} onError, detail:{}", this, ExceptionUtils.exception2detail(e));
     }
 
+    public static String get1stIp(final String peerips) {
+        return peerips.split(",")[0];
+    }
+
     @Override
     public void onNext(final HttpTrade trade) {
         LOG.debug("TradeRelay {} onNext, trade {}", this, trade);
+
+        trade2ctx(trade).doOnNext(ctx -> this._tradeReactor.react(ctx, new InOut() {
+                @Override
+                public Observable<FullMessage<HttpRequest>> inbound() {
+                    return trade.inbound();
+                }
+
+                @Override
+                public Observable<FullMessage<HttpResponse>> outbound() {
+                    return null;
+                }
+            }).retryWhen(retryPolicy(trade)).subscribe(io -> {
+                if (null == io || null == io.outbound()) {
+                    LOG.warn("NO_INOUT for trade({}), react io detail: {}.", trade, io);
+                }
+                trade.outbound(buildResponse(trade, io)
+                        .doOnNext(fullresp ->
+                            ctx.span().setTag(Tags.HTTP_STATUS.getKey(), fullresp.message().status().code()))
+                        .compose(fullresp2objs()));
+            }, error -> {
+                LOG.warn("Trade {} react with error, detail:{}", trade, ExceptionUtils.exception2detail(error));
+                trade.close();
+            })).subscribe();
+    }
+
+    private Observable<ReactContext> trade2ctx(final HttpTrade trade) {
+        return trade.inbound().first().map(fullreq -> fullreq.message())
+                .flatMap(request -> this._finder.find(Tracer.class).map(tracer -> tracer.buildSpan("httpin")
+                    .withTag(Tags.COMPONENT.getKey(), "jocean-http")
+                    .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
+                    .withTag(Tags.HTTP_URL.getKey(), request.uri())
+                    .withTag(Tags.HTTP_METHOD.getKey(), request.method().name())
+                    .withTag(Tags.PEER_HOST_IPV4.getKey(), get1stIp(request.headers().get("x-forwarded-for", "none")))
+                    .start()))
+                .doOnNext(span -> trade.doOnTerminate(() -> span.finish()))
+                .map(span -> buildReactCtx(trade, span));
+    }
+
+    private ReactContext buildReactCtx(final HttpTrade trade, final Span span) {
         final StopWatch watch4Result = new StopWatch();
         final ReactContext ctx = new ReactContext() {
             @Override
@@ -69,27 +119,13 @@ public class TradeRelay extends Subscriber<HttpTrade> {
             public StopWatch watch() {
                 return watch4Result;
             }
+
+            @Override
+            public Span span() {
+                return span;
+            }
         };
-
-        this._tradeReactor.react(ctx, new InOut() {
-            @Override
-            public Observable<FullMessage<HttpRequest>> inbound() {
-                return trade.inbound();
-            }
-
-            @Override
-            public Observable<FullMessage<HttpResponse>> outbound() {
-                return null;
-            }
-        }).retryWhen(retryPolicy(trade)).subscribe(io -> {
-                if (null == io || null == io.outbound()) {
-                    LOG.warn("NO_INOUT for trade({}), react io detail: {}.", trade, io);
-                }
-                trade.outbound(buildResponse(trade, io).compose(fullresp2objs()));
-            }, error -> {
-                LOG.warn("Trade {} react with error, detail:{}", trade, ExceptionUtils.exception2detail(error));
-                trade.close();
-            });
+        return ctx;
     }
 
     private Transformer<FullMessage<HttpResponse>, Object> fullresp2objs() {
@@ -163,6 +199,15 @@ public class TradeRelay extends Subscriber<HttpTrade> {
             }
         };
     }
+
+    @Inject
+    BeanFinder _finder;
+
+    @Value("${http.address}")
+    String _httpAddress = "localhost";
+
+    @Value("${http.port}")
+    int _httpPort = 0;
 
     private final TradeReactor _tradeReactor;
     private final int _maxRetryTimes = 3;
