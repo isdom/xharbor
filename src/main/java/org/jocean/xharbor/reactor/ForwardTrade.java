@@ -185,7 +185,7 @@ public class ForwardTrade implements TradeReactor {
                     return Observable.error(new TransportException("SERVER_ERROR(" + fullresp.message().status() + ")"));
                 }
 
-                ctx.span().setOperationName(this._matcher.summary());
+//                ctx.span().setOperationName(this._matcher.summary());
 
                 return Observable.<InOut>just(new InOut() {
                     @Override
