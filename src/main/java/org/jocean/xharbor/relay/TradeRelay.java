@@ -11,6 +11,7 @@ import javax.inject.Inject;
 import org.jocean.http.FullMessage;
 import org.jocean.http.MessageBody;
 import org.jocean.http.TransportException;
+import org.jocean.http.WriteCtrl;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.idiom.BeanFinder;
 import org.jocean.idiom.ExceptionUtils;
@@ -70,7 +71,8 @@ public class TradeRelay extends Subscriber<HttpTrade> {
     public void onNext(final HttpTrade trade) {
         LOG.debug("TradeRelay {} onNext, trade {}", this, trade);
 
-        trade2ctx(trade).doOnNext(ctx -> this._tradeReactor.react(ctx, new InOut() {
+        trade2ctx(trade).doOnNext(ctx -> hook4httpstatus(trade.writeCtrl(), ctx.span()))
+            .flatMapSingle(ctx -> this._tradeReactor.react(ctx, new InOut() {
                 @Override
                 public Observable<FullMessage<HttpRequest>> inbound() {
                     return trade.inbound();
@@ -80,18 +82,24 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                 public Observable<FullMessage<HttpResponse>> outbound() {
                     return null;
                 }
-            }).retryWhen(retryPolicy(trade)).subscribe(io -> {
+            })).retryWhen(retryPolicy(trade)).subscribe(io -> {
                 if (null == io || null == io.outbound()) {
                     LOG.warn("NO_INOUT for trade({}), react io detail: {}.", trade, io);
                 }
-                trade.outbound(buildResponse(trade, io)
-                        .doOnNext(fullresp ->
-                            ctx.span().setTag(Tags.HTTP_STATUS.getKey(), fullresp.message().status().code()))
-                        .compose(fullresp2objs()));
+                trade.outbound(buildResponse(trade, io).compose(fullresp2objs()));
             }, error -> {
                 LOG.warn("Trade {} react with error, detail:{}", trade, ExceptionUtils.exception2detail(error));
                 trade.close();
-            })).subscribe();
+            });
+    }
+
+    private void hook4httpstatus(final WriteCtrl writeCtrl, final Span span) {
+        writeCtrl.sending().subscribe(obj -> {
+            if ( obj instanceof HttpResponse) {
+                final HttpResponse resp = (HttpResponse)obj;
+                span.setTag(Tags.HTTP_STATUS.getKey(), resp.status().code());
+            }
+        });
     }
 
     private Observable<ReactContext> trade2ctx(final HttpTrade trade) {
@@ -103,7 +111,13 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                     .withTag(Tags.HTTP_METHOD.getKey(), request.method().name())
                     .withTag(Tags.PEER_HOST_IPV4.getKey(), get1stIp(request.headers().get("x-forwarded-for", "none")))
                     .start()))
-                .doOnNext(span -> trade.doOnTerminate(() -> span.finish()))
+                .doOnNext(span -> {
+                    LOG.debug("span {} started", span);
+                    trade.doOnTerminate(() -> {
+                        span.finish();
+                        LOG.debug("span {} finished", span);
+                    });
+                })
                 .map(span -> buildReactCtx(trade, span));
     }
 
