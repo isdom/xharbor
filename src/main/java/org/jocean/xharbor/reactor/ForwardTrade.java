@@ -55,7 +55,6 @@ import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.util.Timer;
 import io.opentracing.Span;
-import io.opentracing.Tracer;
 import io.opentracing.propagation.Format;
 import io.opentracing.propagation.TextMap;
 import io.opentracing.tag.Tags;
@@ -262,35 +261,30 @@ public class ForwardTrade implements TradeReactor {
                         });
 
                     enableDisposeSended(upstream.writeCtrl(), MAX_RETAINED_SIZE);
-
-                    return ctx2span(ctx, target, request)
-                            .flatMap(span ->  isDBS().doOnNext(configDBS(trade))
-                                .flatMap(any -> upstream.defineInteraction(
-                                    inbound.map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient))
-                                    .flatMap(fullreq -> this._finder.find(Tracer.class).map(tracer -> {
-                                            tracer.inject(span.context(), Format.Builtin.HTTP_HEADERS, message2textmap(fullreq.message()));
-                                            return fullreq;
-                                        }))
-                                    .compose(fullreq2objs())))
-                                .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))
-                                .doOnNext(fullresp -> span.setTag(Tags.HTTP_STATUS.getKey(), fullresp.message().status().code()))
-                                .doOnTerminate(() -> span.finish())
-                            );
+                    final Span span = ctx2span(ctx, target, request);
+                    return isDBS().doOnNext(configDBS(trade))
+                        .flatMap(any -> upstream.defineInteraction(
+                            inbound.map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient))
+                            .doOnNext(fullreq -> ctx.tracer().inject(span.context(), Format.Builtin.HTTP_HEADERS, message2textmap(fullreq.message())))
+                            .compose(fullreq2objs())))
+                        .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))
+                        .doOnNext(fullresp -> span.setTag(Tags.HTTP_STATUS.getKey(), fullresp.message().status().code()))
+                        .doOnTerminate(() -> span.finish());
                 });
     }
 
-    private Observable<Span> ctx2span(final ReactContext ctx, final Target target, final HttpRequest request) {
+    private Span ctx2span(final ReactContext ctx, final Target target, final HttpRequest request) {
         final String operationName = buildOperationName(request.uri());
         ctx.span().setOperationName(operationName);
-        return this._finder.find(Tracer.class).map(tracer -> tracer.buildSpan(operationName)
+        return ctx.tracer().buildSpan(operationName)
             .withTag(Tags.COMPONENT.getKey(), "jocean-http")
             .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_CLIENT)
-    //                    .withTag(Tags.HTTP_URL.getKey(), request.uri())
-    //                    .withTag(Tags.HTTP_METHOD.getKey(), request.method().name())
+            .withTag(Tags.HTTP_URL.getKey(), request.uri())
+            .withTag(Tags.HTTP_METHOD.getKey(), request.method().name())
             .withTag(Tags.PEER_HOST_IPV4.getKey(), target.serviceUri().getHost())
             .withTag(Tags.PEER_PORT.getKey(), target.serviceUri().getPort()) // TODO add service
             .asChildOf(ctx.span())
-            .start());
+            .start();
     }
 
     private static TextMap message2textmap(final HttpMessage message) {

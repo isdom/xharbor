@@ -105,21 +105,21 @@ public class TradeRelay extends Subscriber<HttpTrade> {
 
     private Observable<ReactContext> trade2ctx(final HttpTrade trade) {
         return trade.inbound().first().map(fullreq -> fullreq.message())
-                .flatMap(request -> getTracer().map(tracer -> tracer.buildSpan("httpin")
+                .flatMap(request -> getTracer().map(tracer -> {
+                    final Span span = tracer.buildSpan("httpin")
                     .withTag(Tags.COMPONENT.getKey(), "jocean-http")
                     .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
                     .withTag(Tags.HTTP_URL.getKey(), request.uri())
                     .withTag(Tags.HTTP_METHOD.getKey(), request.method().name())
                     .withTag(Tags.PEER_HOST_IPV4.getKey(), get1stIp(request.headers().get("x-forwarded-for", "none")))
-                    .start()))
-                .doOnNext(span -> {
+                    .start();
                     LOG.debug("span {} started", span);
                     trade.doOnTerminate(() -> {
                         span.finish();
                         LOG.debug("span {} finished", span);
                     });
-                })
-                .map(span -> buildReactCtx(trade, span));
+                    return buildReactCtx(trade, span, tracer);
+                }));
     }
 
     private Observable<Tracer> getTracer() {
@@ -128,9 +128,9 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                 : Observable.just(noopTracer);
     }
 
-    private ReactContext buildReactCtx(final HttpTrade trade, final Span span) {
+    private ReactContext buildReactCtx(final HttpTrade trade, final Span span, final Tracer tracer) {
         final StopWatch watch4Result = new StopWatch();
-        final ReactContext ctx = new ReactContext() {
+        return new ReactContext() {
             @Override
             public HttpTrade trade() {
                 return trade;
@@ -145,8 +145,11 @@ public class TradeRelay extends Subscriber<HttpTrade> {
             public Span span() {
                 return span;
             }
-        };
-        return ctx;
+
+            @Override
+            public Tracer tracer() {
+                return tracer;
+            }};
     }
 
     private Transformer<FullMessage<HttpResponse>, Object> fullresp2objs() {
