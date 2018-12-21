@@ -116,7 +116,7 @@ public class ForwardTrade implements TradeReactor {
                     return Observable.just(null);
                 } else {
                     LOG.debug("forward to {} for trade {}", target, ctx.trade());
-                    return io4forward(ctx, fullreq.message(), io, target, this._matcher.summary());
+                    return io4forward(ctx, io, target, this._matcher.summary(), fullreq.message());
                 }
             } else {
                 // not handle this trade
@@ -125,12 +125,17 @@ public class ForwardTrade implements TradeReactor {
         }).compose(RxObservables.<InOut>ensureSubscribeAtmostOnce()).toSingle();
     }
 
+    private String buildOperationName(final String uri) {
+        final String operationName = this._matcher.matchedPath(uri);
+        return null != operationName ? operationName : "httpin";
+    }
+
     private Observable<InOut> io4forward(
             final ReactContext ctx,
-            final HttpRequest request,
             final InOut orgio,
             final MarkableTargetImpl target,
-            final String summary) {
+            final String summary,
+            final HttpRequest request) {
         return new HystrixObservableCommand<InOut>(HystrixObservableCommand.Setter
                         .withGroupKey(HystrixCommandGroupKey.Factory.asKey("forward"))
                         .andCommandKey(HystrixCommandKey.Factory.asKey(summary + "-request"))
@@ -142,14 +147,13 @@ public class ForwardTrade implements TradeReactor {
                         ) {
                     @Override
                     protected Observable<InOut> construct() {
-                        return buildOutbound(ctx, orgio.inbound(), target)
-                            .doOnError(onCommunicationError(target)).compose(makeupio(request, orgio, target, ctx, summary)).first();
+                        return buildOutbound(ctx, orgio.inbound(), target, request)
+                            .doOnError(onCommunicationError(target)).compose(makeupio(orgio, target, ctx, summary)).first();
                     }
                 }.toObservable();
     }
 
     private Transformer<FullMessage<HttpResponse>, InOut> makeupio(
-            final HttpRequest request,
             final InOut orgio,
             final MarkableTargetImpl target,
             final ReactContext ctx,
@@ -188,11 +192,6 @@ public class ForwardTrade implements TradeReactor {
                     return Observable.error(new TransportException("SERVER_ERROR(" + fullresp.message().status() + ")"));
                 }
 
-                final String operationName = this._matcher.matchedPath(request.uri());
-                if (null != operationName) {
-                    ctx.span().setOperationName(operationName);
-                }
-
                 return Observable.<InOut>just(new InOut() {
                     @Override
                     public Observable<FullMessage<HttpRequest>> inbound() {
@@ -229,7 +228,8 @@ public class ForwardTrade implements TradeReactor {
     private Observable<FullMessage<HttpResponse>> buildOutbound(
             final ReactContext ctx,
             final Observable<FullMessage<HttpRequest>> inbound,
-            final Target target) {
+            final Target target,
+            final HttpRequest request) {
         final HttpTrade trade = ctx.trade();
         final StopWatch stopWatch = ctx.watch();
 
@@ -263,7 +263,7 @@ public class ForwardTrade implements TradeReactor {
 
                     enableDisposeSended(upstream.writeCtrl(), MAX_RETAINED_SIZE);
 
-                    return ctx2span(ctx, target)
+                    return ctx2span(ctx, target, request)
                             .flatMap(span ->  isDBS().doOnNext(configDBS(trade))
                                 .flatMap(any -> upstream.defineInteraction(
                                     inbound.map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient))
@@ -279,8 +279,10 @@ public class ForwardTrade implements TradeReactor {
                 });
     }
 
-    private Observable<Span> ctx2span(final ReactContext ctx, final Target target) {
-        return this._finder.find(Tracer.class).map(tracer -> tracer.buildSpan("httpin") //this._matcher.summary()
+    private Observable<Span> ctx2span(final ReactContext ctx, final Target target, final HttpRequest request) {
+        final String operationName = buildOperationName(request.uri());
+        ctx.span().setOperationName(operationName);
+        return this._finder.find(Tracer.class).map(tracer -> tracer.buildSpan(operationName)
             .withTag(Tags.COMPONENT.getKey(), "jocean-http")
             .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_CLIENT)
     //                    .withTag(Tags.HTTP_URL.getKey(), request.uri())
