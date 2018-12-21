@@ -2,6 +2,7 @@ package org.jocean.xharbor.reactor;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.jocean.idiom.Pair;
@@ -72,6 +73,21 @@ public class MatchRule implements Comparable<MatchRule> {
                 }
             }
             return true;
+        }
+    }
+
+    public String matchedPath(final String uri) {
+        if (null != this._pathPattern) {
+            final Matcher matcher = this._pathPattern.matcher(uri);
+            final StringBuilder sb = new StringBuilder();
+            boolean matched = false;
+            while (matcher.find()) {
+                matched = true;
+                sb.append(matcher.group());
+            }
+            return matched ? sb.toString() : null;
+        } else {
+            return null;
         }
     }
 

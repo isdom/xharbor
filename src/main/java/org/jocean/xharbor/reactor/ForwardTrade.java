@@ -116,7 +116,7 @@ public class ForwardTrade implements TradeReactor {
                     return Observable.just(null);
                 } else {
                     LOG.debug("forward to {} for trade {}", target, ctx.trade());
-                    return io4forward(ctx, io, target, this._matcher.summary());
+                    return io4forward(ctx, fullreq.message(), io, target, this._matcher.summary());
                 }
             } else {
                 // not handle this trade
@@ -125,7 +125,9 @@ public class ForwardTrade implements TradeReactor {
         }).compose(RxObservables.<InOut>ensureSubscribeAtmostOnce()).toSingle();
     }
 
-    private Observable<InOut> io4forward(final ReactContext ctx,
+    private Observable<InOut> io4forward(
+            final ReactContext ctx,
+            final HttpRequest request,
             final InOut orgio,
             final MarkableTargetImpl target,
             final String summary) {
@@ -141,12 +143,13 @@ public class ForwardTrade implements TradeReactor {
                     @Override
                     protected Observable<InOut> construct() {
                         return buildOutbound(ctx, orgio.inbound(), target)
-                            .doOnError(onCommunicationError(target)).compose(makeupio(orgio, target, ctx, summary)).first();
+                            .doOnError(onCommunicationError(target)).compose(makeupio(request, orgio, target, ctx, summary)).first();
                     }
                 }.toObservable();
     }
 
     private Transformer<FullMessage<HttpResponse>, InOut> makeupio(
+            final HttpRequest request,
             final InOut orgio,
             final MarkableTargetImpl target,
             final ReactContext ctx,
@@ -185,7 +188,10 @@ public class ForwardTrade implements TradeReactor {
                     return Observable.error(new TransportException("SERVER_ERROR(" + fullresp.message().status() + ")"));
                 }
 
-//                ctx.span().setOperationName(this._matcher.summary());
+                final String operationName = this._matcher.matchedPath(request.uri());
+                if (null != operationName) {
+                    ctx.span().setOperationName(operationName);
+                }
 
                 return Observable.<InOut>just(new InOut() {
                     @Override
@@ -259,10 +265,9 @@ public class ForwardTrade implements TradeReactor {
 
                     return ctx2span(ctx, target)
                             .flatMap(span ->  isDBS().doOnNext(configDBS(trade))
-                            .flatMap(any -> upstream.defineInteraction(
+                                .flatMap(any -> upstream.defineInteraction(
                                     inbound.map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient))
-                                    .flatMap(fullreq ->
-                                        this._finder.find(Tracer.class).map(tracer -> {
+                                    .flatMap(fullreq -> this._finder.find(Tracer.class).map(tracer -> {
                                             tracer.inject(span.context(), Format.Builtin.HTTP_HEADERS, message2textmap(fullreq.message()));
                                             return fullreq;
                                         }))
