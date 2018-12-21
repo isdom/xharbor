@@ -34,6 +34,7 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.opentracing.Span;
 import io.opentracing.Tracer;
+import io.opentracing.noop.NoopTracerFactory;
 import io.opentracing.tag.Tags;
 import rx.Observable;
 import rx.Observable.Transformer;
@@ -104,7 +105,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
 
     private Observable<ReactContext> trade2ctx(final HttpTrade trade) {
         return trade.inbound().first().map(fullreq -> fullreq.message())
-                .flatMap(request -> this._finder.find(Tracer.class).map(tracer -> tracer.buildSpan("httpin")
+                .flatMap(request -> getTracer().map(tracer -> tracer.buildSpan("httpin")
                     .withTag(Tags.COMPONENT.getKey(), "jocean-http")
                     .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
                     .withTag(Tags.HTTP_URL.getKey(), request.uri())
@@ -119,6 +120,12 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                     });
                 })
                 .map(span -> buildReactCtx(trade, span));
+    }
+
+    private Observable<Tracer> getTracer() {
+        return _tracingEnabled
+                ? this._finder.find(Tracer.class).onErrorReturn(e -> noopTracer)
+                : Observable.just(noopTracer);
     }
 
     private ReactContext buildReactCtx(final HttpTrade trade, final Span span) {
@@ -214,8 +221,13 @@ public class TradeRelay extends Subscriber<HttpTrade> {
         };
     }
 
+    private static volatile Tracer noopTracer = NoopTracerFactory.create();
+
     @Inject
     BeanFinder _finder;
+
+    @Value("${tracing.enabled}")
+    boolean _tracingEnabled = true;
 
     @Value("${http.address}")
     String _httpAddress = "localhost";
