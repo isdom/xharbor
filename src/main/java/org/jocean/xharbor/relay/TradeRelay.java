@@ -112,7 +112,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
 
     private Observable<ReactContext> trade2ctx(final HttpTrade trade) {
         return trade.inbound().first().map(fullreq -> fullreq.message())
-                .flatMap(request -> getTracer().map(tracer -> {
+                .flatMap(request -> getTracer(request).map(tracer -> {
                     final Span span = tracer.buildSpan("httpin")
                     .withTag(Tags.COMPONENT.getKey(), "jocean-http")
                     .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
@@ -121,14 +121,32 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                     .withTag(Tags.PEER_HOST_IPV4.getKey(), get1stIp(request.headers().get("x-forwarded-for", "none")))
                     .start();
                     trade.doOnTerminate(() -> span.finish());
+
+//                  SLB-ID头字段获取SLB实例ID。
+//                  通过SLB-IP头字段获取SLB实例公网IP地址。
+//                  通过X-Forwarded-Proto头字段获取SLB的监听协议
+
+                    addTag(span, "slb.id", request.headers().get("slb-id"));
+                    addTag(span, "slb.ip", request.headers().get("slb-ip"));
+                    addTag(span, "slb.proto", request.headers().get("x-forwarded-proto"));
+
                     return buildReactCtx(trade, span, tracer);
                 }));
     }
 
-    private Observable<Tracer> getTracer() {
-        return _tracingEnabled
-                ? this._finder.find(Tracer.class).onErrorReturn(e -> noopTracer)
+    private void addTag(final Span span, final String tag, final String value) {
+        if (null != value) {
+            span.setTag(tag, value);
+        }
+    }
+
+    private Observable<Tracer> getTracer(final HttpRequest request) {
+        return this._tracingEnabled && isRequestFromSLB(request) ? this._finder.find(Tracer.class).onErrorReturn(e -> noopTracer)
                 : Observable.just(noopTracer);
+    }
+
+    private boolean isRequestFromSLB(final HttpRequest request) {
+        return request.headers().contains("x-forwarded-for");
     }
 
     private ReactContext buildReactCtx(final HttpTrade trade, final Span span, final Tracer tracer) {
