@@ -5,6 +5,7 @@ package org.jocean.xharbor.relay;
 
 import java.net.ConnectException;
 import java.nio.channels.ClosedChannelException;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.inject.Inject;
 
@@ -70,9 +71,11 @@ public class TradeRelay extends Subscriber<HttpTrade> {
 
     @Override
     public void onNext(final HttpTrade trade) {
-        LOG.debug("TradeRelay {} onNext, trade {}", this, trade);
+        LOG.trace("TradeRelay {} onNext, trade {}", this, trade);
 
-        trade2ctx(trade).doOnNext(ctx -> hook4httpstatus(trade.writeCtrl(), ctx.span()))
+        final AtomicReference<ReactContext> ctxRef = new AtomicReference<>();
+
+        trade2ctx(trade).doOnNext(ctx -> ctxRef.set(ctx)).doOnNext(ctx -> hook4httpstatus(trade.writeCtrl(), ctx.span()))
             .flatMapSingle(ctx -> this._tradeReactor.react(ctx, new InOut() {
                 @Override
                 public Observable<FullMessage<HttpRequest>> inbound() {
@@ -86,10 +89,14 @@ public class TradeRelay extends Subscriber<HttpTrade> {
             })).retryWhen(retryPolicy(trade)).subscribe(io -> {
                 if (null == io || null == io.outbound()) {
                     LOG.warn("NO_INOUT for trade({}), react io detail: {}.", trade, io);
+                    ctxRef.get().span().setTag(Tags.ERROR.getKey(), true);
+                    ctxRef.get().span().setTag("error.detail", "no forward or responsd");
                 }
                 trade.outbound(buildResponse(trade, io).compose(fullresp2objs()));
             }, error -> {
                 LOG.warn("Trade {} react with error, detail:{}", trade, ExceptionUtils.exception2detail(error));
+                ctxRef.get().span().setTag(Tags.ERROR.getKey(), true);
+                ctxRef.get().span().setTag("error.detail", ExceptionUtils.exception2detail(error));
                 trade.close();
             });
     }
@@ -113,11 +120,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                     .withTag(Tags.HTTP_METHOD.getKey(), request.method().name())
                     .withTag(Tags.PEER_HOST_IPV4.getKey(), get1stIp(request.headers().get("x-forwarded-for", "none")))
                     .start();
-                    LOG.debug("span {} started", span);
-                    trade.doOnTerminate(() -> {
-                        span.finish();
-                        LOG.debug("span {} finished", span);
-                    });
+                    trade.doOnTerminate(() -> span.finish());
                     return buildReactCtx(trade, span, tracer);
                 }));
     }
