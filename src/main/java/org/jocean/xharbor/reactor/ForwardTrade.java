@@ -268,7 +268,17 @@ public class ForwardTrade implements TradeReactor {
                             .doOnNext(fullreq -> ctx.tracer().inject(span.context(), Format.Builtin.HTTP_HEADERS, message2textmap(fullreq.message())))
                             .compose(fullreq2objs())))
                         .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))
-                        .doOnNext(fullresp -> span.setTag(Tags.HTTP_STATUS.getKey(), fullresp.message().status().code()))
+                        .doOnNext(fullresp -> {
+                            final int httpStatusCode = fullresp.message().status().code();
+                            span.setTag(Tags.HTTP_STATUS.getKey(), httpStatusCode);
+                            if (httpStatusCode >= 400) {
+                                span.setTag(Tags.ERROR.getKey(), true);
+                            }
+                        })
+                        .doOnError( e -> {
+                            span.setTag(Tags.ERROR.getKey(), true);
+                            span.setTag("error.detail", ExceptionUtils.exception2detail(e));
+                        })
                         .doOnTerminate(() -> span.finish());
                 });
     }

@@ -2,6 +2,12 @@ name: units
 parameters: |
   __spring.xml=xharbor/xharbor.xml
 children:
+  - name: jaeger
+    parameters: |
+      servicename=xharbor-local
+      endpoint=XXXX
+      username=XXXX
+      password=XXXX
   - name: nettystats
   - name: redisclient
     parameters: |
@@ -151,6 +157,7 @@ children:
           - name: httpin.8889
             parameters: |
               http.port=8889
+              tracing.enabled = false
             children:
               - name: feature_logging
       - name: rules.100
