@@ -132,19 +132,21 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                     .start();
                     trade.doOnTerminate(() -> span.finish());
 
+                    // try to add host
+                    addTagNotNull(span, "http.host", request.headers().get(HttpHeaderNames.HOST));
 //                  SLB-ID头字段获取SLB实例ID。
 //                  通过SLB-IP头字段获取SLB实例公网IP地址。
 //                  通过X-Forwarded-Proto头字段获取SLB的监听协议
 
-                    addTag(span, "slb.id", request.headers().get("slb-id"));
-                    addTag(span, "slb.ip", request.headers().get("slb-ip"));
-                    addTag(span, "slb.proto", request.headers().get("x-forwarded-proto"));
+                    addTagNotNull(span, "slb.id", request.headers().get("slb-id"));
+                    addTagNotNull(span, "slb.ip", request.headers().get("slb-ip"));
+                    addTagNotNull(span, "slb.proto", request.headers().get("x-forwarded-proto"));
 
                     return buildReactCtx(trade, span, tracer);
                 }));
     }
 
-    private void addTag(final Span span, final String tag, final String value) {
+    private static void addTagNotNull(final Span span, final String tag, final String value) {
         if (null != value) {
             span.setTag(tag, value);
         }

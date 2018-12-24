@@ -262,10 +262,18 @@ public class ForwardTrade implements TradeReactor {
 
                     enableDisposeSended(upstream.writeCtrl(), MAX_RETAINED_SIZE);
                     final Span span = ctx2span(ctx, target, request);
+                    addTagNotNull(span, "http.host", request.headers().get(HttpHeaderNames.HOST));
+
+                    upstream.writeCtrl().sending().subscribe(obj -> {
+                        if (obj instanceof HttpRequest) {
+                            final HttpRequest req = (HttpRequest)obj;
+                            ctx.tracer().inject(span.context(), Format.Builtin.HTTP_HEADERS, message2textmap(req));
+                        }
+                    });
+
                     return isDBS().doOnNext(configDBS(trade))
                         .flatMap(any -> upstream.defineInteraction(
                             inbound.map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient))
-                            .doOnNext(fullreq -> ctx.tracer().inject(span.context(), Format.Builtin.HTTP_HEADERS, message2textmap(fullreq.message())))
                             .compose(fullreq2objs())))
                         .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))
                         .doOnNext(fullresp -> {
@@ -287,6 +295,12 @@ public class ForwardTrade implements TradeReactor {
                         })
                         .doOnTerminate(() -> span.finish());
                 });
+    }
+
+    private static void addTagNotNull(final Span span, final String tag, final String value) {
+        if (null != value) {
+            span.setTag(tag, value);
+        }
     }
 
     private Span ctx2span(final ReactContext ctx, final Target target, final HttpRequest request) {
