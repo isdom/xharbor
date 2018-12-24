@@ -105,7 +105,17 @@ public class TradeRelay extends Subscriber<HttpTrade> {
         writeCtrl.sending().subscribe(obj -> {
             if ( obj instanceof HttpResponse) {
                 final HttpResponse resp = (HttpResponse)obj;
-                span.setTag(Tags.HTTP_STATUS.getKey(), resp.status().code());
+                final int statusCode = resp.status().code();
+                span.setTag(Tags.HTTP_STATUS.getKey(), statusCode);
+                if (statusCode >= 300 && statusCode < 400) {
+                    final String location = resp.headers().get(HttpHeaderNames.LOCATION);
+                    if (null != location) {
+                        span.setTag("http.location", location);
+                    }
+                }
+                if (statusCode >= 400) {
+                    span.setTag(Tags.ERROR.getKey(), true);
+                }
             }
         });
     }

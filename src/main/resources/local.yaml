@@ -2,9 +2,8 @@ name: units
 parameters: |
   __spring.xml=xharbor/xharbor.xml
 children:
-  - name: jaeger
+  - name: opentracing
     parameters: |
-      servicename=xharbor-local
       endpoint=XXXX
       username=XXXX
       password=XXXX
