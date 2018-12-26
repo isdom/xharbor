@@ -72,12 +72,13 @@ public class ForwardTrade implements TradeReactor {
     private static final Logger LOG = LoggerFactory.getLogger(ForwardTrade.class);
 
     public ForwardTrade(
+            final String serviceName,
             final MatchRule  matcher,
             final BeanFinder finder,
             final RelayMemo.Builder memoBuilder,
             final ServiceMemo serviceMemo,
-            final Timer timer
-            ) {
+            final Timer timer ) {
+        this._serviceName = serviceName;
         this._matcher = matcher;
         this._finder = finder;
         this._memoBuilder = memoBuilder;
@@ -89,7 +90,7 @@ public class ForwardTrade implements TradeReactor {
     public String toString() {
         final int maxLen = 10;
         final StringBuilder builder = new StringBuilder();
-        builder.append("ForwardTrade [matcher=").append(_matcher).append(", targets=")
+        builder.append("ForwardTrade [service=").append(_serviceName).append(", matcher=").append(_matcher).append(", targets=")
                 .append(_targets != null ? _targets.subList(0, Math.min(_targets.size(), maxLen)) : null).append("]");
         return builder.toString();
     }
@@ -312,7 +313,8 @@ public class ForwardTrade implements TradeReactor {
             .withTag(Tags.HTTP_URL.getKey(), request.uri())
             .withTag(Tags.HTTP_METHOD.getKey(), request.method().name())
             .withTag(Tags.PEER_HOST_IPV4.getKey(), target.serviceUri().getHost())
-            .withTag(Tags.PEER_PORT.getKey(), target.serviceUri().getPort()) // TODO add service
+            .withTag(Tags.PEER_PORT.getKey(), target.serviceUri().getPort())
+            .withTag(Tags.PEER_SERVICE.getKey(), this._serviceName)
             .asChildOf(ctx.span())
             .start();
     }
@@ -553,9 +555,9 @@ public class ForwardTrade implements TradeReactor {
     }
 
     private final MatchRule     _matcher;
-    private final List<MarkableTargetImpl>  _targets =
-            Lists.newCopyOnWriteArrayList();
+    private final List<MarkableTargetImpl>  _targets = Lists.newCopyOnWriteArrayList();
 
+    private final String        _serviceName;
     private final BeanFinder    _finder;
     private final RelayMemo.Builder _memoBuilder;
     private final ServiceMemo   _serviceMemo;

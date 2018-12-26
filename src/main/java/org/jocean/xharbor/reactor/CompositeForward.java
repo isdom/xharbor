@@ -81,19 +81,18 @@ public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardDat
             for (final ForwardData f : data) {
                 ForwardTrade reactor = matcher2reactor.get(f.matcher());
                 if (null == reactor) {
-                    reactor = new ForwardTrade(f.matcher(),
+                    reactor = new ForwardTrade(f.serviceName(),
+                            f.matcher(),
                             this._finder,
                             this._memoBuilder,
                             this._serviceMemo,
-                            this._timer
-                            );
+                            this._timer);
                     matcher2reactor.put(f.matcher(), reactor);
                 }
                 reactor.addTarget(f.target());
             }
             final ForwardTrade[] newReactors = matcher2reactor.values().toArray(EMPTY_FORWARD);
-            if (this._reactorsRef.compareAndSet(this._reactorsRef.getReference(), newReactors,
-                    newStamp, newStamp)) {
+            if (this._reactorsRef.compareAndSet(this._reactorsRef.getReference(), newReactors, newStamp, newStamp)) {
                 LOG.info("CompositeForward's rule has update to stamp({}) success.", newStamp);
             } else {
                 LOG.info("CompositeForward's rule try update to stamp({}) failed, bcs other newest stamp({}) exist.",
@@ -111,8 +110,7 @@ public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardDat
             LOG.trace("try {} for trade {}", this, ctx.trade());
         }
         final ForwardTrade[] reactors = this._reactorsRef.getReference();
-        if (null == reactors ||
-            (null != reactors && reactors.length == 0)) {
+        if (null == reactors || (null != reactors && reactors.length == 0)) {
             return Single.<InOut>just(null);
         } else {
             return TradeReactor.OP.first(Arrays.asList(reactors), ctx, io);
@@ -121,11 +119,9 @@ public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardDat
 
     private final AtomicInteger _stampProvider = new AtomicInteger(0);
 
-    private final List<ForwardData> _forwards =
-            new CopyOnWriteArrayList<>();
+    private final List<ForwardData> _forwards = new CopyOnWriteArrayList<>();
 
-    private final AtomicStampedReference<ForwardTrade[]> _reactorsRef =
-            new AtomicStampedReference<>(null, 0);
+    private final AtomicStampedReference<ForwardTrade[]> _reactorsRef = new AtomicStampedReference<>(null, 0);
 
     @Inject
     private BeanFinder _finder;

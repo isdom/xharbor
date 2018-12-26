@@ -9,14 +9,15 @@ import org.jocean.idiom.BeanHolderAware;
 import org.jocean.xharbor.api.Target;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 
 import rx.functions.Func0;
 
 public class ForwardData implements BeanHolderAware {
-    
+
     private static final Logger LOG = LoggerFactory
             .getLogger(ForwardData.class);
-    
+
     public ForwardData(
             final MatchRule matcher,
             final String uri,
@@ -26,11 +27,11 @@ public class ForwardData implements BeanHolderAware {
         this._uri = new URI(uri);
         this._featuresName = featuresName;
     }
-    
+
     MatchRule matcher() {
         return this._matcher;
     }
-    
+
     Target target() {
         return new Target() {
             @Override
@@ -51,14 +52,25 @@ public class ForwardData implements BeanHolderAware {
                 return "[uri:" + _uri+ ",features:" + _featuresName + "]";
             }};
     }
-    
+
     @Override
     public void setBeanHolder(final BeanHolder beanHolder) {
         this._beanHolder = beanHolder;
     }
-    
+
+    public void setServiceName(final String serviceName) {
+        this._serviceName = serviceName;
+    }
+
+    public String serviceName() {
+        return this._serviceName;
+    }
+
+    @Value("${service}")
+    private String _serviceName = "(unknown)";
+
     private BeanHolder _beanHolder;
-    
+
     private final MatchRule _matcher;
     private final URI _uri;
     private final String _featuresName;
