@@ -3,6 +3,7 @@ package org.jocean.xharbor.reactor;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -292,7 +293,7 @@ public class ForwardTrade implements TradeReactor {
                         })
                         .doOnError( e -> {
                             span.setTag(Tags.ERROR.getKey(), true);
-                            span.setTag("error.detail", ExceptionUtils.exception2detail(e));
+                            span.log(Collections.singletonMap("error.detail", ExceptionUtils.exception2detail(e)));
                         })
                         .doOnTerminate(() -> span.finish());
                 });

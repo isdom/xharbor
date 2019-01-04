@@ -5,6 +5,7 @@ package org.jocean.xharbor.relay;
 
 import java.net.ConnectException;
 import java.nio.channels.ClosedChannelException;
+import java.util.Collections;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.inject.Inject;
@@ -90,13 +91,13 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                 if (null == io || null == io.outbound()) {
                     LOG.warn("NO_INOUT for trade({}), react io detail: {}.", trade, io);
                     ctxRef.get().span().setTag(Tags.ERROR.getKey(), true);
-                    ctxRef.get().span().setTag("error.detail", "no forward or responsd");
+                    ctxRef.get().span().setTag("error.type", "NO_INOUT");
                 }
                 trade.outbound(buildResponse(trade, io).compose(fullresp2objs()));
             }, error -> {
                 LOG.warn("Trade {} react with error, detail:{}", trade, ExceptionUtils.exception2detail(error));
                 ctxRef.get().span().setTag(Tags.ERROR.getKey(), true);
-                ctxRef.get().span().setTag("error.detail", ExceptionUtils.exception2detail(error));
+                ctxRef.get().span().log(Collections.singletonMap("error.detail", ExceptionUtils.exception2detail(error)));
                 trade.close();
             });
     }
