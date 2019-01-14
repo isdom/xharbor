@@ -42,38 +42,6 @@
         </encoder>
     </appender>
 
-    <appender name="timeoutLogger" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${user.dir}/logs/timeout.log</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <FileNamePattern>${user.dir}/logs/bak/timeout.%d{yyyy-MM-dd}.log.gz</FileNamePattern>
-            <maxHistory>7</maxHistory>
-        </rollingPolicy>
-        <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %5p |-%c{35}:%L - %m %n</pattern>
-        </encoder>
-    </appender>
-
-    <appender name="ipLogger" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${user.dir}/logs/ip.log</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <FileNamePattern>${user.dir}/logs/bak/ip.%d{yyyy-MM-dd}.log.gz</FileNamePattern>
-            <maxHistory>7</maxHistory>
-        </rollingPolicy>
-        <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %5p |-%c{35}:%L - %m %n</pattern>
-        </encoder>
-    </appender>
-
-<!--     <appender name="jOceanLogAppender" class="ch.qos.logback.ext.spring.DelegatingLogbackAppender">
-        <filter class="ch.qos.logback.classic.filter.LevelFilter">
-            <level>ERROR</level>
-            <onMatch>ACCEPT</onMatch>
-            <onMismatch>DENY</onMismatch>
-        </filter>
-    </appender>
- -->
-<!--     <logger name="org.jocean" level="TRACE"/>
- -->
     <logger name="io.netty" level="DEBUG"/>
     <logger name="org.jocean.http.util" level="INFO"/>
     <logger name="org.jocean.http.util.RxNettys" level="INFO"/>
@@ -81,14 +49,6 @@
     <logger name="org.jocean.xharbor" level="TRACE"/>
     <logger name="org.springframework" level="INFO"/>
         
-    <logger name="timeoutLogger" level="INFO" additivity="false">
-        <appender-ref ref="timeoutLogger"/>
-    </logger>
-
-    <logger name="ipLogger" level="INFO" additivity="false">
-        <appender-ref ref="ipLogger"/>
-    </logger>
-
     <appender name="ASYNC" class="ch.qos.logback.classic.AsyncAppender">
         <includeCallerData>true</includeCallerData>
         <appender-ref ref="file"/>
@@ -98,6 +58,5 @@
         <appender-ref ref="stdout"/>
         <appender-ref ref="ASYNC"/>
         <appender-ref ref="errorFile"/>
-<!--         <appender-ref ref="jOceanLogAppender"/>
- -->    </root>
+    </root>
 </configuration>
