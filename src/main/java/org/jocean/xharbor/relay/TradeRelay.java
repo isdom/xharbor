@@ -13,7 +13,6 @@ import javax.inject.Inject;
 import org.jocean.http.FullMessage;
 import org.jocean.http.MessageBody;
 import org.jocean.http.TransportException;
-import org.jocean.http.WriteCtrl;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.idiom.BeanFinder;
 import org.jocean.idiom.ExceptionUtils;
@@ -21,6 +20,7 @@ import org.jocean.idiom.StepableUtil;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxObservables;
 import org.jocean.idiom.rx.RxObservables.RetryPolicy;
+import org.jocean.svr.tracing.TraceUtil;
 import org.jocean.xharbor.api.TradeReactor;
 import org.jocean.xharbor.api.TradeReactor.InOut;
 import org.jocean.xharbor.api.TradeReactor.ReactContext;
@@ -49,8 +49,7 @@ import rx.functions.Func1;
  */
 public class TradeRelay extends Subscriber<HttpTrade> {
 
-    private static final Logger LOG =
-            LoggerFactory.getLogger(TradeRelay.class);
+    private static final Logger LOG = LoggerFactory.getLogger(TradeRelay.class);
 
     public TradeRelay(final TradeReactor reactor) {
         this._tradeReactor = reactor;
@@ -76,7 +75,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
 
         final AtomicReference<ReactContext> ctxRef = new AtomicReference<>();
 
-        trade2ctx(trade).doOnNext(ctx -> ctxRef.set(ctx)).doOnNext(ctx -> hook4httpstatus(trade.writeCtrl(), ctx.span()))
+        trade2ctx(trade).doOnNext(ctx -> ctxRef.set(ctx)).doOnNext(ctx -> TraceUtil.hook4serversend(trade.writeCtrl(), ctx.span()))
             .flatMapSingle(ctx -> this._tradeReactor.react(ctx, new InOut() {
                 @Override
                 public Observable<FullMessage<HttpRequest>> inbound() {
@@ -102,25 +101,6 @@ public class TradeRelay extends Subscriber<HttpTrade> {
             });
     }
 
-    private void hook4httpstatus(final WriteCtrl writeCtrl, final Span span) {
-        writeCtrl.sending().subscribe(obj -> {
-            if ( obj instanceof HttpResponse) {
-                final HttpResponse resp = (HttpResponse)obj;
-                final int statusCode = resp.status().code();
-                span.setTag(Tags.HTTP_STATUS.getKey(), statusCode);
-                if (statusCode >= 300 && statusCode < 400) {
-                    final String location = resp.headers().get(HttpHeaderNames.LOCATION);
-                    if (null != location) {
-                        span.setTag("http.location", location);
-                    }
-                }
-                if (statusCode >= 400) {
-                    span.setTag(Tags.ERROR.getKey(), true);
-                }
-            }
-        });
-    }
-
     private Observable<ReactContext> trade2ctx(final HttpTrade trade) {
         return trade.inbound().first().map(fullreq -> fullreq.message())
                 .flatMap(request -> getTracer(request).map(tracer -> {
@@ -134,31 +114,26 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                     trade.doOnTerminate(() -> span.finish());
 
                     // try to add host
-                    addTagNotNull(span, "http.host", request.headers().get(HttpHeaderNames.HOST));
+                    TraceUtil.addTagNotNull(span, "http.host", request.headers().get(HttpHeaderNames.HOST));
 //                  SLB-ID头字段获取SLB实例ID。
 //                  通过SLB-IP头字段获取SLB实例公网IP地址。
 //                  通过X-Forwarded-Proto头字段获取SLB的监听协议
 
-                    addTagNotNull(span, "slb.id", request.headers().get("slb-id"));
-                    addTagNotNull(span, "slb.ip", request.headers().get("slb-ip"));
-                    addTagNotNull(span, "slb.proto", request.headers().get("x-forwarded-proto"));
+                    TraceUtil.addTagNotNull(span, "slb.id", request.headers().get("slb-id"));
+                    TraceUtil.addTagNotNull(span, "slb.ip", request.headers().get("slb-ip"));
+                    TraceUtil.addTagNotNull(span, "slb.proto", request.headers().get("x-forwarded-proto"));
 
                     return buildReactCtx(trade, span, tracer);
                 }));
     }
 
-    private static void addTagNotNull(final Span span, final String tag, final String value) {
-        if (null != value) {
-            span.setTag(tag, value);
-        }
-    }
-
     private Observable<Tracer> getTracer(final HttpRequest request) {
-        return this._tracingEnabled && isRequestFromSLB(request) ? this._finder.find(Tracer.class).onErrorReturn(e -> noopTracer)
+        return this._tracingEnabled && isRequestForwardBySLB(request)
+                ? this._finder.find(Tracer.class).onErrorReturn(e -> noopTracer)
                 : Observable.just(noopTracer);
     }
 
-    private boolean isRequestFromSLB(final HttpRequest request) {
+    private boolean isRequestForwardBySLB(final HttpRequest request) {
         return request.headers().contains("x-forwarded-for");
     }
 
