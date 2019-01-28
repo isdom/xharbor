@@ -34,7 +34,7 @@
         factory-method="subscribe"
         destroy-method="unsubscribe">
         <constructor-arg>
-            <bean class="org.jocean.xharbor.relay.TradeRelay">
+            <bean class="org.jocean.xharbor.relay.TradeRelay" init-method="start" destroy-method="stop">
                 <constructor-arg ref="router" />
             </bean>
         </constructor-arg>

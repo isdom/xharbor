@@ -14,6 +14,7 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.opentracing.Span;
 import io.opentracing.Tracer;
 import rx.Observable;
+import rx.Scheduler;
 import rx.Single;
 import rx.SingleSubscriber;
 
@@ -23,6 +24,7 @@ public interface TradeReactor {
         public StopWatch watch();
         public Tracer tracer();
         public Span span();
+        public Scheduler scheduler();
     }
 
     public interface InOut {

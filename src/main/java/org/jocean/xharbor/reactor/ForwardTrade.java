@@ -4,10 +4,8 @@ import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -27,6 +25,7 @@ import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxObservables;
+import org.jocean.svr.tracing.TraceUtil;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.RelayMemo.RESULT;
 import org.jocean.xharbor.api.RoutingInfo;
@@ -47,7 +46,6 @@ import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
-import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -57,7 +55,6 @@ import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.util.Timer;
 import io.opentracing.Span;
 import io.opentracing.propagation.Format;
-import io.opentracing.propagation.TextMap;
 import io.opentracing.tag.Tags;
 import rx.Observable;
 import rx.Observable.Transformer;
@@ -264,12 +261,12 @@ public class ForwardTrade implements TradeReactor {
 
                     enableDisposeSended(upstream.writeCtrl(), MAX_RETAINED_SIZE);
                     final Span span = ctx2span(ctx, target, request);
-                    addTagNotNull(span, "http.host", request.headers().get(HttpHeaderNames.HOST));
+                    TraceUtil.addTagNotNull(span, "http.host", request.headers().get(HttpHeaderNames.HOST));
 
                     upstream.writeCtrl().sending().subscribe(obj -> {
                         if (obj instanceof HttpRequest) {
                             final HttpRequest req = (HttpRequest)obj;
-                            ctx.tracer().inject(span.context(), Format.Builtin.HTTP_HEADERS, message2textmap(req));
+                            ctx.tracer().inject(span.context(), Format.Builtin.HTTP_HEADERS, TraceUtil.message2textmap(req));
                         }
                     });
 
@@ -277,32 +274,15 @@ public class ForwardTrade implements TradeReactor {
                         .flatMap(any -> upstream.defineInteraction(
                             inbound.map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient))
                             .compose(fullreq2objs())))
+                        .observeOn(ctx.scheduler())
                         .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))
-                        .doOnNext(fullresp -> {
-                            final int statusCode = fullresp.message().status().code();
-                            span.setTag(Tags.HTTP_STATUS.getKey(), statusCode);
-                            if (statusCode >= 300 && statusCode < 400) {
-                                final String location = fullresp.message().headers().get(HttpHeaderNames.LOCATION);
-                                if (null != location) {
-                                    span.setTag("http.location", location);
-                                }
-                            }
-                            if (statusCode >= 400) {
-                                span.setTag(Tags.ERROR.getKey(), true);
-                            }
-                        })
+                        .doOnNext(TraceUtil.hookhttpresp(span))
                         .doOnError( e -> {
                             span.setTag(Tags.ERROR.getKey(), true);
                             span.log(Collections.singletonMap("error.detail", ExceptionUtils.exception2detail(e)));
                         })
                         .doOnTerminate(() -> span.finish());
                 });
-    }
-
-    private static void addTagNotNull(final Span span, final String tag, final String value) {
-        if (null != value) {
-            span.setTag(tag, value);
-        }
     }
 
     private Span ctx2span(final ReactContext ctx, final Target target, final HttpRequest request) {
@@ -318,19 +298,6 @@ public class ForwardTrade implements TradeReactor {
             .withTag(Tags.PEER_SERVICE.getKey(), this._serviceName)
             .asChildOf(ctx.span())
             .start();
-    }
-
-    private static TextMap message2textmap(final HttpMessage message) {
-        return new TextMap() {
-            @Override
-            public Iterator<Entry<String, String>> iterator() {
-                return message.headers().iteratorAsString();
-            }
-
-            @Override
-            public void put(final String key, final String value) {
-                message.headers().set(key, value);
-            }};
     }
 
     private Transformer<FullMessage<HttpRequest>, Object> fullreq2objs() {

@@ -6,6 +6,8 @@ package org.jocean.xharbor.relay;
 import java.net.ConnectException;
 import java.nio.channels.ClosedChannelException;
 import java.util.Collections;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.inject.Inject;
@@ -40,8 +42,10 @@ import io.opentracing.noop.NoopTracerFactory;
 import io.opentracing.tag.Tags;
 import rx.Observable;
 import rx.Observable.Transformer;
+import rx.Scheduler;
 import rx.Subscriber;
 import rx.functions.Func1;
+import rx.schedulers.Schedulers;
 
 /**
  * @author isdom
@@ -102,7 +106,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
     }
 
     private Observable<ReactContext> trade2ctx(final HttpTrade trade) {
-        return trade.inbound().first().map(fullreq -> fullreq.message())
+        return trade.inbound().first().observeOn(this._workerScheduler).map(fullreq -> fullreq.message())
                 .flatMap(request -> getTracer(request).map(tracer -> {
                     final Span span = tracer.buildSpan("httpin")
                     .withTag(Tags.COMPONENT.getKey(), "jocean-http")
@@ -123,7 +127,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                     TraceUtil.addTagNotNull(span, "slb.ip", request.headers().get("slb-ip"));
                     TraceUtil.addTagNotNull(span, "slb.proto", request.headers().get("x-forwarded-proto"));
 
-                    return buildReactCtx(trade, span, tracer);
+                    return buildReactCtx(trade, span, tracer, this._workerScheduler);
                 }));
     }
 
@@ -137,7 +141,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
         return request.headers().contains("x-forwarded-for");
     }
 
-    private ReactContext buildReactCtx(final HttpTrade trade, final Span span, final Tracer tracer) {
+    private ReactContext buildReactCtx(final HttpTrade trade, final Span span, final Tracer tracer, final Scheduler scheduler) {
         final StopWatch watch4Result = new StopWatch();
         return new ReactContext() {
             @Override
@@ -158,6 +162,11 @@ public class TradeRelay extends Subscriber<HttpTrade> {
             @Override
             public Tracer tracer() {
                 return tracer;
+            }
+
+            @Override
+            public Scheduler scheduler() {
+                return scheduler;
             }};
     }
 
@@ -232,6 +241,21 @@ public class TradeRelay extends Subscriber<HttpTrade> {
             }
         };
     }
+
+    void start() {
+        this._workers = Executors.newFixedThreadPool(this._workerCount);
+        this._workerScheduler = Schedulers.from(this._workers);
+    }
+
+    void stop() {
+        this._workers.shutdown();
+    }
+
+    @Value("${worker.count}")
+    int _workerCount = 2;
+
+    private ExecutorService _workers;
+    private Scheduler _workerScheduler;
 
     private static volatile Tracer noopTracer = NoopTracerFactory.create();
 
