@@ -75,8 +75,8 @@ public class LogAccessInfo2Redis implements TradeReactor, Ordered, BeanHolderAwa
                         data.put("respContentLength", resp.headers().get(HttpHeaderNames.CONTENT_LENGTH));
 
                         if (null != remoteip) {
-                            return redisclient.getConnection().compose(RedisUtil
-                                    .interactWithRedis(RedisUtil.cmdSet(remoteip, JSON.toJSONString(data)).build()));
+                            return redisclient.getConnection().compose(RedisUtil.interacts(
+                                    RedisUtil.cmdSet(remoteip, JSON.toJSONString(data)).build()));
                         } else {
                             return Observable.<RedisMessage>empty();
                         }
