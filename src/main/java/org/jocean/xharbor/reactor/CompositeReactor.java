@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
 import rx.Single;
 import rx.functions.Action0;
 
-public class CompositeReactor implements TradeReactor, Ordered /*, Func1<TradeReactor, Action0> */ {
+public class CompositeReactor implements TradeReactor, Ordered {
 
     @Override
     public String toString() {
@@ -50,14 +50,6 @@ public class CompositeReactor implements TradeReactor, Ordered /*, Func1<TradeRe
     public void setOrdinal(final int ordinal) {
         this._ordinal = ordinal;
     }
-
-    /*
-    @Override
-    public Action0 call(final TradeReactor reactor) {
-        addReactor(reactor);
-        return () -> removeReactor(reactor);
-    }
-    */
 
     public Action0 addReactor(final TradeReactor reactor) {
         this._reactors.add(reactor);

@@ -23,7 +23,7 @@ import io.netty.util.Timer;
 import rx.Single;
 import rx.functions.Action0;
 
-public class CompositeForward implements TradeReactor, Ordered /*, Func1<ForwardData, Action0> */ {
+public class CompositeForward implements TradeReactor, Ordered {
 
     private static final ForwardTrade[] EMPTY_FORWARD = new ForwardTrade[0];
     private static final ForwardData[] EMPTY_DATA = new ForwardData[0];
@@ -40,12 +40,6 @@ public class CompositeForward implements TradeReactor, Ordered /*, Func1<Forward
                 .append(", ordinal=").append(_ordinal).append("]");
         return builder.toString();
     }
-
-//    @Override
-//    public Action0 call(final ForwardData data) {
-//        addForward(data);
-//        return () -> removeForward(data);
-//    }
 
     public void setOrdinal(final int ordinal) {
         this._ordinal = ordinal;
