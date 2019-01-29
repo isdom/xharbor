@@ -3,24 +3,21 @@
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
-    
-    <bean class="org.jocean.idiom.rx.RxActions"
-        factory-method="doCall"
-        destroy-method="call">
-        <constructor-arg ref="forwards"/>
+
+    <bean factory-bean="forwards" factory-method="addForward" destroy-method="call">
         <constructor-arg>
             <bean class="org.jocean.xharbor.reactor.ForwardData">
                 <constructor-arg>
-		            <bean class="org.jocean.xharbor.reactor.MatchRule">
-				        <constructor-arg value="${forward.method:}"/>
-				        <constructor-arg value="${forward.path:}"/>
-				        <constructor-arg value="${forward.headers:}"/>
-		            </bean>
+                    <bean class="org.jocean.xharbor.reactor.MatchRule">
+                        <constructor-arg value="${forward.method:}"/>
+                        <constructor-arg value="${forward.path:}"/>
+                        <constructor-arg value="${forward.headers:}"/>
+                    </bean>
                 </constructor-arg>
-		        <constructor-arg value="${forward.to}"/>
-		        <constructor-arg value="${features.name:default}"/>
+                <constructor-arg value="${forward.to}"/>
+                <constructor-arg value="${features.name:default}"/>
             </bean>
         </constructor-arg>
     </bean>
-    
+
 </beans>

@@ -5,23 +5,20 @@
         http://www.springframework.org/schema/beans/spring-beans.xsd">
     
     <bean id="extraHeaders" class="java.util.concurrent.ConcurrentHashMap"/>
-    
-    <bean class="org.jocean.idiom.rx.RxActions"
-        factory-method="doCall"
-        destroy-method="call">
-        <constructor-arg ref="rwresps"/>
+
+    <bean factory-bean="rwresps" factory-method="addReactor" destroy-method="call">
         <constructor-arg>
             <bean class="org.jocean.xharbor.reactor.RewriteResponse">
-		        <constructor-arg>
+                <constructor-arg>
                     <bean class="org.jocean.xharbor.reactor.MatchRule">
                         <constructor-arg value="${rewrite.method:}"/>
                         <constructor-arg value="${rewrite.path:}"/>
                         <constructor-arg value="${rewrite.headers:}"/>
                     </bean>
-		        </constructor-arg>
-		        <constructor-arg ref="extraHeaders"/>
+                </constructor-arg>
+                <constructor-arg ref="extraHeaders"/>
             </bean>
         </constructor-arg>
     </bean>
-    
+
 </beans>

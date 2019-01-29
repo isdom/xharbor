@@ -22,9 +22,8 @@ import com.google.common.collect.Maps;
 import io.netty.util.Timer;
 import rx.Single;
 import rx.functions.Action0;
-import rx.functions.Func1;
 
-public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardData, Action0> {
+public class CompositeForward implements TradeReactor, Ordered /*, Func1<ForwardData, Action0> */ {
 
     private static final ForwardTrade[] EMPTY_FORWARD = new ForwardTrade[0];
     private static final ForwardData[] EMPTY_DATA = new ForwardData[0];
@@ -42,11 +41,11 @@ public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardDat
         return builder.toString();
     }
 
-    @Override
-    public Action0 call(final ForwardData data) {
-        addForward(data);
-        return () -> removeForward(data);
-    }
+//    @Override
+//    public Action0 call(final ForwardData data) {
+//        addForward(data);
+//        return () -> removeForward(data);
+//    }
 
     public void setOrdinal(final int ordinal) {
         this._ordinal = ordinal;
@@ -57,9 +56,10 @@ public class CompositeForward implements TradeReactor, Ordered, Func1<ForwardDat
         return this._ordinal;
     }
 
-    public void addForward(final ForwardData data) {
+    public Action0 addForward(final ForwardData data) {
         this._forwards.add(data);
         updateStampAndRule();
+        return () -> removeForward(data);
     }
 
     public void removeForward(final ForwardData data) {

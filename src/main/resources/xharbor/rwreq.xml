@@ -3,19 +3,16 @@
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
-    
-    <bean class="org.jocean.idiom.rx.RxActions"
-        factory-method="doCall"
-        destroy-method="call">
-        <constructor-arg ref="rwpaths"/>
+
+    <bean factory-bean="rwpaths" factory-method="addReactor" destroy-method="call">
         <constructor-arg>
             <bean class="org.jocean.xharbor.reactor.RewriteRequest">
-		        <constructor-arg value="${rewrite.path}"/>
-		        <constructor-arg value="${rewrite.to:}"/>
+                <constructor-arg value="${rewrite.path}"/>
+                <constructor-arg value="${rewrite.to:}"/>
                 <constructor-arg value="${rewrite.header.name:}"/>
                 <constructor-arg value="${rewrite.header.value:}"/>
             </bean>
         </constructor-arg>
     </bean>
-    
+
 </beans>

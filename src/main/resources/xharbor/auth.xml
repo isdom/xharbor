@@ -3,25 +3,22 @@
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
-    
-    <bean class="org.jocean.idiom.rx.RxActions"
-        factory-method="doCall"
-        destroy-method="call">
-        <constructor-arg ref="auths"/>
+
+    <bean factory-bean="auths" factory-method="addReactor" destroy-method="call">
         <constructor-arg>
-		    <bean class="org.jocean.xharbor.reactor.BasicAuthenticate">
-		        <constructor-arg>
+            <bean class="org.jocean.xharbor.reactor.BasicAuthenticate">
+                <constructor-arg>
                     <bean class="org.jocean.xharbor.reactor.MatchRule">
                         <constructor-arg value="${auth.method:}"/>
                         <constructor-arg value="${auth.path:}"/>
                         <constructor-arg value="${auth.headers:}"/>
                     </bean>
-		        </constructor-arg>
-		        <constructor-arg value="${auth.user}"/>
-		        <constructor-arg value="${auth.password}"/>
-		        <constructor-arg value="${auth.authenticate:jocean}"/>
-		    </bean>
+                </constructor-arg>
+                <constructor-arg value="${auth.user}"/>
+                <constructor-arg value="${auth.password}"/>
+                <constructor-arg value="${auth.authenticate:jocean}"/>
+            </bean>
         </constructor-arg>
     </bean>
-    
+
 </beans>
