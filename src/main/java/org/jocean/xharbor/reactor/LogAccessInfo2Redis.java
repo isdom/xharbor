@@ -42,7 +42,7 @@ public class LogAccessInfo2Redis implements TradeReactor, Ordered, BeanHolderAwa
 
     @Override
     public Single<Boolean> match(final ReactContext ctx, final InOut io) {
-        return Single.just(false);
+        return Single.just(true);
     }
 
     @Override

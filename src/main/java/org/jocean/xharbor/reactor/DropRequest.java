@@ -32,7 +32,10 @@ public class DropRequest implements TradeReactor {
 
     @Override
     public Single<Boolean> match(final ReactContext ctx, final InOut io) {
-        return Single.just(false);
+        if (null != io.outbound()) {
+            return Single.just(false);
+        }
+        return io.inbound().first().map(fullreq -> _matcher.match(fullreq.message())).toSingle();
     }
 
     @Override
