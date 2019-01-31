@@ -41,6 +41,25 @@ public class BasicAuthenticate implements TradeReactor {
     }
 
     @Override
+    public Single<Boolean> match(final ReactContext ctx, final InOut io) {
+        if (null != io.outbound()) {
+            return Single.just(false);
+        }
+        return io.inbound().first().map(fullreq -> {
+            if (_matcher.match(fullreq.message())) {
+                if (isAuthorizeSuccess(fullreq.message(), _user, _password)) {
+                    return false;
+                } else {
+                    // response 401 Unauthorized
+                    return true;
+                }
+            } else {
+                return false;
+            }
+        }).toSingle();
+    }
+
+    @Override
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
         if (LOG.isTraceEnabled()) {
             LOG.trace("try {} for trade {}", this, ctx.trade());

@@ -41,6 +41,11 @@ public class LogAccessInfo2Redis implements TradeReactor, Ordered, BeanHolderAwa
     }
 
     @Override
+    public Single<Boolean> match(final ReactContext ctx, final InOut io) {
+        return Single.just(false);
+    }
+
+    @Override
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
         if ( null != this._beanHolder) {
             final RedisClient redisclient =

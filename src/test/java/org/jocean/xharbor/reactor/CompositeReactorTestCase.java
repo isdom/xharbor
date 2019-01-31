@@ -32,6 +32,10 @@ public class CompositeReactorTestCase {
             return this._ordinal;
         }
         @Override
+        public Single<Boolean> match(final ReactContext ctx, final InOut io) {
+            return Single.just(false);
+        }
+        @Override
         public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
             return this._doReact.call(ctx, io);
         }
