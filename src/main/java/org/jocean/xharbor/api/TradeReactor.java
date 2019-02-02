@@ -38,14 +38,14 @@ public interface TradeReactor {
 
     public static class OP {
         private static final Logger LOG = LoggerFactory.getLogger(TradeReactor.class);
-        public static Single<? extends InOut> first(final Iterable<? extends TradeReactor> Iterable,
+        public static Single<? extends InOut> first(final Iterable<? extends TradeReactor> iterable,
                 final ReactContext ctx, final InOut io) {
-            return Single.create(subscriber -> reactByFirst(ctx, io, Iterable.iterator(), subscriber));
+            return Single.create(subscriber -> reactByFirst(ctx, io, iterable.iterator(), subscriber));
         }
 
-        public static Single<? extends InOut> all(final Iterable<? extends TradeReactor> Iterable,
+        public static Single<? extends InOut> all(final Iterable<? extends TradeReactor> iterable,
                 final ReactContext ctx, final InOut io) {
-            return Single.create(subscriber -> reactAll(ctx, io, Iterable.iterator(), subscriber, false));
+            return Single.create(subscriber -> reactAll(ctx, io, iterable.iterator(), subscriber, false));
         }
 
         private static void reactByFirst(final ReactContext ctx, final InOut io,
@@ -57,21 +57,21 @@ public interface TradeReactor {
                     LOG.trace("before {} react for {}", reactor, ctx.trade());
                     reactor.react(ctx, io).subscribe(newio -> {
                         LOG.trace("after {} react for {}", reactor, ctx.trade());
-                            if (!subscriber.isUnsubscribed()) {
-                                if (null != newio) {
-                                    LOG.trace("invoke onSuccess with newio {} for {}", newio, ctx.trade());
-                                    subscriber.onSuccess(newio);
-                                } else {
-                                    LOG.trace("invoke reactByFirst with orgio {} for {}", io, ctx.trade());
-                                    reactByFirst(ctx, io, iter, subscriber);
-                                }
+                        if (!subscriber.isUnsubscribed()) {
+                            if (null != newio) {
+                                LOG.trace("invoke onSuccess with newio {} for {}", newio, ctx.trade());
+                                subscriber.onSuccess(newio);
+                            } else {
+                                LOG.trace("invoke reactByFirst with orgio {} for {}", io, ctx.trade());
+                                reactByFirst(ctx, io, iter, subscriber);
                             }
-                        },  e -> {
-                            LOG.trace("invoke onError {} for {}", ExceptionUtils.exception2detail(e), ctx.trade());
-                            if (!subscriber.isUnsubscribed()) {
-                                subscriber.onError(e);
-                            }
-                        });
+                        }
+                    },  e -> {
+                        LOG.trace("invoke onError {} for {}", ExceptionUtils.exception2detail(e), ctx.trade());
+                        if (!subscriber.isUnsubscribed()) {
+                            subscriber.onError(e);
+                        }
+                    });
                 } else {
                     subscriber.onSuccess(null);
                 }
