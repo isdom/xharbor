@@ -1,5 +1,6 @@
 package org.jocean.xharbor.reactor;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -10,6 +11,7 @@ import java.util.concurrent.atomic.AtomicStampedReference;
 import javax.inject.Inject;
 
 import org.jocean.idiom.BeanFinder;
+import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.Ordered;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.ServiceMemo;
@@ -21,6 +23,7 @@ import com.google.common.collect.Maps;
 
 import io.netty.util.Timer;
 import rx.Single;
+import rx.SingleSubscriber;
 import rx.functions.Action0;
 
 public class CompositeForward implements TradeReactor, Ordered {
@@ -100,7 +103,7 @@ public class CompositeForward implements TradeReactor, Ordered {
 
     @Override
     public Single<Boolean> match(final ReactContext ctx, final InOut io) {
-        return Single.just(false);
+        return Single.just(true);
     }
 
     @Override
@@ -113,6 +116,54 @@ public class CompositeForward implements TradeReactor, Ordered {
             return Single.<InOut>just(null);
         } else {
             return TradeReactor.OP.first(Arrays.asList(reactors), ctx, io);
+//            return first(reactors, ctx, io, 1);
+        }
+    }
+
+    public static <T extends TradeReactor> Single<? extends InOut> first(final T[] reactors,
+            final ReactContext ctx, final InOut io, final int concurrent) {
+        return Single.create(subscriber -> reactByFirst(ctx, io, reactors, 0, concurrent, subscriber));
+    }
+
+    private static <T extends TradeReactor> void reactByFirst(final ReactContext ctx, final InOut io,
+            final T[] reactors,
+            final int begin,
+            final int concurrent,
+            final SingleSubscriber<? super InOut> subscriber) {
+        if (!subscriber.isUnsubscribed()) {
+            final List<Single<Boolean>> domatchs = new ArrayList<>();
+            final int size = Math.min(reactors.length - begin, concurrent);
+            for (int idx = begin; idx < begin + size; idx++) {
+                domatchs.add(reactors[idx].match(ctx, io).subscribeOn(ctx.scheduler()));
+            }
+            Single.<Integer>zip(domatchs, (final Object... matchs) -> {
+                    int idx = 0;
+                    for (final Object ismatch : matchs) {
+                        if ((Boolean)ismatch) {
+                            return idx;
+                        }
+                        idx++;
+                    }
+                    return -1;
+                }).subscribe(idx -> {
+                    if (-1 == idx) {
+                        // not matched
+                        if (begin + size >= reactors.length) {
+                            // end of reactors
+                            subscriber.onSuccess(null);
+                        } else {
+                            reactByFirst(ctx, io, reactors, begin + size, concurrent, subscriber);
+                        }
+                    } else {
+                        // matched
+                        reactors[begin + idx].react(ctx, io).subscribe(subscriber);
+                    }
+                }, e -> {
+                    LOG.trace("invoke onError {} for {}", ExceptionUtils.exception2detail(e), ctx.trade());
+                    if (!subscriber.isUnsubscribed()) {
+                        subscriber.onError(e);
+                    }
+                });
         }
     }
 

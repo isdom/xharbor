@@ -29,12 +29,24 @@
         </constructor-arg>
     </bean>
     
-    <bean id="tradeSubscription" 
+    <bean id="doObserveOn" 
         factory-bean="agentServer" 
+        factory-method="compose">
+        <constructor-arg>
+            <bean class="org.jocean.xharbor.relay.TradeExecutor" factory-method="observeOn">
+                <constructor-arg ref="beanFinder" />
+                <constructor-arg value="${tp.name:tp_default}" />
+                <constructor-arg value="${max.pending:1024}" />
+            </bean>
+        </constructor-arg>
+    </bean>
+    
+    <bean id="tradeSubscription" 
+        factory-bean="doObserveOn" 
         factory-method="subscribe"
         destroy-method="unsubscribe">
         <constructor-arg>
-            <bean class="org.jocean.xharbor.relay.TradeRelay" init-method="start" destroy-method="stop">
+            <bean class="org.jocean.xharbor.relay.TradeRelay">
                 <constructor-arg ref="router" />
             </bean>
         </constructor-arg>

@@ -31,6 +31,9 @@ children:
           features.name=default
 #        children:
 #          - name: feature_logging
+  - name: trade_tp.default
+    parameters: |
+      worker.count = 4
   - name: httpclient.default
     parameters: |
       http.client.thread.count = 2

@@ -282,7 +282,7 @@ public class ForwardTrade implements TradeReactor {
                         .flatMap(any -> upstream.defineInteraction(
                             inbound.map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient))
                             .compose(fullreq2objs())))
-                        .observeOn(ctx.scheduler())
+//                        .observeOn(ctx.scheduler())  TODO : disable
                         .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))
                         .doOnNext(TraceUtil.hookhttpresp(span))
                         .doOnError( e -> {
