@@ -3,7 +3,6 @@ package org.jocean.xharbor.relay;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.idiom.BeanFinder;
 import org.springframework.beans.factory.annotation.Value;
 
@@ -13,8 +12,8 @@ import rx.schedulers.Schedulers;
 
 public class TradeExecutor {
 
-    public static Transformer<HttpTrade, HttpTrade> observeOn(final BeanFinder finder, final String tpname, final int bufferSize) {
-        return trades -> finder.find(tpname, TradeExecutor.class).flatMap(executor -> trades.observeOn(executor._workerScheduler, bufferSize));
+    public static <T> Transformer<T, T> observeOn(final BeanFinder finder, final String tpname, final int bufferSize) {
+        return ts -> finder.find(tpname, TradeExecutor.class).flatMap(executor -> ts.observeOn(executor._workerScheduler, bufferSize));
     }
 
     void start() {

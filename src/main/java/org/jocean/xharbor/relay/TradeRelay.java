@@ -76,7 +76,8 @@ public class TradeRelay extends Subscriber<HttpTrade> {
 
         final AtomicReference<ReactContext> ctxRef = new AtomicReference<>();
 
-        trade2ctx(trade).doOnNext(ctx -> ctxRef.set(ctx)).doOnNext(ctx -> TraceUtil.hook4serversend(trade.writeCtrl(), ctx.span()))
+        trade2ctx(trade).doOnNext(ctx -> LOG.trace("trade {} generate ctx: {}", trade, ctx))
+            .doOnNext(ctx -> ctxRef.set(ctx)).doOnNext(ctx -> TraceUtil.hook4serversend(trade.writeCtrl(), ctx.span()))
             .flatMapSingle(ctx -> this._tradeReactor.react(ctx, new InOut() {
                 @Override
                 public Observable<FullMessage<HttpRequest>> inbound() {
@@ -103,7 +104,8 @@ public class TradeRelay extends Subscriber<HttpTrade> {
     }
 
     private Observable<ReactContext> trade2ctx(final HttpTrade trade) {
-        return trade.inbound().first().map(fullreq -> fullreq.message())
+        return trade.inbound().first().compose(TradeExecutor.observeOn(this._finder, this._tpName, this._maxPending))
+                .map(fullreq -> fullreq.message())
                 .flatMap(request -> getTracer(request).map(tracer -> {
                     final Span span = tracer.buildSpan("httpin")
                     .withTag(Tags.COMPONENT.getKey(), "jocean-http")
@@ -243,6 +245,12 @@ public class TradeRelay extends Subscriber<HttpTrade> {
 
     @Inject
     BeanFinder _finder;
+
+    @Value("${tp.name}")
+    String _tpName = "tp_default";
+
+    @Value("${max.pending}")
+    int _maxPending = 1024;
 
     @Value("${tracing.enabled}")
     boolean _tracingEnabled = true;
