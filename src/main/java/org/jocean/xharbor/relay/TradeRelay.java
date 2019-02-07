@@ -104,7 +104,8 @@ public class TradeRelay extends Subscriber<HttpTrade> {
     }
 
     private Observable<ReactContext> trade2ctx(final HttpTrade trade) {
-        return trade.inbound().first().compose(TradeExecutor.observeOn(this._finder, this._tpName, this._maxPending))
+        final AtomicReference<Scheduler> schedulerRef = new AtomicReference<>();
+        return trade.inbound().first().compose(runWithin(schedulerRef))
                 .map(fullreq -> fullreq.message())
                 .flatMap(request -> getTracer(request).map(tracer -> {
                     final Span span = tracer.buildSpan("httpin")
@@ -126,8 +127,13 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                     TraceUtil.addTagNotNull(span, "slb.ip", request.headers().get("slb-ip"));
                     TraceUtil.addTagNotNull(span, "slb.proto", request.headers().get("x-forwarded-proto"));
 
-                    return buildReactCtx(trade, span, tracer, null);
+                    return buildReactCtx(trade, span, tracer, schedulerRef.get());
                 }));
+    }
+
+    private <T> Transformer<T, T> runWithin(final AtomicReference<Scheduler> schedulerRef) {
+        return ts -> _finder.find(_tpName, TradeExecutor.class).doOnNext(executor -> schedulerRef.set(executor.scheduler()))
+                .flatMap(executor ->  ts.observeOn(executor.scheduler(), this._maxPending));
     }
 
     private Observable<Tracer> getTracer(final HttpRequest request) {
