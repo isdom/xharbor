@@ -132,7 +132,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
     }
 
     private <T> Transformer<T, T> runWithin(final AtomicReference<Scheduler> schedulerRef) {
-        return ts -> _finder.find(_tpName, TradeExecutor.class).doOnNext(executor -> schedulerRef.set(executor.scheduler()))
+        return ts -> _finder.find(_tpName, TradeScheduler.class).doOnNext(executor -> schedulerRef.set(executor.scheduler()))
                 .flatMap(executor ->  ts.observeOn(executor.scheduler(), this._maxPending));
     }
 
@@ -252,8 +252,8 @@ public class TradeRelay extends Subscriber<HttpTrade> {
     @Inject
     BeanFinder _finder;
 
-    @Value("${tp.name}")
-    String _tpName = "tp_default";
+    @Value("${scheduler.name}")
+    String _tpName = "scheduler_default";
 
     @Value("${max.pending}")
     int _maxPending = 1024;

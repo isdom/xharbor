@@ -4,9 +4,9 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
     
-    <bean id="tradeexec" class="org.jocean.xharbor.relay.TradeExecutor" 
+    <bean id="scheduler" class="org.jocean.xharbor.relay.TradeScheduler" 
         init-method="start" destroy-method="stop" />
         
-    <alias name="tradeexec" alias="${tp.name:tp_default}"/>
+    <alias name="scheduler" alias="${scheduler.name:scheduler_default}"/>
 
 </beans>

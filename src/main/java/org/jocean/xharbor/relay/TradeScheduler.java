@@ -10,10 +10,10 @@ import rx.Observable.Transformer;
 import rx.Scheduler;
 import rx.schedulers.Schedulers;
 
-public class TradeExecutor {
+public class TradeScheduler {
 
     public static <T> Transformer<T, T> observeOn(final BeanFinder finder, final String tpname, final int bufferSize) {
-        return ts -> finder.find(tpname, TradeExecutor.class).flatMap(executor -> ts.observeOn(executor._workerScheduler, bufferSize));
+        return ts -> finder.find(tpname, TradeScheduler.class).flatMap(executor -> ts.observeOn(executor._workerScheduler, bufferSize));
     }
 
     void start() {
