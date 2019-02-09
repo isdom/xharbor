@@ -1,7 +1,6 @@
 package org.jocean.xharbor.reactor;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -115,30 +114,35 @@ public class CompositeForward implements TradeReactor, Ordered {
         if (null == reactors || (null != reactors && reactors.length == 0)) {
             return Single.<InOut>just(null);
         } else {
-            return TradeReactor.OP.first(Arrays.asList(reactors), ctx, io);
-//            return first(reactors, ctx, io, 1);
+//            return TradeReactor.OP.first(Arrays.asList(reactors), ctx, io);
+            return first(reactors, ctx, io, ctx.concurrent());
         }
     }
 
-    public static <T extends TradeReactor> Single<? extends InOut> first(final T[] reactors,
-            final ReactContext ctx, final InOut io, final int concurrent) {
+    public static <T extends TradeReactor> Single<? extends InOut> first(
+            final T[] reactors,
+            final ReactContext ctx,
+            final InOut io,
+            final int concurrent) {
         return Single.create(subscriber -> reactByFirst(ctx, io, reactors, 0, concurrent, subscriber));
     }
 
-    private static <T extends TradeReactor> void reactByFirst(final ReactContext ctx, final InOut io,
+    private static <T extends TradeReactor> void reactByFirst(
+            final ReactContext ctx,
+            final InOut io,
             final T[] reactors,
-            final int begin,
+            final int start,
             final int concurrent,
             final SingleSubscriber<? super InOut> subscriber) {
         if (!subscriber.isUnsubscribed()) {
             final List<Single<Boolean>> domatchs = new ArrayList<>();
-            final int size = Math.min(reactors.length - begin, concurrent);
-            for (int idx = begin; idx < begin + size; idx++) {
+            final int count = Math.min(reactors.length - start, concurrent);
+            for (int idx = start; idx < start + count; idx++) {
                 domatchs.add(reactors[idx].match(ctx, io).subscribeOn(ctx.scheduler()));
             }
-            Single.<Integer>zip(domatchs, (final Object... matchs) -> {
+            Single.<Integer>zip(domatchs, results -> {
                     int idx = 0;
-                    for (final Object ismatch : matchs) {
+                    for (final Object ismatch : results) {
                         if ((Boolean)ismatch) {
                             return idx;
                         }
@@ -147,16 +151,16 @@ public class CompositeForward implements TradeReactor, Ordered {
                     return -1;
                 }).subscribe(idx -> {
                     if (-1 == idx) {
-                        // not matched
-                        if (begin + size >= reactors.length) {
+                        // no matched forward, so next
+                        if (start + count >= reactors.length) {
                             // end of reactors
                             subscriber.onSuccess(null);
                         } else {
-                            reactByFirst(ctx, io, reactors, begin + size, concurrent, subscriber);
+                            reactByFirst(ctx, io, reactors, start + count, concurrent, subscriber);
                         }
                     } else {
                         // matched
-                        reactors[begin + idx].react(ctx, io).subscribe(subscriber);
+                        reactors[start + idx].react(ctx, io).subscribe(subscriber);
                     }
                 }, e -> {
                     LOG.trace("invoke onError {} for {}", ExceptionUtils.exception2detail(e), ctx.trade());

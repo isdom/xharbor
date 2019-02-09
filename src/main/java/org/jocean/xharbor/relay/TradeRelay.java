@@ -6,6 +6,7 @@ package org.jocean.xharbor.relay;
 import java.net.ConnectException;
 import java.nio.channels.ClosedChannelException;
 import java.util.Collections;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.inject.Inject;
@@ -105,7 +106,8 @@ public class TradeRelay extends Subscriber<HttpTrade> {
 
     private Observable<ReactContext> trade2ctx(final HttpTrade trade) {
         final AtomicReference<Scheduler> schedulerRef = new AtomicReference<>();
-        return trade.inbound().first().compose(runWithin(schedulerRef))
+        final AtomicInteger concurrent = new AtomicInteger(1);
+        return trade.inbound().first().compose(runWithin(schedulerRef, concurrent))
                 .map(fullreq -> fullreq.message())
                 .flatMap(request -> getTracer(request).map(tracer -> {
                     final Span span = tracer.buildSpan("httpin")
@@ -127,12 +129,16 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                     TraceUtil.addTagNotNull(span, "slb.ip", request.headers().get("slb-ip"));
                     TraceUtil.addTagNotNull(span, "slb.proto", request.headers().get("x-forwarded-proto"));
 
-                    return buildReactCtx(trade, span, tracer, schedulerRef.get());
+                    return buildReactCtx(trade, span, tracer, schedulerRef.get(), concurrent.get());
                 }));
     }
 
-    private <T> Transformer<T, T> runWithin(final AtomicReference<Scheduler> schedulerRef) {
-        return ts -> _finder.find(this._schedulerName, TradeScheduler.class).doOnNext(scheduler -> schedulerRef.set(scheduler.scheduler()))
+    private <T> Transformer<T, T> runWithin(final AtomicReference<Scheduler> schedulerRef, final AtomicInteger concurrent) {
+        return ts -> _finder.find(this._schedulerName, TradeScheduler.class)
+                .doOnNext(scheduler -> {
+                    schedulerRef.set(scheduler.scheduler());
+                    concurrent.set(scheduler._workerCount);
+                })
                 .flatMap(scheduler ->  ts.observeOn(scheduler.scheduler(), this._maxPending));
     }
 
@@ -146,7 +152,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
         return request.headers().contains("x-forwarded-for");
     }
 
-    private ReactContext buildReactCtx(final HttpTrade trade, final Span span, final Tracer tracer, final Scheduler scheduler) {
+    private ReactContext buildReactCtx(final HttpTrade trade, final Span span, final Tracer tracer, final Scheduler scheduler, final int concurrent) {
         final StopWatch watch4Result = new StopWatch();
         return new ReactContext() {
             @Override
@@ -172,6 +178,11 @@ public class TradeRelay extends Subscriber<HttpTrade> {
             @Override
             public Scheduler scheduler() {
                 return scheduler;
+            }
+
+            @Override
+            public int concurrent() {
+                return concurrent;
             }};
     }
 

@@ -25,6 +25,7 @@ public interface TradeReactor {
         public Tracer tracer();
         public Span span();
         public Scheduler scheduler();
+        public int concurrent();
     }
 
     public interface InOut {
