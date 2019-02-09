@@ -132,8 +132,8 @@ public class TradeRelay extends Subscriber<HttpTrade> {
     }
 
     private <T> Transformer<T, T> runWithin(final AtomicReference<Scheduler> schedulerRef) {
-        return ts -> _finder.find(_schedulerName, TradeScheduler.class).doOnNext(executor -> schedulerRef.set(executor.scheduler()))
-                .flatMap(executor ->  ts.observeOn(executor.scheduler(), this._maxPending));
+        return ts -> _finder.find(this._schedulerName, TradeScheduler.class).doOnNext(scheduler -> schedulerRef.set(scheduler.scheduler()))
+                .flatMap(scheduler ->  ts.observeOn(scheduler.scheduler(), this._maxPending));
     }
 
     private Observable<Tracer> getTracer(final HttpRequest request) {
