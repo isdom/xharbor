@@ -46,7 +46,7 @@ public class CompositeReactorTestCase {
 
     @Test
     public final void testCompositeReactor() {
-        final CompositeReactor cr = new CompositeReactor();
+        final CompositeReactor cr = new CompositeReactor(TradeReactor.OP.reactAll());
         final AtomicBoolean tr1Reacted = new AtomicBoolean(false);
         final AtomicBoolean tr2Reacted = new AtomicBoolean(false);
 

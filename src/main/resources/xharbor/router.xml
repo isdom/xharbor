@@ -4,6 +4,10 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
     
-    <bean id="router" class="org.jocean.xharbor.reactor.CompositeReactor"/>
+    <bean id="router" class="org.jocean.xharbor.reactor.CompositeReactor">
+        <constructor-arg>
+            <bean class="org.jocean.xharbor.api.TradeReactor.OP" factory-method="reactAll"/>
+        </constructor-arg>
+    </>
     
 </beans>
