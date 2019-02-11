@@ -48,8 +48,8 @@ public class CompositeReactor implements TradeReactor, Ordered {
 
     private static final Logger LOG = LoggerFactory.getLogger(CompositeReactor.class);
 
-    public CompositeReactor(final Func3<TradeReactor[],ReactContext,InOut,Single<? extends InOut>> reactOperator) {
-        this._reactOperator = reactOperator;
+    public CompositeReactor(final Func3<TradeReactor[],ReactContext,InOut,Single<? extends InOut>> compositeReactor) {
+        this._compositeReactor = compositeReactor;
     }
 
     public void setOrdinal(final int ordinal) {
@@ -106,7 +106,7 @@ public class CompositeReactor implements TradeReactor, Ordered {
             (null != reactors && reactors.length == 0)) {
             return Single.<InOut>just(null);
         } else {
-            return _reactOperator.call(reactors, ctx, io);
+            return _compositeReactor.call(reactors, ctx, io);
 //            return TradeReactor.OP.all(Arrays.asList(reactors), ctx, io);
         }
     }
@@ -120,5 +120,5 @@ public class CompositeReactor implements TradeReactor, Ordered {
     private final List<TradeReactor> _reactors = new CopyOnWriteArrayList<>();
     private final AtomicStampedReference<TradeReactor[]> _descReactorsRef = new AtomicStampedReference<>(null, 0);
     private int _ordinal = 0;
-    private final Func3<TradeReactor[],ReactContext,InOut,Single<? extends InOut>> _reactOperator;
+    private final Func3<TradeReactor[],ReactContext,InOut,Single<? extends InOut>> _compositeReactor;
 }

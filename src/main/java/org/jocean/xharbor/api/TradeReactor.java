@@ -43,10 +43,6 @@ public interface TradeReactor {
 
     public static class OP {
         private static final Logger LOG = LoggerFactory.getLogger(TradeReactor.class);
-        public static Single<? extends InOut> first(final Iterable<? extends TradeReactor> iterable,
-                final ReactContext ctx, final InOut io) {
-            return Single.create(subscriber -> reactByFirst(ctx, io, iterable.iterator(), subscriber));
-        }
 
         public static Func3<TradeReactor[],ReactContext,InOut,Single<? extends InOut>> reactAll() {
             return (reactors, ctx, io) -> all(Arrays.asList(reactors), ctx, io);
@@ -57,36 +53,6 @@ public interface TradeReactor {
                 final ReactContext ctx,
                 final InOut io) {
             return Single.create(subscriber -> reactAll(ctx, io, iterable.iterator(), subscriber, false));
-        }
-
-        private static void reactByFirst(final ReactContext ctx, final InOut io,
-                final Iterator<? extends TradeReactor> iter,
-                final SingleSubscriber<? super InOut> subscriber) {
-            if (!subscriber.isUnsubscribed()) {
-                if (iter.hasNext()) {
-                    final TradeReactor reactor = iter.next();
-                    LOG.trace("before {} react for {}", reactor, ctx.trade());
-                    reactor.react(ctx, io).subscribe(newio -> {
-                        LOG.trace("after {} react for {}", reactor, ctx.trade());
-                        if (!subscriber.isUnsubscribed()) {
-                            if (null != newio) {
-                                LOG.trace("invoke onSuccess with newio {} for {}", newio, ctx.trade());
-                                subscriber.onSuccess(newio);
-                            } else {
-                                LOG.trace("invoke reactByFirst with orgio {} for {}", io, ctx.trade());
-                                reactByFirst(ctx, io, iter, subscriber);
-                            }
-                        }
-                    },  e -> {
-                        LOG.trace("invoke onError {} for {}", ExceptionUtils.exception2detail(e), ctx.trade());
-                        if (!subscriber.isUnsubscribed()) {
-                            subscriber.onError(e);
-                        }
-                    });
-                } else {
-                    subscriber.onSuccess(null);
-                }
-            }
         }
 
         private static void reactAll(final ReactContext ctx, final InOut io,
@@ -117,6 +83,46 @@ public interface TradeReactor {
                         });
                 } else {
                     subscriber.onSuccess(handled ? io : null);
+                }
+            }
+        }
+
+        public static Func3<TradeReactor[],ReactContext,InOut,Single<? extends InOut>> reactFirst() {
+            return (reactors, ctx, io) -> first(Arrays.asList(reactors), ctx, io);
+        }
+
+        public static Single<? extends InOut> first(final Iterable<? extends TradeReactor> iterable,
+                final ReactContext ctx, final InOut io) {
+            return Single.create(subscriber -> reactByFirst(ctx, io, iterable.iterator(), subscriber));
+        }
+
+        private static void reactByFirst(
+                final ReactContext ctx, final InOut io,
+                final Iterator<? extends TradeReactor> iter,
+                final SingleSubscriber<? super InOut> subscriber) {
+            if (!subscriber.isUnsubscribed()) {
+                if (iter.hasNext()) {
+                    final TradeReactor reactor = iter.next();
+                    LOG.trace("before {} react for {}", reactor, ctx.trade());
+                    reactor.react(ctx, io).subscribe(newio -> {
+                        LOG.trace("after {} react for {}", reactor, ctx.trade());
+                        if (!subscriber.isUnsubscribed()) {
+                            if (null != newio) {
+                                LOG.trace("invoke onSuccess with newio {} for {}", newio, ctx.trade());
+                                subscriber.onSuccess(newio);
+                            } else {
+                                LOG.trace("invoke reactByFirst with orgio {} for {}", io, ctx.trade());
+                                reactByFirst(ctx, io, iter, subscriber);
+                            }
+                        }
+                    },  e -> {
+                        LOG.trace("invoke onError {} for {}", ExceptionUtils.exception2detail(e), ctx.trade());
+                        if (!subscriber.isUnsubscribed()) {
+                            subscriber.onError(e);
+                        }
+                    });
+                } else {
+                    subscriber.onSuccess(null);
                 }
             }
         }

@@ -63,6 +63,34 @@ children:
               http.address=127.0.0.1
             children:
               - name: feature_ssl4server
+      - name: rwreq.live
+        parameters: |
+          rewrite.path=/demo/
+          rewrite.header.name=Host
+          rewrite.header.value=live.iplusmed.com
+      - name: rwreq.crossdomain
+        parameters: |
+          rewrite.path=/crossdomain.xml
+          rewrite.header.name=Host
+          rewrite.header.value=wapp.jocean.org
+      - name: respond.status
+        parameters: |
+          request.method=HEAD
+          request.path=/status
+          response.status = 200
+          response.log=false
+      - name: rwresp.cors
+        parameters: |
+          rewrite.path=/api1/
+        children:
+          - name: addheader.cors.basic
+            parameters: |
+              header.name=Access-Control-Allow-Origin
+              header.value=*
+#      - name: drop.reject_missctx
+#        parameters: |
+#          request.path=/newrest/stream
+#          request.headers=x-ctx,==null
       - name: rules.100
         parameters: |
           priority=100
@@ -77,26 +105,11 @@ children:
               forward.path=/demo/
               forward.to=http://live.iplusmed.com:80
               features.name=default
-          - name: rwreq.live
-            parameters: |
-              rewrite.path=/demo/
-              rewrite.header.name=Host
-              rewrite.header.value=live.iplusmed.com
           - name: forward.crossdomain
             parameters: |
               forward.path=/crossdomain.xml
               forward.to=http://wapp.jocean.org:80
               features.name=default
-          - name: rwreq.crossdomain
-            parameters: |
-              rewrite.path=/crossdomain.xml
-              rewrite.header.name=Host
-              rewrite.header.value=wapp.jocean.org
-          - name: respond.checkhealth
-            parameters: |
-              request.method=HEAD|GET
-              request.path=^/$|/checkhealth
-              response.status=200
           - name: forward.ydd
             parameters: |
               forward.path=/api1/|/api2/
@@ -113,14 +126,6 @@ children:
             parameters: |
               forward.path=/zkwebui/
               forward.to=http://127.0.0.1:7080
-          - name: rwresp.cors
-            parameters: |
-              rewrite.path=/api1/
-            children:
-              - name: addheader.cors.basic
-                parameters: |
-                  header.name=Access-Control-Allow-Origin
-                  header.value=*
           - name: forward.mock
             parameters: |
               forward.path=/mock
@@ -135,20 +140,6 @@ children:
 #              request.path=/newrest/stream
 #              request.headers=x-ctx,==null
 #              response.status = 404
-      - name: rules.300
-        parameters: |
-          priority=300
-        children:
-          - name: respond.status
-            parameters: |
-              request.method=HEAD
-              request.path=/status
-              response.status = 200
-              response.log=false
-#          - name: drop.reject_missctx
-#            parameters: |
-#              request.path=/newrest/stream
-#              request.headers=x-ctx,==null
   - name: router.console
     children:
       - name: httpserver.console
@@ -162,36 +153,35 @@ children:
               tracing.enabled = false
             children:
               - name: feature_logging
+      - name: rwreq.jmxhtml
+        parameters: |
+          rewrite.path=/jmxhtml/
+          rewrite.to=/
+          rewrite.header.name=x-jmx
+          rewrite.header.value=jmxhtml.self
+      - name: rwreq.hystrix
+        parameters: |
+          rewrite.path=/hystrix/
+          rewrite.to=/
+          rewrite.header.name=x-hystrix
+          rewrite.header.value=hystrix
+#      - name: auth.jmxhtml
+#        parameters: |
+#          auth.headers=x-jmx,jmxhtml(\\w)*
+#          auth.user=test
+#          auth.password=test
       - name: rules.100
         parameters: |
           priority=100
-          in.maxBPS = 1024
         children:
           - name: forward.jmxhtml.self
             parameters: |
               forward.headers=x-jmx,jmxhtml.self
               forward.to=http://127.0.0.1:8083
-          - name: rwreq.jmxhtml
-            parameters: |
-              rewrite.path=/jmxhtml/
-              rewrite.to=/
-              rewrite.header.name=x-jmx
-              rewrite.header.value=jmxhtml.self
-#          - name: auth.jmxhtml
-#            parameters: |
-#              auth.headers=x-jmx,jmxhtml(\\w)*
-#              auth.user=test
-#              auth.password=test
           - name: forward.hystrix.self
             parameters: |
               forward.headers=x-hystrix,hystrix
               forward.to=http://127.0.0.1:4004
-          - name: rwreq.hystrix
-            parameters: |
-              rewrite.path=/hystrix/
-              rewrite.to=/
-              rewrite.header.name=x-hystrix
-              rewrite.header.value=hystrix
   - name: httpserver
     parameters: |
       http.server.inbound.recvbuf = 8192
