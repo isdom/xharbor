@@ -139,21 +139,8 @@ public interface TradeReactor {
                 final int concurrent,
                 final SingleSubscriber<? super InOut> subscriber) {
             if (!subscriber.isUnsubscribed()) {
-                final List<Single<Boolean>> domatchs = new ArrayList<>();
                 final int count = Math.min(reactors.length - start, concurrent);
-                for (int idx = start; idx < start + count; idx++) {
-                    domatchs.add(reactors[idx].match(ctx, io).subscribeOn(ctx.scheduler()));
-                }
-                Single.<Integer>zip(domatchs, results -> {
-                        int idx = 0;
-                        for (final Object ismatch : results) {
-                            if ((Boolean)ismatch) {
-                                return idx;
-                            }
-                            idx++;
-                        }
-                        return -1;
-                    }).subscribe(idx -> {
+                matchsOf(ctx, io, reactors, start, count).subscribe(idx -> {
                         if (-1 == idx) {
                             // no matched forward, so next
                             if (start + count >= reactors.length) {
@@ -172,6 +159,34 @@ public interface TradeReactor {
                             subscriber.onError(e);
                         }
                     });
+            }
+        }
+
+        private static Single<Integer> matchsOf(
+                final ReactContext ctx,
+                final InOut io,
+                final TradeReactor[] reactors,
+                final int start,
+                final int count) {
+            if (count > 1) {
+                LOG.debug("concurrent count is {}, try parallel", count);
+                final List<Single<Boolean>> domatchs = new ArrayList<>();
+                for (int idx = start; idx < start + count; idx++) {
+                    domatchs.add(reactors[idx].match(ctx, io).subscribeOn(ctx.scheduler()));
+                }
+                return Single.<Integer>zip(domatchs, results -> {
+                        int idx = 0;
+                        for (final Object ismatch : results) {
+                            if ((Boolean)ismatch) {
+                                return idx;
+                            }
+                            idx++;
+                        }
+                        return -1;
+                    });
+            } else {
+                LOG.debug("concurrent count is {}, back to serial", count);
+                return reactors[start].match(ctx, io).map(matched -> matched ? 0 : -1);
             }
         }
     }
