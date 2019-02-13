@@ -13,6 +13,7 @@ import org.jocean.idiom.Ordered;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.ServiceMemo;
 import org.jocean.xharbor.api.TradeReactor;
+import org.jocean.xharbor.relay.ReactUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -117,7 +118,7 @@ public class CompositeForward implements TradeReactor, Ordered {
         }
     }
 
-    final Func3<TradeReactor[], ReactContext, InOut, Single<? extends InOut>> _compositeReactor = TradeReactor.OP.parallelFirstof();
+    final Func3<TradeReactor[], ReactContext, InOut, Single<? extends InOut>> _compositeReactor = ReactUtil.parallelFirstof();
 
     private final AtomicInteger _stampProvider = new AtomicInteger(0);
 

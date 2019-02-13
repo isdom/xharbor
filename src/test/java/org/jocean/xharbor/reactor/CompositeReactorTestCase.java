@@ -11,6 +11,7 @@ import org.jocean.idiom.Ordered;
 import org.jocean.xharbor.api.TradeReactor;
 import org.jocean.xharbor.api.TradeReactor.InOut;
 import org.jocean.xharbor.api.TradeReactor.ReactContext;
+import org.jocean.xharbor.relay.ReactUtil;
 import org.junit.Test;
 
 import io.netty.handler.codec.http.HttpRequest;
@@ -46,7 +47,7 @@ public class CompositeReactorTestCase {
 
     @Test
     public final void testCompositeReactor() {
-        final CompositeReactor cr = new CompositeReactor(TradeReactor.OP.reactAll());
+        final CompositeReactor cr = new CompositeReactor(ReactUtil.reactAll());
         final AtomicBoolean tr1Reacted = new AtomicBoolean(false);
         final AtomicBoolean tr2Reacted = new AtomicBoolean(false);
 
