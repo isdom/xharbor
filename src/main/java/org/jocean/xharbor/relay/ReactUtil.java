@@ -104,7 +104,11 @@ public class ReactUtil {
         }
 
         public static Func3<TradeReactor[],ReactContext,InOut,Single<? extends InOut>> parallelFirst() {
-            return (reactors, ctx, io) -> Single.create(subscriber -> reactByFirst(ctx, io, reactors, 0, ctx.concurrent(), subscriber));
+            return (reactors, ctx, io) -> parallelFirst(reactors, ctx, io);
+        }
+
+        public static Single<? extends InOut> parallelFirst(final TradeReactor[] reactors, final ReactContext ctx, final InOut io) {
+            return Single.create(subscriber -> reactByFirst(ctx, io, reactors, 0, ctx.concurrent(), subscriber));
         }
 
         private static void reactByFirst(

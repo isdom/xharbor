@@ -22,7 +22,6 @@ import com.google.common.collect.Maps;
 import io.netty.util.Timer;
 import rx.Single;
 import rx.functions.Action0;
-import rx.functions.Func3;
 
 public class CompositeForward implements TradeReactor, Ordered {
 
@@ -113,12 +112,9 @@ public class CompositeForward implements TradeReactor, Ordered {
         if (null == fwdts || (null != fwdts && fwdts.length == 0)) {
             return Single.<InOut>just(null);
         } else {
-//            return TradeReactor.OP.first(Arrays.asList(reactors), ctx, io);
-            return this._compositeReactor.call(fwdts, ctx, io);
+            return ReactUtil.parallelFirst(fwdts, ctx, io);
         }
     }
-
-    final Func3<TradeReactor[], ReactContext, InOut, Single<? extends InOut>> _compositeReactor = ReactUtil.parallelFirst();
 
     private final AtomicInteger _stampProvider = new AtomicInteger(0);
 
