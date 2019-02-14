@@ -118,7 +118,7 @@ public class CompositeForward implements TradeReactor, Ordered {
         }
     }
 
-    final Func3<TradeReactor[], ReactContext, InOut, Single<? extends InOut>> _compositeReactor = ReactUtil.parallelFirstof();
+    final Func3<TradeReactor[], ReactContext, InOut, Single<? extends InOut>> _compositeReactor = ReactUtil.parallelFirst();
 
     private final AtomicInteger _stampProvider = new AtomicInteger(0);
 

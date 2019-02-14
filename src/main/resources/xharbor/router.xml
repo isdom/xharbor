@@ -10,7 +10,7 @@
         </constructor-arg>
     </bean>
 
-    <bean id="first" class="org.jocean.xharbor.relay.ReactUtil" factory-method="parallelFirstof"/>
+    <bean id="first" class="org.jocean.xharbor.relay.ReactUtil" factory-method="parallelFirst"/>
     
     <bean id="drops" class="org.jocean.xharbor.reactor.CompositeReactor">
         <constructor-arg ref="first"/>

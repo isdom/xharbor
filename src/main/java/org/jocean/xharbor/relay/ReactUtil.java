@@ -30,7 +30,8 @@ public class ReactUtil {
             return Single.create(subscriber -> reactAll(ctx, io, iterable.iterator(), subscriber, false));
         }
 
-        private static void reactAll(final ReactContext ctx, final InOut io,
+        private static void reactAll(final ReactContext ctx,
+                final InOut io,
                 final Iterator<? extends TradeReactor> iter,
                 final SingleSubscriber<? super InOut> subscriber,
                 final boolean handled) {
@@ -102,7 +103,7 @@ public class ReactUtil {
             }
         }
 
-        public static Func3<TradeReactor[],ReactContext,InOut,Single<? extends InOut>> parallelFirstof() {
+        public static Func3<TradeReactor[],ReactContext,InOut,Single<? extends InOut>> parallelFirst() {
             return (reactors, ctx, io) -> Single.create(subscriber -> reactByFirst(ctx, io, reactors, 0, ctx.concurrent(), subscriber));
         }
 
