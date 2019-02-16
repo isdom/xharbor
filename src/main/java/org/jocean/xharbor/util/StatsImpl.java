@@ -1,5 +1,5 @@
 /**
- * 
+ *
  */
 package org.jocean.xharbor.util;
 
@@ -21,7 +21,7 @@ public class StatsImpl implements RulesMBean, Action2<String, Func0<Map<String, 
         return new HashMap<String, Map<String, Object>>() {
             private static final long serialVersionUID = 1L;
         {
-            for (Map.Entry<String, Func0<Map<String, Object>>> entry : _register.entrySet()) {
+            for (final Map.Entry<String, Func0<Map<String, Object>>> entry : _register.entrySet()) {
                 final Map<String, Object> content = entry.getValue().call();
                 if (null != content && !content.isEmpty()) {
                     this.put(entry.getKey(), content);
@@ -29,13 +29,11 @@ public class StatsImpl implements RulesMBean, Action2<String, Func0<Map<String, 
             }
         }};
     }
-    
+
     @Override
     public void call(final String name, final Func0<Map<String, Object>> getter) {
         this._register.put(name, getter);
     }
 
-    private final Map<String, Func0<Map<String, Object>>> _register = 
-            new ConcurrentHashMap<>();
-
+    private final Map<String, Func0<Map<String, Object>>> _register = new ConcurrentHashMap<>();
 }
