@@ -46,6 +46,11 @@ children:
       - name: httpclient_dashboard
   - name: router.biz
     children:
+      - name: isolate_req.echo
+        parameters: |
+          path = /newrest/echo
+          max.concurrent=10
+          redirect.location = http://baidu.com
       - name: httpserver.biz
         parameters: |
           http.server.inbound.blocksize = 8192

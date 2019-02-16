@@ -6,10 +6,12 @@ package org.jocean.xharbor.relay;
 import java.net.ConnectException;
 import java.nio.channels.ClosedChannelException;
 import java.util.Collections;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.inject.Inject;
+import javax.inject.Named;
 
 import org.jocean.http.FullMessage;
 import org.jocean.http.MessageBody;
@@ -29,12 +31,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 
+import com.netflix.hystrix.HystrixCommandGroupKey;
+import com.netflix.hystrix.HystrixCommandKey;
+import com.netflix.hystrix.HystrixCommandProperties;
+import com.netflix.hystrix.HystrixCommandProperties.ExecutionIsolationStrategy;
+import com.netflix.hystrix.HystrixObservableCommand;
+
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.handler.codec.http.QueryStringDecoder;
+import io.netty.util.CharsetUtil;
 import io.opentracing.Span;
 import io.opentracing.Tracer;
 import io.opentracing.noop.NoopTracerFactory;
@@ -43,6 +54,7 @@ import rx.Observable;
 import rx.Observable.Transformer;
 import rx.Scheduler;
 import rx.Subscriber;
+import rx.functions.Func0;
 import rx.functions.Func1;
 
 /**
@@ -77,60 +89,137 @@ public class TradeRelay extends Subscriber<HttpTrade> {
 
         final AtomicReference<ReactContext> ctxRef = new AtomicReference<>();
 
-        trade2ctx(trade).doOnNext(ctx -> LOG.trace("trade {} generate ctx: {}", trade, ctx))
-            .doOnNext(ctx -> ctxRef.set(ctx)).doOnNext(ctx -> TraceUtil.hook4serversend(trade.writeCtrl(), ctx.span()))
-            .flatMapSingle(ctx -> this._tradeReactor.react(ctx, new InOut() {
-                @Override
-                public Observable<FullMessage<HttpRequest>> inbound() {
-                    return trade.inbound();
-                }
-
-                @Override
-                public Observable<FullMessage<HttpResponse>> outbound() {
-                    return null;
-                }
-            })).retryWhen(retryPolicy(trade)).subscribe(io -> {
-                if (null == io || null == io.outbound()) {
-                    LOG.warn("NO_INOUT for trade({}), react io detail: {}.", trade, io);
-                    ctxRef.get().span().setTag(Tags.ERROR.getKey(), true);
-                    ctxRef.get().span().setTag("error.type", "NO_INOUT");
-                }
-                trade.outbound(buildResponse(trade, io).compose(fullresp2objs()));
-            }, error -> {
-                LOG.warn("Trade {} react with error, detail:{}", trade, ExceptionUtils.exception2detail(error));
+        trade2io(trade, ctxRef).retryWhen(retryPolicy(trade))
+        .subscribe(io -> {
+            if (null == io || null == io.outbound()) {
+                LOG.warn("NO_INOUT for trade({}), react io detail: {}.", trade, io);
                 ctxRef.get().span().setTag(Tags.ERROR.getKey(), true);
-                ctxRef.get().span().log(Collections.singletonMap("error.detail", ExceptionUtils.exception2detail(error)));
-                trade.close();
-            });
+                ctxRef.get().span().setTag("error.type", "NO_INOUT");
+            }
+            trade.outbound(buildResponse(trade, io).compose(fullresp2objs()));
+        }, error -> {
+            LOG.warn("Trade {} react with error, detail:{}", trade, ExceptionUtils.exception2detail(error));
+            ctxRef.get().span().setTag(Tags.ERROR.getKey(), true);
+            ctxRef.get().span().log(Collections.singletonMap("error.detail", ExceptionUtils.exception2detail(error)));
+            trade.close();
+        });
     }
 
-    private Observable<ReactContext> trade2ctx(final HttpTrade trade) {
+    private InOut initial_io(final HttpTrade trade, final Observable<FullMessage<HttpResponse>> outbound) {
+        return new InOut() {
+            @Override
+            public Observable<FullMessage<HttpRequest>> inbound() {
+                return trade.inbound();
+            }
+
+            @Override
+            public Observable<FullMessage<HttpResponse>> outbound() {
+                return outbound;
+            }
+        };
+    }
+
+    private Observable<InOut> trade2io(final HttpTrade trade, final AtomicReference<ReactContext> ctxRef) {
         final AtomicReference<Scheduler> schedulerRef = new AtomicReference<>();
         final AtomicInteger concurrent = new AtomicInteger(1);
         return trade.inbound().first().compose(runWithin(schedulerRef, concurrent))
                 .map(fullreq -> fullreq.message())
-                .flatMap(request -> getTracer(request).map(tracer -> {
-                    final Span span = tracer.buildSpan("httpin")
-                    .withTag(Tags.COMPONENT.getKey(), "jocean-http")
-                    .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
-                    .withTag(Tags.HTTP_URL.getKey(), request.uri())
-                    .withTag(Tags.HTTP_METHOD.getKey(), request.method().name())
-                    .withTag(Tags.PEER_HOST_IPV4.getKey(), get1stIp(request.headers().get("x-forwarded-for", "none")))
-                    .start();
-                    trade.doOnTerminate(() -> span.finish());
+                .flatMap(request -> makectx(request, trade, schedulerRef.get(), concurrent.get())
+                        .doOnNext(ctx -> ctxRef.set(ctx))
+                        // .doOnNext(ctx -> LOG.trace("trade {} generate ctx: {}", trade, ctx))
+                        .flatMap(ctx -> {
+                            final Observable<? extends InOut> normalProcess = this._tradeReactor
+                                    .react(ctx, initial_io(trade, null)).toObservable();
+                            final RequestIsolation req_isolation = req2isolation(request);
+                            if (null != req_isolation) {
+                                return enableIsolation(req_isolation, normalProcess,
+                                        () -> fallbackOutbound(req_isolation, request.protocolVersion(), trade));
+                            } else {
+                                return normalProcess;
+                            }
+                        }));
+    }
 
-                    // try to add host
-                    TraceUtil.addTagNotNull(span, "http.host", request.headers().get(HttpHeaderNames.HOST));
+    private Observable<InOut> fallbackOutbound(final RequestIsolation req_isolation, final HttpVersion protocolVersion,
+            final HttpTrade trade) {
+        final HttpResponse response = new DefaultHttpResponse(protocolVersion, HttpResponseStatus.OK);
+        response.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
+        response.headers().set(HttpHeaderNames.LOCATION, req_isolation._location);
+        return Observable.just(initial_io(trade, responseWithoutBody(response)));
+    }
+
+    private Observable<? extends InOut> enableIsolation(
+            final RequestIsolation req_isolation,
+            final Observable<? extends InOut> normal,
+            final Func0<Observable<InOut>> getfallback) {
+        return new HystrixObservableCommand<InOut>(HystrixObservableCommand.Setter
+                .withGroupKey(HystrixCommandGroupKey.Factory.asKey("req_isolations"))
+                .andCommandKey(HystrixCommandKey.Factory.asKey(req_isolation._path))
+                .andCommandPropertiesDefaults(HystrixCommandProperties.Setter()
+                        .withExecutionIsolationStrategy(ExecutionIsolationStrategy.SEMAPHORE)
+                        .withExecutionIsolationSemaphoreMaxConcurrentRequests(req_isolation._maxConcurrent)
+                        .withFallbackIsolationSemaphoreMaxConcurrentRequests(100)
+                        )
+                ) {
+            @Override
+            protected Observable<InOut> construct() {
+                return (Observable<InOut>) normal;
+            }
+
+            @Override
+            protected Observable<InOut> resumeWithFallback() {
+                return getfallback.call();
+            }
+        }.toObservable();
+    }
+
+    private RequestIsolation req2isolation(final HttpRequest request) {
+        final QueryStringDecoder decoder = new QueryStringDecoder(request.uri(), CharsetUtil.UTF_8);
+        final String path = decoder.path();
+        final RequestIsolation req_isolation = this._requestIsolations.get(path);
+        return req_isolation;
+    }
+
+    private static Observable<FullMessage<HttpResponse>> responseWithoutBody(final HttpResponse response) {
+        return Observable.just(new FullMessage<HttpResponse>() {
+            @Override
+            public HttpResponse message() {
+                return response;
+            }
+            @Override
+            public Observable<? extends MessageBody> body() {
+                return Observable.empty();
+            }});
+    }
+
+    private Observable<ReactContext> makectx(
+            final HttpRequest request,
+            final HttpTrade trade,
+            final Scheduler scheduler,
+            final int concurrent) {
+        return getTracer(request).map(tracer -> {
+            final Span span = tracer.buildSpan("httpin")
+            .withTag(Tags.COMPONENT.getKey(), "jocean-http")
+            .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
+            .withTag(Tags.HTTP_URL.getKey(), request.uri())
+            .withTag(Tags.HTTP_METHOD.getKey(), request.method().name())
+            .withTag(Tags.PEER_HOST_IPV4.getKey(), get1stIp(request.headers().get("x-forwarded-for", "none")))
+            .start();
+            trade.doOnTerminate(() -> span.finish());
+
+            // try to add host
+            TraceUtil.addTagNotNull(span, "http.host", request.headers().get(HttpHeaderNames.HOST));
 //                  SLB-ID头字段获取SLB实例ID。
 //                  通过SLB-IP头字段获取SLB实例公网IP地址。
 //                  通过X-Forwarded-Proto头字段获取SLB的监听协议
 
-                    TraceUtil.addTagNotNull(span, "slb.id", request.headers().get("slb-id"));
-                    TraceUtil.addTagNotNull(span, "slb.ip", request.headers().get("slb-ip"));
-                    TraceUtil.addTagNotNull(span, "slb.proto", request.headers().get("x-forwarded-proto"));
+            TraceUtil.addTagNotNull(span, "slb.id", request.headers().get("slb-id"));
+            TraceUtil.addTagNotNull(span, "slb.ip", request.headers().get("slb-ip"));
+            TraceUtil.addTagNotNull(span, "slb.proto", request.headers().get("x-forwarded-proto"));
+            TraceUtil.hook4serversend(trade.writeCtrl(), span);
 
-                    return buildReactCtx(trade, span, tracer, schedulerRef.get(), concurrent.get());
-                }));
+            return buildReactCtx(trade, span, tracer, scheduler, concurrent);
+        });
     }
 
     private <T> Transformer<T, T> runWithin(final AtomicReference<Scheduler> schedulerRef, final AtomicInteger concurrent) {
@@ -277,6 +366,10 @@ public class TradeRelay extends Subscriber<HttpTrade> {
 
     @Value("${http.port}")
     int _httpPort = 0;
+
+    @Inject
+    @Named("req_isolations")
+    Map<String, RequestIsolation> _requestIsolations;
 
     private final TradeReactor _tradeReactor;
     private final int _maxRetryTimes = 3;

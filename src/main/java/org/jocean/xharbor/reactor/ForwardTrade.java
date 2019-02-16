@@ -39,6 +39,7 @@ import com.google.common.collect.Lists;
 import com.netflix.hystrix.HystrixCommandGroupKey;
 import com.netflix.hystrix.HystrixCommandKey;
 import com.netflix.hystrix.HystrixCommandProperties;
+import com.netflix.hystrix.HystrixCommandProperties.ExecutionIsolationStrategy;
 import com.netflix.hystrix.HystrixObservableCommand;
 
 import io.netty.handler.codec.http.DefaultHttpRequest;
@@ -146,9 +147,11 @@ public class ForwardTrade implements TradeReactor {
                         .withGroupKey(HystrixCommandGroupKey.Factory.asKey("forward"))
                         .andCommandKey(HystrixCommandKey.Factory.asKey(summary + "-request"))
                         .andCommandPropertiesDefaults(HystrixCommandProperties.Setter()
+                                .withExecutionIsolationStrategy(ExecutionIsolationStrategy.SEMAPHORE)
 //                                .withExecutionTimeoutEnabled(false)
                                 .withExecutionTimeoutInMilliseconds(30 * 1000)
                                 .withExecutionIsolationSemaphoreMaxConcurrentRequests(1000)
+                                .withFallbackIsolationSemaphoreMaxConcurrentRequests(2000)
                                 )
                         ) {
                     @Override
