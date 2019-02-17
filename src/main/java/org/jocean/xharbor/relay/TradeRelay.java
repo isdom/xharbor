@@ -142,7 +142,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
 
     private Observable<InOut> fallbackOutbound(final RequestIsolation req_isolation, final HttpVersion protocolVersion,
             final HttpTrade trade) {
-        final HttpResponse response = new DefaultHttpResponse(protocolVersion, HttpResponseStatus.OK);
+        final HttpResponse response = new DefaultHttpResponse(protocolVersion, HttpResponseStatus.FOUND);
         response.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
         response.headers().set(HttpHeaderNames.LOCATION, req_isolation._location);
         return Observable.just(initial_io(trade, responseWithoutBody(response)));
