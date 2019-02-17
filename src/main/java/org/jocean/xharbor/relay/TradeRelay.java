@@ -66,7 +66,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
     private static final Logger LOG = LoggerFactory.getLogger(TradeRelay.class);
 
     public TradeRelay(final TradeReactor reactor) {
-        this._tradeReactor = reactor;
+        this._reactor = reactor;
     }
 
     @Override
@@ -128,23 +128,26 @@ public class TradeRelay extends Subscriber<HttpTrade> {
                         .doOnNext(ctx -> ctxRef.set(ctx))
                         // .doOnNext(ctx -> LOG.trace("trade {} generate ctx: {}", trade, ctx))
                         .flatMap(ctx -> {
-                            final Observable<? extends InOut> normalProcess = this._tradeReactor
-                                    .react(ctx, initial_io(trade, null)).toObservable();
+                            final Observable<? extends InOut> normalProcess =
+                                    this._reactor.react(ctx, initial_io(trade, null)).toObservable();
                             final RequestIsolation req_isolation = req2isolation(request);
                             if (null != req_isolation) {
                                 return enableIsolation(req_isolation, normalProcess,
-                                        () -> fallbackOutbound(req_isolation, request.protocolVersion(), trade));
+                                        () -> fallbackOutbound(ctx.span(), req_isolation, request.protocolVersion(), trade));
                             } else {
                                 return normalProcess;
                             }
                         }));
     }
 
-    private Observable<InOut> fallbackOutbound(final RequestIsolation req_isolation, final HttpVersion protocolVersion,
+    private Observable<InOut> fallbackOutbound(final Span span, final RequestIsolation req_isolation, final HttpVersion protocolVersion,
             final HttpTrade trade) {
         final HttpResponse response = new DefaultHttpResponse(protocolVersion, HttpResponseStatus.FOUND);
         response.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
         response.headers().set(HttpHeaderNames.LOCATION, req_isolation._location);
+
+        span.setTag("fallback", true);
+
         return Observable.just(initial_io(trade, responseWithoutBody(response)));
     }
 
@@ -371,7 +374,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
     @Named("req_isolations")
     Map<String, RequestIsolation> _requestIsolations;
 
-    private final TradeReactor _tradeReactor;
+    private final TradeReactor _reactor;
     private final int _maxRetryTimes = 3;
     private final int _retryIntervalBase = 2;
 }
