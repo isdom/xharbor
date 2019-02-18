@@ -46,6 +46,11 @@ children:
       - name: httpclient_dashboard
   - name: router.biz
     children:
+      - name: schd4req.status
+        parameters: |
+          path=/status
+          worker.count=1
+          thread.name=status
       - name: isolate_req.echo
         parameters: |
           path = /newrest/echo
@@ -136,6 +141,12 @@ children:
               forward.path=/mock
               forward.to=http://127.0.0.1:4004
               features.name=default
+          - name: respond.status
+            parameters: |
+              request.method=HEAD
+              request.path=/status
+              response.status = 200
+              response.log=false
 #      - name: rules.200
 #        parameters: |
 #          priority=200

@@ -6,6 +6,7 @@ package org.jocean.xharbor.relay;
 import java.net.ConnectException;
 import java.nio.channels.ClosedChannelException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -20,6 +21,8 @@ import org.jocean.idiom.BeanFinder;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StepableUtil;
 import org.jocean.idiom.StopWatch;
+import org.jocean.idiom.jmx.MBeanRegister;
+import org.jocean.idiom.jmx.MBeanRegisterAware;
 import org.jocean.idiom.rx.RxObservables;
 import org.jocean.idiom.rx.RxObservables.RetryPolicy;
 import org.jocean.svr.tracing.TraceUtil;
@@ -60,9 +63,23 @@ import rx.functions.Func1;
  * @author isdom
  *
  */
-public class TradeRelay extends Subscriber<HttpTrade> {
+public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBean, MBeanRegisterAware {
 
     private static final Logger LOG = LoggerFactory.getLogger(TradeRelay.class);
+
+    @Override
+    public void setMBeanRegister(final MBeanRegister register) {
+        register.registerMBean("name=relay", this);
+    }
+
+    @Override
+    public Map<String, String> getSchedulers() {
+        final Map<String, String> schedulers = new HashMap<>();
+        for ( final Map.Entry<String, TradeScheduler> entry : this._requestSchedulers.entrySet()) {
+            schedulers.put(entry.getKey(), entry.getValue().toString());
+        }
+        return schedulers;
+    }
 
     public TradeRelay(final TradeReactor reactor) {
         this._reactor = reactor;
