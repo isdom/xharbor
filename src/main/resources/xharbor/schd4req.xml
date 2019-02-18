@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd">
+    
+    <bean id="schd4req" class="org.jocean.xharbor.relay.TradeScheduler" 
+        init-method="start" destroy-method="stop" />
+        
+    <bean class="org.jocean.idiom.rx.RxActions"
+        factory-method="doPut"
+        destroy-method="call">
+        <constructor-arg ref="req_schedulers"/>
+        <constructor-arg value="${path}"/>
+        <constructor-arg ref="schd4req"/>
+    </bean>
+
+</beans>

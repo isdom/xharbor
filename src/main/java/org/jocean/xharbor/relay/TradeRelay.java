@@ -7,7 +7,6 @@ import java.net.ConnectException;
 import java.nio.channels.ClosedChannelException;
 import java.util.Collections;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.inject.Inject;
@@ -120,24 +119,23 @@ public class TradeRelay extends Subscriber<HttpTrade> {
     }
 
     private Observable<InOut> trade2io(final HttpTrade trade, final AtomicReference<ReactContext> ctxRef) {
-        final AtomicReference<Scheduler> schedulerRef = new AtomicReference<>();
-        final AtomicInteger concurrent = new AtomicInteger(1);
-        return trade.inbound().first().compose(runWithin(schedulerRef, concurrent))
-                .map(fullreq -> fullreq.message())
-                .flatMap(request -> makectx(request, trade, schedulerRef.get(), concurrent.get())
-                        .doOnNext(ctx -> ctxRef.set(ctx))
-                        // .doOnNext(ctx -> LOG.trace("trade {} generate ctx: {}", trade, ctx))
-                        .flatMap(ctx -> {
-                            final Observable<? extends InOut> normalProcess =
-                                    this._reactor.react(ctx, initial_io(trade, null)).toObservable();
-                            final RequestIsolation req_isolation = req2isolation(request);
-                            if (null != req_isolation) {
-                                return enableIsolation(req_isolation, normalProcess,
-                                        () -> fallbackOutbound(ctx.span(), req_isolation, request.protocolVersion(), trade));
-                            } else {
-                                return normalProcess;
-                            }
-                        }));
+        return trade.inbound().first().map(fullreq -> fullreq.message()).flatMap(request -> {
+                    final String path = extractPath(request);
+                    LOG.info("trade2io: {} extract path {}", trade, path);
+                    return path2scheduler(path).flatMap(ts -> makectx(request, trade, ts.scheduler(), ts._workerCount)
+                            .doOnNext(ctx -> LOG.info("trade2io: {} handle with ctx {}", trade, ctx))
+                            .doOnNext(ctx -> ctxRef.set(ctx))
+                            .flatMap(ctx -> {
+                                final Observable<? extends InOut> reaction = this._reactor.react(ctx, initial_io(trade, null)).toObservable();
+                                final RequestIsolation req_isolation = path2isolation(path);
+                                if (null != req_isolation) {
+                                    return enableIsolation(req_isolation, reaction,
+                                            () -> fallbackOutbound(ctx.span(), req_isolation, request.protocolVersion(), trade));
+                                } else {
+                                    return reaction;
+                                }
+                            }));
+                });
     }
 
     private Observable<InOut> fallbackOutbound(final Span span, final RequestIsolation req_isolation, final HttpVersion protocolVersion,
@@ -146,6 +144,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
         response.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
         response.headers().set(HttpHeaderNames.LOCATION, req_isolation._location);
 
+        span.setOperationName(req_isolation._path);
         span.setTag("fallback", true);
 
         return Observable.just(initial_io(trade, responseWithoutBody(response)));
@@ -176,11 +175,14 @@ public class TradeRelay extends Subscriber<HttpTrade> {
         }.toObservable();
     }
 
-    private RequestIsolation req2isolation(final HttpRequest request) {
+    private RequestIsolation path2isolation(final String path) {
+        return this._requestIsolations.get(path);
+    }
+
+    private static String extractPath(final HttpRequest request) {
         final QueryStringDecoder decoder = new QueryStringDecoder(request.uri(), CharsetUtil.UTF_8);
         final String path = decoder.path();
-        final RequestIsolation req_isolation = this._requestIsolations.get(path);
-        return req_isolation;
+        return path;
     }
 
     private static Observable<FullMessage<HttpResponse>> responseWithoutBody(final HttpResponse response) {
@@ -200,7 +202,7 @@ public class TradeRelay extends Subscriber<HttpTrade> {
             final HttpTrade trade,
             final Scheduler scheduler,
             final int concurrent) {
-        return getTracer(request).map(tracer -> {
+        return getTracer(request).subscribeOn(scheduler).map(tracer -> {
             final Span span = tracer.buildSpan("httpin")
             .withTag(Tags.COMPONENT.getKey(), "jocean-http")
             .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
@@ -225,14 +227,19 @@ public class TradeRelay extends Subscriber<HttpTrade> {
         });
     }
 
-    private <T> Transformer<T, T> runWithin(final AtomicReference<Scheduler> schedulerRef, final AtomicInteger concurrent) {
-        return ts -> _finder.find(this._schedulerName, TradeScheduler.class)
-                .doOnNext(scheduler -> {
-                    schedulerRef.set(scheduler.scheduler());
-                    concurrent.set(scheduler._workerCount);
-                })
-                .flatMap(scheduler ->  ts.observeOn(scheduler.scheduler(), this._maxPending));
+    private Observable<TradeScheduler> path2scheduler(final String path) {
+        final TradeScheduler ts = _requestSchedulers.get(path);
+        return (null != ts ? Observable.just(ts) : _finder.find(this._schedulerName, TradeScheduler.class));
     }
+
+//    private <T> Transformer<T, T> runWithin(final AtomicReference<Scheduler> schedulerRef, final AtomicInteger concurrent) {
+//        return ts -> _finder.find(this._schedulerName, TradeScheduler.class)
+//                .doOnNext(scheduler -> {
+//                    schedulerRef.set(scheduler.scheduler());
+//                    concurrent.set(scheduler._workerCount);
+//                })
+//                .flatMap(scheduler ->  ts.observeOn(scheduler.scheduler(), this._maxPending));
+//    }
 
     private Observable<Tracer> getTracer(final HttpRequest request) {
         return this._tracingEnabled && isRequestForwardBySLB(request)
@@ -373,6 +380,10 @@ public class TradeRelay extends Subscriber<HttpTrade> {
     @Inject
     @Named("req_isolations")
     Map<String, RequestIsolation> _requestIsolations;
+
+    @Inject
+    @Named("req_schedulers")
+    Map<String, TradeScheduler> _requestSchedulers;
 
     private final TradeReactor _reactor;
     private final int _maxRetryTimes = 3;

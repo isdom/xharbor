@@ -5,6 +5,7 @@
         http://www.springframework.org/schema/beans/spring-beans.xsd">
 
     <bean id="req_isolations" class="java.util.concurrent.ConcurrentHashMap"/>
+    <bean id="req_schedulers" class="java.util.concurrent.ConcurrentHashMap"/>
 
     <bean id="router" class="org.jocean.xharbor.reactor.CompositeReactor">
         <constructor-arg>
