@@ -18,6 +18,14 @@ public class TradeScheduler {
         return ts -> finder.find(tpname, TradeScheduler.class).flatMap(executor -> ts.observeOn(executor._workerScheduler, bufferSize));
     }
 
+    @Override
+    public String toString() {
+        final StringBuilder builder = new StringBuilder();
+        builder.append("TradeScheduler [workerCount=").append(_workerCount).append(", threadName=")
+                .append(_threadName).append("]");
+        return builder.toString();
+    }
+
     static class DefaultThreadFactory implements ThreadFactory {
         private final ThreadGroup _group;
         private final AtomicInteger _threadNumber = new AtomicInteger(1);

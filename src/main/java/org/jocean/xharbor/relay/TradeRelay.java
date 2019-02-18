@@ -122,7 +122,8 @@ public class TradeRelay extends Subscriber<HttpTrade> {
         return trade.inbound().first().map(fullreq -> fullreq.message()).flatMap(request -> {
                     final String path = extractPath(request);
                     LOG.info("trade2io: {} extract path {}", trade, path);
-                    return path2scheduler(path).flatMap(ts -> makectx(request, trade, ts.scheduler(), ts._workerCount)
+                    return path2scheduler(path).doOnNext(ts -> LOG.info("path {} <--> scheduler {}", path, ts))
+                            .flatMap(ts -> makectx(request, trade, ts.scheduler(), ts._workerCount)
                             .doOnNext(ctx -> LOG.info("trade2io: {} handle with ctx {}", trade, ctx))
                             .doOnNext(ctx -> ctxRef.set(ctx))
                             .flatMap(ctx -> {
