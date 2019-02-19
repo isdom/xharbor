@@ -4,4 +4,5 @@ import java.util.Map;
 
 public interface TradeRelayMXBean {
     public Map<String, String> getSchedulers();
+    public Map<String, String> getIsolations();
 }

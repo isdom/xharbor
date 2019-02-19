@@ -25,6 +25,7 @@ import org.jocean.idiom.jmx.MBeanRegister;
 import org.jocean.idiom.jmx.MBeanRegisterAware;
 import org.jocean.idiom.rx.RxObservables;
 import org.jocean.idiom.rx.RxObservables.RetryPolicy;
+import org.jocean.svr.TradeScheduler;
 import org.jocean.svr.tracing.TraceUtil;
 import org.jocean.xharbor.api.TradeReactor;
 import org.jocean.xharbor.api.TradeReactor.InOut;
@@ -79,6 +80,15 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
             schedulers.put(entry.getKey(), entry.getValue().toString());
         }
         return schedulers;
+    }
+
+    @Override
+    public Map<String, String> getIsolations() {
+        final Map<String, String> isolations = new HashMap<>();
+        for ( final Map.Entry<String, RequestIsolation> entry : this._requestIsolations.entrySet()) {
+            isolations.put(entry.getKey(), entry.getValue().toString());
+        }
+        return isolations;
     }
 
     public TradeRelay(final TradeReactor reactor) {
@@ -140,7 +150,7 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
                     final String path = extractPath(request);
                     LOG.info("trade2io: {} extract path {}", trade, path);
                     return path2scheduler(path).doOnNext(ts -> LOG.info("path {} <--> scheduler {}", path, ts))
-                            .flatMap(ts -> makectx(request, trade, ts.scheduler(), ts._workerCount)
+                            .flatMap(ts -> makectx(request, trade, ts.scheduler(), ts.workerCount())
                             .doOnNext(ctx -> LOG.info("trade2io: {} handle with ctx {}", trade, ctx))
                             .doOnNext(ctx -> ctxRef.set(ctx))
                             .flatMap(ctx -> {

@@ -31,7 +31,7 @@ children:
           features.name=default
 #        children:
 #          - name: feature_logging
-  - name: relay_schd.default
+  - name: trade_schd.default
     parameters: |
       worker.count = 4
   - name: httpclient.default

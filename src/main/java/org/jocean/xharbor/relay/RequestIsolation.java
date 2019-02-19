@@ -12,4 +12,12 @@ public class RequestIsolation {
 
     @Value("${max.concurrent}")
     int _maxConcurrent = 100;
+
+    @Override
+    public String toString() {
+        final StringBuilder builder = new StringBuilder();
+        builder.append("RequestIsolation [path=").append(_path).append(", maxConcurrent=").append(_maxConcurrent)
+            .append(", location=").append(_location).append("]");
+        return builder.toString();
+    }
 }
