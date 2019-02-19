@@ -4,7 +4,7 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
     
-    <bean id="schd4req" class="org.jocean.xharbor.relay.TradeScheduler" 
+    <bean id="schd4req" class="org.jocean.svr.TradeScheduler" 
         init-method="start" destroy-method="stop" />
         
     <bean class="org.jocean.idiom.rx.RxActions"
