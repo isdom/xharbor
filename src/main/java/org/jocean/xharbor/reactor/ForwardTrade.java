@@ -499,6 +499,11 @@ public class ForwardTrade extends SingleReactor {
 
         private static final int MAX_EFFECTIVEWEIGHT = 1000;
 
+        @Override
+        public String toString() {
+            return this._target.toString();
+        }
+
         MarkableTargetImpl(final Target target) {
             this._target = target;
         }
