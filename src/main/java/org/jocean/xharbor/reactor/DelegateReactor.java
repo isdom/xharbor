@@ -15,7 +15,6 @@ import rx.Single;
 
 public class DelegateReactor implements TradeReactor, Ordered {
 
-    @SuppressWarnings("unused")
     private static final Logger LOG = LoggerFactory.getLogger(DelegateReactor.class);
     private static final TradeReactor NULL_REACTOR = new NullReactor();
 

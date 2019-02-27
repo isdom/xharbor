@@ -21,11 +21,15 @@
             </array>
         </constructor-arg>
     </bean>
-    
+
     <bean id="serviceMemo" class="org.jocean.xharbor.util.ServiceMemoImpl"/>
-    
+
     <bean id="noRoutingMemo" class="org.jocean.xharbor.util.RoutingInfoMemoImpl"/>
-   
+
+    <bean id="req_isolations" class="java.util.concurrent.ConcurrentHashMap"/>
+
+    <bean id="req_schedulers" class="java.util.concurrent.ConcurrentHashMap"/>
+
     <bean id="xharborExporter" class="org.springframework.jmx.export.MBeanExporter"
           lazy-init="false">
         <property name="beans">
