@@ -7,4 +7,6 @@ public interface TradeRelayMXBean {
     public Map<String, String> getIsolations();
 
     public boolean isTracingEnabled();
+
+    public String[] getReactors();
 }

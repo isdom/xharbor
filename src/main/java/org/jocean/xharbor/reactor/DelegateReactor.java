@@ -21,10 +21,24 @@ public class DelegateReactor implements TradeReactor, Ordered {
     @Override
     public String toString() {
         final StringBuilder builder = new StringBuilder();
-        builder.append("DelegateReactor [ordinal=").append(_ordinal).append(", delegateName=").append(_delegateName)
-                .append(", delegateReactor=").append(null != _delegateReactor.get() ? _delegateReactor.get() : "(not delegate)" )
+        builder.append("DelegateReactor [ordinal=").append(_ordinal).append(", name=").append(_delegateName)
+                .append(", delegate=").append(null != _delegateReactor.get() ? _delegateReactor.get() : "(none)" )
                 .append("]");
         return builder.toString();
+    }
+
+    @Override
+    public String[] reactItems() {
+        final TradeReactor delegate = _delegateReactor.get();
+        if (null != delegate) {
+            final String[] subItems = delegate.reactItems();
+            final String[] newItems = new String[subItems.length + 1];
+            newItems[0] = "DelegateReactor: ordinal=" + _ordinal + ", name=" + _delegateName;
+            System.arraycopy(subItems, 0, newItems, 1, subItems.length);
+            return newItems;
+        } else {
+            return new String[]{toString()};
+        }
     }
 
     @Override

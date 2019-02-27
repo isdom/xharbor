@@ -11,7 +11,6 @@ import org.jocean.idiom.Ordered;
 import org.jocean.idiom.Pair;
 import org.jocean.redis.RedisClient;
 import org.jocean.redis.RedisUtil;
-import org.jocean.xharbor.api.TradeReactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,10 +29,9 @@ import rx.Single;
  * @author isdom
  *
  */
-public class LogAccessInfo2Redis implements TradeReactor, Ordered, BeanHolderAware {
+public class LogAccessInfo2Redis extends SingleReactor implements Ordered, BeanHolderAware {
 
-    private static final Logger LOG = LoggerFactory
-            .getLogger(LogAccessInfo2Redis.class);
+    private static final Logger LOG = LoggerFactory.getLogger(LogAccessInfo2Redis.class);
 
     @Override
     public void setBeanHolder(final BeanHolder beanHolder) {

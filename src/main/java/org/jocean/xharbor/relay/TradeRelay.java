@@ -96,6 +96,11 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
         return _tracingEnabled;
     }
 
+    @Override
+    public String[] getReactors() {
+        return _reactor.reactItems();
+    }
+
     public TradeRelay(final TradeReactor reactor) {
         this._reactor = reactor;
     }

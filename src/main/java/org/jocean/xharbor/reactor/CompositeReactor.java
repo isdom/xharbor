@@ -1,5 +1,6 @@
 package org.jocean.xharbor.reactor;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -27,6 +28,20 @@ public class CompositeReactor implements TradeReactor, Ordered {
                 .append(_reactors != null ? _reactors.subList(0, Math.min(_reactors.size(), maxLen)) : null)
                 .append(", ordinal=").append(_ordinal).append("]");
         return builder.toString();
+    }
+
+    @Override
+    public String[] reactItems() {
+        final TradeReactor[] reactors = _descReactorsRef.getReference();
+        if (null != reactors) {
+            final List<String> items = new ArrayList<>();
+            for (final TradeReactor reactor : reactors) {
+                items.addAll(Arrays.asList(reactor.reactItems()));
+            }
+            return items.toArray(new String[0]);
+        } else {
+            return new String[]{"CompositeReactor: (empty)"};
+        }
     }
 
     private static final TradeReactor[] EMPTY_REACTOR = new TradeReactor[0];

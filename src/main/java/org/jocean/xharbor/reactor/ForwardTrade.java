@@ -31,7 +31,6 @@ import org.jocean.xharbor.api.RelayMemo.RESULT;
 import org.jocean.xharbor.api.RoutingInfo;
 import org.jocean.xharbor.api.ServiceMemo;
 import org.jocean.xharbor.api.Target;
-import org.jocean.xharbor.api.TradeReactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,7 +63,7 @@ import rx.functions.Action1;
 import rx.functions.Func0;
 import rx.functions.Func1;
 
-public class ForwardTrade implements TradeReactor {
+public class ForwardTrade extends SingleReactor {
 
     private static final int MAX_RETAINED_SIZE = 8 * 1024;
     private static final long _period = 20; // 30 seconds

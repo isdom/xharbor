@@ -1,5 +1,7 @@
 package org.jocean.xharbor.reactor;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -39,6 +41,20 @@ public class CompositeForward implements TradeReactor, Ordered {
                 .append(_fwdds != null ? _fwdds.subList(0, Math.min(_fwdds.size(), maxLen)) : null)
                 .append(", ordinal=").append(_ordinal).append("]");
         return builder.toString();
+    }
+
+    @Override
+    public String[] reactItems() {
+        final TradeReactor[] reactors = _fwdtsRef.getReference();
+        if (null != reactors) {
+            final List<String> items = new ArrayList<>();
+            for (final TradeReactor reactor : reactors) {
+                items.addAll(Arrays.asList(reactor.reactItems()));
+            }
+            return items.toArray(new String[0]);
+        } else {
+            return new String[]{"CompositeForward: (empty)"};
+        }
     }
 
     public void setOrdinal(final int ordinal) {

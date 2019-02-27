@@ -4,7 +4,6 @@ import org.jocean.http.FullMessage;
 import org.jocean.http.MessageBody;
 import org.jocean.idiom.Pair;
 import org.jocean.idiom.StepableUtil;
-import org.jocean.xharbor.api.TradeReactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,7 +18,7 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import rx.Observable;
 import rx.Single;
 
-public class BasicAuthenticate implements TradeReactor {
+public class BasicAuthenticate extends SingleReactor {
     private static final Logger LOG = LoggerFactory.getLogger(BasicAuthenticate.class);
 
     @Override

@@ -5,7 +5,6 @@ import java.util.Iterator;
 import java.util.Map;
 
 import org.jocean.http.FullMessage;
-import org.jocean.xharbor.api.TradeReactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,7 +13,7 @@ import io.netty.handler.codec.http.HttpResponse;
 import rx.Observable;
 import rx.Single;
 
-public class RewriteResponse implements TradeReactor {
+public class RewriteResponse extends SingleReactor {
     private static final Logger LOG = LoggerFactory.getLogger(RewriteResponse.class);
 
     public RewriteResponse(final MatchRule matcher, final Map<String, String> extraHeaders) {

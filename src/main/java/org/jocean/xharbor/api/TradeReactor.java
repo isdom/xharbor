@@ -30,4 +30,6 @@ public interface TradeReactor {
     public Single<Boolean> match(final ReactContext ctx, final InOut io);
 
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io);
+
+    public String[] reactItems();
 }

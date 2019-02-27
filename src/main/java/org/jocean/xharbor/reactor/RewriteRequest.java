@@ -6,7 +6,6 @@ import java.util.regex.Pattern;
 import org.jocean.http.FullMessage;
 import org.jocean.http.MessageBody;
 import org.jocean.idiom.Regexs;
-import org.jocean.xharbor.api.TradeReactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,7 +17,7 @@ import io.netty.handler.codec.http.HttpResponse;
 import rx.Observable;
 import rx.Single;
 
-public class RewriteRequest implements TradeReactor {
+public class RewriteRequest extends SingleReactor {
     private static final Logger LOG = LoggerFactory.getLogger(RewriteRequest.class);
 
     public RewriteRequest(

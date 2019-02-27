@@ -2,7 +2,6 @@ package org.jocean.xharbor.reactor;
 
 import org.jocean.http.CloseException;
 import org.jocean.http.FullMessage;
-import org.jocean.xharbor.api.TradeReactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,10 +10,9 @@ import io.netty.handler.codec.http.HttpResponse;
 import rx.Observable;
 import rx.Single;
 
-public class DropRequest implements TradeReactor {
+public class DropRequest extends SingleReactor {
 
-    private static final Logger LOG = LoggerFactory
-            .getLogger(DropRequest.class);
+    private static final Logger LOG = LoggerFactory.getLogger(DropRequest.class);
 
     public DropRequest(
             final MatchRule matcher,

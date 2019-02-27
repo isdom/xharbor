@@ -8,7 +8,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.jocean.http.FullMessage;
 import org.jocean.idiom.Ordered;
-import org.jocean.xharbor.api.TradeReactor;
 import org.jocean.xharbor.api.TradeReactor.InOut;
 import org.jocean.xharbor.api.TradeReactor.ReactContext;
 import org.jocean.xharbor.relay.ReactUtil;
@@ -22,7 +21,7 @@ import rx.functions.Func2;
 
 public class CompositeReactorTestCase {
 
-    class OrderedTradeReactor implements TradeReactor, Ordered {
+    class OrderedTradeReactor extends SingleReactor implements Ordered {
 
         OrderedTradeReactor(final int ordinal, final Func2<ReactContext, InOut, Single<? extends InOut>> doReact) {
             this._ordinal = ordinal;
