@@ -100,11 +100,19 @@ public class CompositeForward implements TradeReactor, Ordered {
 
     @Override
     public Single<Boolean> match(final ReactContext ctx, final InOut io) {
-        return Single.just(true);
+        if (null != io.outbound()) {
+            return Single.just(false);
+        } else {
+            return Single.just(true);
+        }
     }
 
     @Override
     public Single<? extends InOut> react(final ReactContext ctx, final InOut io) {
+        // skip when io has outbound
+        if (null != io.outbound()) {
+            return Single.<InOut>just(null);
+        }
         if (LOG.isTraceEnabled()) {
             LOG.trace("try {} for trade {}", this, ctx.trade());
         }

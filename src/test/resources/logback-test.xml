@@ -48,6 +48,7 @@
     <logger name="org.apache.zookeeper" level="WARN"/>
     <logger name="org.jocean.xharbor" level="TRACE"/>
     <logger name="org.springframework" level="INFO"/>
+    <logger name="org.jocean.j2se.util" level="WARN"/>
         
     <appender name="ASYNC" class="ch.qos.logback.classic.AsyncAppender">
         <includeCallerData>true</includeCallerData>

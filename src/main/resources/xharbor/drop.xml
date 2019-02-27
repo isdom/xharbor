@@ -4,7 +4,7 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
 
-    <bean factory-bean="drops" factory-method="addReactor" destroy-method="call">
+    <bean factory-bean="rules" factory-method="addReactor" destroy-method="call">
         <constructor-arg>
             <bean class="org.jocean.xharbor.reactor.DropRequest">
                 <constructor-arg>

@@ -6,7 +6,7 @@
     
     <bean id="extraHeaders" class="java.util.concurrent.ConcurrentHashMap"/>
 
-    <bean factory-bean="responds" factory-method="addReactor" destroy-method="call">
+    <bean factory-bean="rules" factory-method="addReactor" destroy-method="call">
         <constructor-arg>
             <bean class="org.jocean.xharbor.reactor.ResponseWithHeaderonly">
                 <constructor-arg>

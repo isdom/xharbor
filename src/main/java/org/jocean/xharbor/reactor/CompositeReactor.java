@@ -11,6 +11,7 @@ import org.jocean.idiom.Ordered;
 import org.jocean.xharbor.api.TradeReactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 
 import rx.Single;
 import rx.functions.Action0;
@@ -50,10 +51,6 @@ public class CompositeReactor implements TradeReactor, Ordered {
 
     public CompositeReactor(final Func3<TradeReactor[],ReactContext,InOut,Single<? extends InOut>> compositeReactor) {
         this._compositeReactor = compositeReactor;
-    }
-
-    public void setOrdinal(final int ordinal) {
-        this._ordinal = ordinal;
     }
 
     public Action0 addReactor(final TradeReactor reactor) {
@@ -116,9 +113,11 @@ public class CompositeReactor implements TradeReactor, Ordered {
         return this._ordinal;
     }
 
+    @Value("${priority}")
+    int _ordinal = 0;
+
     private final AtomicInteger _stampProvider = new AtomicInteger(0);
     private final List<TradeReactor> _reactors = new CopyOnWriteArrayList<>();
     private final AtomicStampedReference<TradeReactor[]> _descReactorsRef = new AtomicStampedReference<>(null, 0);
-    private int _ordinal = 0;
     private final Func3<TradeReactor[],ReactContext,InOut,Single<? extends InOut>> _compositeReactor;
 }

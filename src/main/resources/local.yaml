@@ -44,131 +44,9 @@ children:
       http.client.outbound.highmark = 16384
     children:
       - name: httpclient_dashboard
-  - name: router.biz
+  - name: rules.console-rwreqs
+    parameters: name=console-rwreqs
     children:
-      - name: schd4req.status
-        parameters: |
-          path=/status
-          worker.count=1
-          thread.name=status
-      - name: isolate_req.echo
-        parameters: |
-          path = /newrest/echo
-          max.concurrent=10
-          redirect.location = http://baidu.com
-      - name: httpserver.biz
-        parameters: |
-          http.server.inbound.blocksize = 8192
-          http.server.inbound.recvbuf = 8192
-        children:
-          - name: httpin.8888
-            parameters: |
-              http.port=8888
-              http.address=127.0.0.1
-            children:
-              - name: feature_logging
-          - name: httpin.8443_https
-            parameters: |
-              http.port=8443
-              http.address=127.0.0.1
-            children:
-              - name: feature_ssl4server
-      - name: rwreq.live
-        parameters: |
-          rewrite.path=/demo/
-          rewrite.header.name=Host
-          rewrite.header.value=live.iplusmed.com
-      - name: rwreq.crossdomain
-        parameters: |
-          rewrite.path=/crossdomain.xml
-          rewrite.header.name=Host
-          rewrite.header.value=wapp.jocean.org
-      - name: respond.status
-        parameters: |
-          request.method=HEAD
-          request.path=/status
-          response.status = 200
-          response.log=false
-      - name: rwresp.cors
-        parameters: |
-          rewrite.path=/api1/
-        children:
-          - name: addheader.cors.basic
-            parameters: |
-              header.name=Access-Control-Allow-Origin
-              header.value=*
-#      - name: drop.reject_missctx
-#        parameters: |
-#          request.path=/newrest/stream
-#          request.headers=x-ctx,==null
-      - name: rules.100
-        parameters: |
-          priority=100
-        children:
-          - name: forward.newrest
-            parameters: |
-              forward.path=/newrest/
-              forward.to=http://127.0.0.1:9090
-              features.name=default
-          - name: forward.live
-            parameters: |
-              forward.path=/demo/
-              forward.to=http://live.iplusmed.com:80
-              features.name=default
-          - name: forward.crossdomain
-            parameters: |
-              forward.path=/crossdomain.xml
-              forward.to=http://wapp.jocean.org:80
-              features.name=default
-          - name: forward.ydd
-            parameters: |
-              forward.path=/api1/|/api2/
-              
-              forward.to=http://api.iplusmed.com:80
-              features.name=compress
-          - name: forward.snsgw
-            parameters: |
-              forward.path=/test/
-              
-              forward.to=http://127.0.0.1:9090
-              features.name=default
-          - name: forward.zkwebui
-            parameters: |
-              forward.path=/zkwebui/
-              forward.to=http://127.0.0.1:7080
-          - name: forward.mock
-            parameters: |
-              forward.path=/mock
-              forward.to=http://127.0.0.1:4004
-              features.name=default
-          - name: respond.status
-            parameters: |
-              request.method=HEAD
-              request.path=/status
-              response.status = 200
-              response.log=false
-#      - name: rules.200
-#        parameters: |
-#          priority=200
-#        children:
-#          - name: respond.reject_missctx
-#            parameters: |
-#              request.path=/newrest/stream
-#              request.headers=x-ctx,==null
-#              response.status = 404
-  - name: router.console
-    children:
-      - name: httpserver.console
-        parameters: |
-          http.server.inbound.blocksize = 8192
-          http.server.inbound.recvbuf = 8192
-        children:
-          - name: httpin.8889
-            parameters: |
-              http.port=8889
-              tracing.enabled = false
-            children:
-              - name: feature_logging
       - name: rwreq.jmxhtml
         parameters: |
           rewrite.path=/jmxhtml/
@@ -181,23 +59,46 @@ children:
           rewrite.to=/
           rewrite.header.name=x-hystrix
           rewrite.header.value=hystrix
-#      - name: auth.jmxhtml
-#        parameters: |
-#          auth.headers=x-jmx,jmxhtml(\\w)*
-#          auth.user=test
-#          auth.password=test
-      - name: rules.100
+  - name: rules.console-auths
+    parameters: name=console-auths
+    children:
+      - name: auth.jmxhtml
         parameters: |
+          auth.headers=x-jmx,jmxhtml(\\w)*
+          auth.user=test
+          auth.password=test
+  - name: fwds.console-100
+    parameters: name=console-fwds100
+    children:
+      - name: forward.jmxhtml.self
+        parameters: |
+          forward.headers=x-jmx,jmxhtml.self
+          forward.to=http://127.0.0.1:8083
+      - name: forward.hystrix.self
+        parameters: |
+          forward.headers=x-hystrix,hystrix
+          forward.to=http://127.0.0.1:4004
+  - name: router.console
+    children:
+      - name: delegate.console-rwreqs
+        parameters: |
+          delegate.name=console-rwreqs
           priority=100
+      - name: delegate.console-fwds100
+        parameters: |
+          delegate.name=console-fwds100
+          priority=70
+      - name: httpserver.console
+        parameters: |
+          http.server.inbound.blocksize = 8192
+          http.server.inbound.recvbuf = 8192
         children:
-          - name: forward.jmxhtml.self
+          - name: httpin.8889
             parameters: |
-              forward.headers=x-jmx,jmxhtml.self
-              forward.to=http://127.0.0.1:8083
-          - name: forward.hystrix.self
-            parameters: |
-              forward.headers=x-hystrix,hystrix
-              forward.to=http://127.0.0.1:4004
+              http.port=8889
+              tracing.enabled = false
+            children:
+              - name: feature_logging
   - name: httpserver
     parameters: |
       http.server.inbound.recvbuf = 8192

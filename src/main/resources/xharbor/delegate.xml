@@ -4,13 +4,15 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
 
-    <bean id="req_isolations" class="java.util.concurrent.ConcurrentHashMap"/>
-    <bean id="req_schedulers" class="java.util.concurrent.ConcurrentHashMap"/>
-
-    <bean id="router" class="org.jocean.xharbor.reactor.CompositeReactor">
+    <!-- 
+    delegate.name
+    priority
+    -->
+    
+    <bean factory-bean="router" factory-method="addReactor" destroy-method="call">
         <constructor-arg>
-            <bean class="org.jocean.xharbor.relay.ReactUtil" factory-method="reactAll"/>
+            <bean class="org.jocean.xharbor.reactor.DelegateReactor"/>
         </constructor-arg>
     </bean>
-
+    
 </beans>

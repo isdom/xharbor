@@ -3,13 +3,8 @@
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean id="forwards" class="org.jocean.xharbor.reactor.CompositeForward"/>
     
-    <bean id="rules" class="org.jocean.xharbor.reactor.CompositeReactor">
-        <constructor-arg>
-            <bean class="org.jocean.xharbor.relay.ReactUtil" factory-method="parallelFirst"/>
-        </constructor-arg>
-    </bean>
-    
-    <alias name="rules" alias="${name}"/>
-    
+    <alias name="forwards" alias="${name}"/>
 </beans>
