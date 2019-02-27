@@ -11,13 +11,18 @@ public class RequestIsolation {
     String _location;
 
     @Value("${max.concurrent}")
-    int _maxConcurrent = 100;
+    int _maxConcurrent = 10;
+
+    @Value("${timeoutInMs}")
+    int _timeoutInMs = 0;
 
     @Override
     public String toString() {
-        final StringBuilder builder = new StringBuilder();
-        builder.append("RequestIsolation [path=").append(_path).append(", maxConcurrent=").append(_maxConcurrent)
-            .append(", location=").append(_location).append("]");
-        return builder.toString();
+        return new StringBuilder().append("RequestIsolation [path=").append(_path)
+                .append(", maxConcurrent=").append(_maxConcurrent)
+                .append(", timeoutInMs=").append(_timeoutInMs)
+                .append(", location=").append(_location)
+                .append("]").toString();
     }
+
 }

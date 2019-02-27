@@ -191,6 +191,8 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
                 .withGroupKey(HystrixCommandGroupKey.Factory.asKey("req_isolations"))
                 .andCommandKey(HystrixCommandKey.Factory.asKey(req_isolation._path))
                 .andCommandPropertiesDefaults(HystrixCommandProperties.Setter()
+                        .withExecutionTimeoutEnabled(req_isolation._timeoutInMs > 0)
+                        .withExecutionTimeoutInMilliseconds(req_isolation._timeoutInMs > 0 ? req_isolation._timeoutInMs : 0)
                         .withExecutionIsolationStrategy(ExecutionIsolationStrategy.SEMAPHORE)
                         .withExecutionIsolationSemaphoreMaxConcurrentRequests(req_isolation._maxConcurrent)
                         .withFallbackIsolationSemaphoreMaxConcurrentRequests(100)
