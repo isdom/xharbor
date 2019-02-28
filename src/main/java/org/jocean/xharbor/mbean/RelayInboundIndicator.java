@@ -27,8 +27,16 @@ public class RelayInboundIndicator extends InboundIndicator implements RelayInbo
         return _group;
     }
 
+    @Override
+    public int getWeight() {
+        return _weight;
+    }
+
     private MBeanRegister _register;
 
     @Value("${group}")
     String _group = "none";
+
+    @Value("${weight}")
+    int _weight = 0;
 }
