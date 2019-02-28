@@ -13,8 +13,7 @@ public class RelayInboundIndicator extends InboundIndicator implements RelayInbo
     @Override
     public void setServerChannel(final ServerChannel serverChannel) {
         super.setServerChannel(serverChannel);
-        this._register.registerMBean("name=httpin,address=" + this.getBindIp()
-                +",port=" + this.getPort(), this);
+        this._register.registerMBean("name=httpin,address=" + this.getBindIp() +",port=" + this.getPort(), this);
     }
 
     @Override
