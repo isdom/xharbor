@@ -242,7 +242,9 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
             final HttpTrade trade,
             final Scheduler scheduler,
             final int concurrent) {
-        return getTracer(request).subscribeOn(scheduler).map(tracer -> {
+        return getTracer(request)
+                //.subscribeOn(scheduler)
+        .map(tracer -> {
             final Span span = tracer.buildSpan("httpin")
             .withTag(Tags.COMPONENT.getKey(), "jocean-http")
             .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)
@@ -264,7 +266,7 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
             TraceUtil.hook4serversend(trade.writeCtrl(), span);
 
             return buildReactCtx(trade, span, tracer, scheduler, concurrent);
-        });
+        }).observeOn(scheduler, this._maxPending);
     }
 
     private Observable<TradeScheduler> path2scheduler(final String path) {
