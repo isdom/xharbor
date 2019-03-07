@@ -29,12 +29,9 @@
         </constructor-arg>
     </bean>
     
-    <bean factory-bean="agentServer" factory-method="subscribe"
-        destroy-method="unsubscribe">
+    <bean factory-bean="agentServer" factory-method="subscribe" destroy-method="unsubscribe">
         <constructor-arg>
-            <bean class="org.jocean.xharbor.relay.TradeRelay">
-                <constructor-arg ref="router" />
-            </bean>
+            <bean class="org.jocean.xharbor.relay.TradeRelay"/>
         </constructor-arg>
     </bean>
     

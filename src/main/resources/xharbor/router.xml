@@ -10,4 +10,6 @@
         </constructor-arg>
     </bean>
 
+    <alias name="router" alias="${name:default_router}"/>
+    
 </beans>

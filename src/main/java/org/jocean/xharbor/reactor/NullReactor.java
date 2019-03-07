@@ -4,6 +4,8 @@ import rx.Single;
 
 public class NullReactor extends SingleReactor {
 
+    public static NullReactor INSTANCE = new NullReactor();
+
     @Override
     public String toString() {
         return "NullReactor";

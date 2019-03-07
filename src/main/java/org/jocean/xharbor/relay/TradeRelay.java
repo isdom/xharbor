@@ -30,6 +30,7 @@ import org.jocean.svr.tracing.TraceUtil;
 import org.jocean.xharbor.api.TradeReactor;
 import org.jocean.xharbor.api.TradeReactor.InOut;
 import org.jocean.xharbor.api.TradeReactor.ReactContext;
+import org.jocean.xharbor.reactor.NullReactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -99,10 +100,6 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
     @Override
     public String[] getReactors() {
         return _reactor.reactItems();
-    }
-
-    public TradeRelay(final TradeReactor reactor) {
-        this._reactor = reactor;
     }
 
     @Override
@@ -427,7 +424,10 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
     @Named("req_schedulers")
     Map<String, TradeScheduler> _requestSchedulers;
 
-    private final TradeReactor _reactor;
+    @Inject
+    @Named("default_router")
+    TradeReactor _reactor = NullReactor.INSTANCE;
+
     private final int _maxRetryTimes = 3;
     private final int _retryIntervalBase = 2;
 }
