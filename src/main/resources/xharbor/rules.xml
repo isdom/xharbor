@@ -10,6 +10,8 @@
         </constructor-arg>
     </bean>
     
-    <alias name="rules" alias="${name}"/>
+    <bean factory-bean="router" factory-method="addReactor" destroy-method="call">
+        <constructor-arg ref="rules"/>
+    </bean>
     
 </beans>

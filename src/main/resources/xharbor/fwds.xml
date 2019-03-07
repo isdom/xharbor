@@ -6,5 +6,7 @@
 
     <bean id="forwards" class="org.jocean.xharbor.reactor.CompositeForward"/>
     
-    <alias name="forwards" alias="${name}"/>
+    <bean factory-bean="router" factory-method="addReactor" destroy-method="call">
+        <constructor-arg ref="forwards"/>
+    </bean>
 </beans>

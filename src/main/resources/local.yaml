@@ -44,21 +44,6 @@ children:
       http.client.outbound.highmark = 16384
     children:
       - name: httpclient_dashboard
-  - name: rules.console-rwreqs
-    parameters: name=console-rwreqs
-    children:
-      - name: rwreq.jmxhtml
-        parameters: |
-          rewrite.path=/jmxhtml/
-          rewrite.to=/
-          rewrite.header.name=x-jmx
-          rewrite.header.value=jmxhtml.self
-      - name: rwreq.hystrix
-        parameters: |
-          rewrite.path=/hystrix/
-          rewrite.to=/
-          rewrite.header.name=x-hystrix
-          rewrite.header.value=hystrix
   - name: rules.console-auths
     parameters: name=console-auths
     children:
@@ -67,27 +52,34 @@ children:
           auth.headers=x-jmx,jmxhtml(\\w)*
           auth.user=test
           auth.password=test
-  - name: fwds.console-100
-    parameters: name=console-fwds100
-    children:
-      - name: forward.jmxhtml.self
-        parameters: |
-          forward.headers=x-jmx,jmxhtml.self
-          forward.to=http://127.0.0.1:8083
-      - name: forward.hystrix.self
-        parameters: |
-          forward.headers=x-hystrix,hystrix
-          forward.to=http://127.0.0.1:4004
   - name: router.console
     children:
-      - name: delegate.console-rwreqs
-        parameters: |
-          delegate.name=console-rwreqs
-          priority=100
-      - name: delegate.console-fwds100
-        parameters: |
-          delegate.name=console-fwds100
-          priority=70
+      - name: rules.console-rwreqs
+        parameters: priority=100
+        children:
+          - name: rwreq.jmxhtml
+            parameters: |
+              rewrite.path=/jmxhtml/
+              rewrite.to=/
+              rewrite.header.name=x-jmx
+              rewrite.header.value=jmxhtml.self
+          - name: rwreq.hystrix
+            parameters: |
+              rewrite.path=/hystrix/
+              rewrite.to=/
+              rewrite.header.name=x-hystrix
+              rewrite.header.value=hystrix
+      - name: fwds.console-100
+        parameters: priority=70
+        children:
+          - name: forward.jmxhtml.self
+            parameters: |
+              forward.headers=x-jmx,jmxhtml.self
+              forward.to=http://127.0.0.1:8083
+          - name: forward.hystrix.self
+            parameters: |
+              forward.headers=x-hystrix,hystrix
+              forward.to=http://127.0.0.1:4004
       - name: httpserver.console
         parameters: |
           http.server.inbound.blocksize = 8192

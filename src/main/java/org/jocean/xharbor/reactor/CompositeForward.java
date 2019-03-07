@@ -18,6 +18,7 @@ import org.jocean.xharbor.api.TradeReactor;
 import org.jocean.xharbor.relay.ReactUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.google.common.collect.Maps;
 
@@ -30,8 +31,7 @@ public class CompositeForward implements TradeReactor, Ordered {
     private static final ForwardTrade[] EMPTY_FWDT = new ForwardTrade[0];
     private static final ForwardData[] EMPTY_FWDD = new ForwardData[0];
 
-    private static final Logger LOG = LoggerFactory
-            .getLogger(CompositeForward.class);
+    private static final Logger LOG = LoggerFactory.getLogger(CompositeForward.class);
 
     @Override
     public String toString() {
@@ -55,10 +55,6 @@ public class CompositeForward implements TradeReactor, Ordered {
         } else {
             return new String[]{"CompositeForward: (empty)"};
         }
-    }
-
-    public void setOrdinal(final int ordinal) {
-        this._ordinal = ordinal;
     }
 
     @Override
@@ -158,5 +154,6 @@ public class CompositeForward implements TradeReactor, Ordered {
     @Inject
     private Timer _timer;
 
-    private int _ordinal = 0;
+    @Value("${priority}")
+    int _ordinal = 0;
 }
