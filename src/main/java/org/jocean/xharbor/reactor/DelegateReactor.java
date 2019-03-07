@@ -16,7 +16,6 @@ import rx.Single;
 public class DelegateReactor implements TradeReactor, Ordered {
 
     private static final Logger LOG = LoggerFactory.getLogger(DelegateReactor.class);
-    private static final TradeReactor NULL_REACTOR = new NullReactor();
 
     @Override
     public String toString() {
@@ -70,7 +69,7 @@ public class DelegateReactor implements TradeReactor, Ordered {
                 LOG.info("using delegated reactor {} with name: {}", reactor, this._delegateName);
                 return this._delegateReactor.get();
             }
-        }).toSingle().onErrorReturn(e -> NULL_REACTOR);
+        }).toSingle().onErrorReturn(e -> NullReactor.INSTANCE);
     }
 
     @Override

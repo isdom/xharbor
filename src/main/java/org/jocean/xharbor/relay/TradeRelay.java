@@ -99,7 +99,8 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
 
     @Override
     public String[] getReactors() {
-        return _reactor.reactItems();
+        final TradeReactor reactor = this._reactorRef.get();
+        return null != reactor ? reactor.reactItems() : NullReactor.INSTANCE.reactItems();
     }
 
     @Override
@@ -161,7 +162,7 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
                             .doOnNext(ctx -> LOG.info("trade2io: {} handle with ctx {}", trade, ctx))
                             .doOnNext(ctx -> ctxRef.set(ctx))
                             .flatMap(ctx -> {
-                                final Observable<? extends InOut> reaction = this._reactor.react(ctx, initial_io(trade, null)).toObservable();
+                                final Observable<? extends InOut> reaction = getReactor().flatMap(reactor -> reactor.react(ctx, initial_io(trade, null)).toObservable());
                                 final RequestIsolation req_isolation = path2isolation(path);
                                 if (null != req_isolation) {
                                     return enableIsolation(req_isolation, reaction,
@@ -171,6 +172,11 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
                                 }
                             }));
                 });
+    }
+
+    private Observable<TradeReactor> getReactor() {
+        final TradeReactor reactor = this._reactorRef.get();
+        return null != reactor ? Observable.just(reactor) : findAndSetRouter();
     }
 
     private Observable<InOut> fallbackOutbound(final Span span, final RequestIsolation req_isolation, final HttpVersion protocolVersion,
@@ -396,6 +402,20 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
         };
     }
 
+    private Observable<TradeReactor> findAndSetRouter() {
+        return this._finder.find(this._routerName, TradeReactor.class).map(reactor -> {
+            if (this._reactorRef.compareAndSet(null, reactor)) {
+                LOG.info("found router {} with name: {}", reactor, this._routerName);
+                return reactor;
+            } else {
+                LOG.info("using router {} with name: {}", reactor, this._routerName);
+                return this._reactorRef.get();
+            }
+        })
+        .doOnError( e -> LOG.warn("can't found router named {}", _routerName) )
+        .onErrorReturn(e -> NullReactor.INSTANCE);
+    }
+
     private static volatile Tracer noopTracer = NoopTracerFactory.create();
 
     @Inject
@@ -424,9 +444,10 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
     @Named("req_schedulers")
     Map<String, TradeScheduler> _requestSchedulers;
 
-    @Inject
-    @Named("default_router")
-    TradeReactor _reactor = NullReactor.INSTANCE;
+    @Value("${router.name}")
+    String _routerName = "default_router";
+
+    final private AtomicReference<TradeReactor> _reactorRef = new AtomicReference<>(null);;
 
     private final int _maxRetryTimes = 3;
     private final int _retryIntervalBase = 2;
