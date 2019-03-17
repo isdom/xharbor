@@ -241,14 +241,14 @@ public class ForwardTrade extends SingleReactor {
         final HttpTrade trade = ctx.trade();
         final StopWatch stopWatch = ctx.watch();
 
-        return forwardTo(target).doOnNext(upstream->trade.doOnTerminate(upstream.closer()))
+        return forwardTo(target).doOnNext(upstream->trade.doOnEnd(upstream.closer()))
                 .flatMap(upstream -> {
                     final AtomicBoolean isKeepAliveFromClient = new AtomicBoolean(true);
                     final AtomicReference<HttpRequest> refReq = new AtomicReference<>();
                     final AtomicReference<HttpResponse> refResp = new AtomicReference<>();
 
                     final TrafficCounter upstreamTraffic = upstream.traffic();
-                    trade.doOnTerminate(() -> {
+                    trade.doOnEnd(() -> {
                             final long ttl = stopWatch.stopAndRestart();
                             final RelayMemo memo = _memoBuilder.build(target, buildRoutingInfo(refReq.get()));
                             memo.incBizResult(RESULT.RELAY_SUCCESS, ttl);
@@ -345,10 +345,6 @@ public class ForwardTrade extends SingleReactor {
             }
         });
     }
-
-//    private Observable<Boolean> isRBS() {
-//        return this._finder.find("configs", Map.class).map(conf -> !istrue(conf.get(_matcher.pathPattern() + ":" + "disable_rbs")));
-//    }
 
     private Observable<Boolean> isDBS() {
         return this._finder.find("configs", Map.class).map(conf -> !istrue(conf.get(_matcher.pathPattern() + ":" + "disable_dbs")));

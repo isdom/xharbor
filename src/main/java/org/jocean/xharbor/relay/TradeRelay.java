@@ -255,7 +255,7 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
             .withTag(Tags.HTTP_METHOD.getKey(), request.method().name())
             .withTag(Tags.PEER_HOST_IPV4.getKey(), get1stIp(request.headers().get("x-forwarded-for", "none")))
             .start();
-            trade.doOnTerminate(() -> span.finish());
+            trade.doOnEnd(() -> span.finish());
 
             // try to add host
             TraceUtil.addTagNotNull(span, "http.host", request.headers().get(HttpHeaderNames.HOST));
