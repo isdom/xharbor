@@ -18,11 +18,7 @@ public class ForwardData implements BeanHolderAware {
     private static final Logger LOG = LoggerFactory
             .getLogger(ForwardData.class);
 
-    public ForwardData(
-            final MatchRule matcher,
-            final String uri,
-            final String featuresName
-            ) throws Exception {
+    public ForwardData(final MatchRule matcher, final String uri, final String featuresName) throws Exception {
         this._matcher = matcher;
         this._uri = new URI(uri);
         this._featuresName = featuresName;
@@ -58,16 +54,12 @@ public class ForwardData implements BeanHolderAware {
         this._beanHolder = beanHolder;
     }
 
-    public void setServiceName(final String serviceName) {
-        this._serviceName = serviceName;
-    }
-
     public String serviceName() {
         return this._serviceName;
     }
 
     @Value("${service}")
-    private String _serviceName = "(unknown)";
+    String _serviceName = "(unknown)";
 
     private BeanHolder _beanHolder;
 
