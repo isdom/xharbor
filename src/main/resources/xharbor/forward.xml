@@ -14,8 +14,6 @@
                         <constructor-arg value="${forward.headers:}"/>
                     </bean>
                 </constructor-arg>
-                <constructor-arg value="${forward.to}"/>
-                <constructor-arg value="${features.name:default}"/>
             </bean>
         </constructor-arg>
     </bean>

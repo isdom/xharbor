@@ -15,13 +15,10 @@ import rx.functions.Func0;
 
 public class ForwardData implements BeanHolderAware {
 
-    private static final Logger LOG = LoggerFactory
-            .getLogger(ForwardData.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ForwardData.class);
 
-    public ForwardData(final MatchRule matcher, final String uri, final String featuresName) throws Exception {
+    public ForwardData(final MatchRule matcher) {
         this._matcher = matcher;
-        this._uri = new URI(uri);
-        this._featuresName = featuresName;
     }
 
     MatchRule matcher() {
@@ -64,6 +61,14 @@ public class ForwardData implements BeanHolderAware {
     private BeanHolder _beanHolder;
 
     private final MatchRule _matcher;
-    private final URI _uri;
-    private final String _featuresName;
+
+    @Value("${forward.to}")
+    public void setUri(final String uri) throws Exception {
+        this._uri = new URI(uri);
+    }
+
+    URI _uri;
+
+    @Value("${features.name}")
+    String _featuresName = "default";
 }
