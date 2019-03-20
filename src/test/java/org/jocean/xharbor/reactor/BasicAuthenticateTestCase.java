@@ -20,11 +20,16 @@ public class BasicAuthenticateTestCase {
 
     @Test
     public final void testBasicAuthorizer() {
-        final BasicAuthenticate authorizer = new BasicAuthenticate(
-                new MatchRule(null, "/needauth(\\w)*", null),
-                "hello", "world", "demo");
+        final BasicAuthenticate authorizer = new BasicAuthenticate();
 
-        final InOut io = authorizer.react(null, new InOut() {
+        authorizer._matcher = new MatchRule();
+        authorizer._matcher.setPath("/needauth(\\w)*");
+
+        authorizer._user = "hello";
+        authorizer._password = "world";
+        authorizer._strWWWAuthenticate = "demo";
+
+        final InOut io = authorizer.react(TestReactorUtil.nullctx(), new InOut() {
                 @Override
                 public Observable<FullMessage<HttpRequest>> inbound() {
                     return Observable.just(new FullMessage<HttpRequest>() {

@@ -4,11 +4,15 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
 
+import javax.inject.Inject;
+import javax.inject.Named;
+
 import org.jocean.http.FullMessage;
 import org.jocean.http.MessageBody;
 import org.jocean.idiom.StepableUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
@@ -21,17 +25,6 @@ import rx.Single;
 public class ResponseWithHeaderonly extends SingleReactor {
 
     private static final Logger LOG = LoggerFactory.getLogger(ResponseWithHeaderonly.class);
-
-    public ResponseWithHeaderonly(
-            final MatchRule matcher,
-            final int responseStatus,
-            final Map<String, String> extraHeaders,
-            final boolean enableLogReact) {
-        this._matcher = matcher;
-        this._responseStatus = responseStatus;
-        this._extraHeaders = extraHeaders;
-        this._logReact = enableLogReact;
-    }
 
     @Override
     public String toString() {
@@ -75,7 +68,7 @@ public class ResponseWithHeaderonly extends SingleReactor {
         return io.inbound().first().map(fullreq -> {
             if (this._matcher.match(fullreq.message())) {
                 LOG.trace("ResponseWithHeaderonly.react {} matched", fullreq.message());
-                return io4Response(ctx, io, fullreq);
+                return io4response(ctx, io, fullreq);
             } else {
                 // not handle this trade
                 LOG.trace("ResponseWithHeaderonly.react {} !NOT! matched", fullreq.message());
@@ -84,7 +77,7 @@ public class ResponseWithHeaderonly extends SingleReactor {
         }).toSingle();
     }
 
-    private InOut io4Response(final ReactContext ctx, final InOut orgio, final FullMessage<HttpRequest> orgfullreq) {
+    private InOut io4response(final ReactContext ctx, final InOut orgio, final FullMessage<HttpRequest> orgfullreq) {
         return new InOut() {
             @Override
             public Observable<FullMessage<HttpRequest>> inbound() {
@@ -118,8 +111,16 @@ public class ResponseWithHeaderonly extends SingleReactor {
             }};
     }
 
-    private final MatchRule _matcher;
-    private final int _responseStatus;
-    private final Map<String, String> _extraHeaders;
-    private final boolean _logReact;
+    @Inject
+    MatchRule _matcher;
+
+    @Value("${response.status}")
+    int _responseStatus = 200;
+
+    @Inject
+    @Named("extraHeaders")
+    Map<String, String> _extraHeaders;
+
+    @Value("${response.log}")
+    boolean _logReact = true;
 }

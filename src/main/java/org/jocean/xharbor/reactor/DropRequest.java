@@ -1,9 +1,12 @@
 package org.jocean.xharbor.reactor;
 
+import javax.inject.Inject;
+
 import org.jocean.http.CloseException;
 import org.jocean.http.FullMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -13,13 +16,6 @@ import rx.Single;
 public class DropRequest extends SingleReactor {
 
     private static final Logger LOG = LoggerFactory.getLogger(DropRequest.class);
-
-    public DropRequest(
-            final MatchRule matcher,
-            final boolean enableLog) {
-        this._matcher = matcher;
-        this._log = enableLog;
-    }
 
     @Override
     public String toString() {
@@ -46,7 +42,7 @@ public class DropRequest extends SingleReactor {
         }
         return io.inbound().first().map(fullreq -> {
             if (_matcher.match(fullreq.message())) {
-                return io4Drop(ctx, io, fullreq);
+                return io4drop(ctx, io, fullreq);
             } else {
                 // not handle this trade
                 return null;
@@ -54,7 +50,7 @@ public class DropRequest extends SingleReactor {
         }).toSingle();
     }
 
-    private InOut io4Drop(final ReactContext ctx, final InOut originalio,
+    private InOut io4drop(final ReactContext ctx, final InOut originalio,
             final FullMessage<HttpRequest> orgreq) {
         return new InOut() {
             @Override
@@ -72,6 +68,9 @@ public class DropRequest extends SingleReactor {
             }};
     }
 
-    private final MatchRule _matcher;
-    private final boolean _log;
+    @Inject
+    MatchRule _matcher;
+
+    @Value("${log}")
+    boolean _log = true;
 }

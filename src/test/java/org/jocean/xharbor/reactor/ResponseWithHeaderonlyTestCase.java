@@ -19,11 +19,13 @@ public class ResponseWithHeaderonlyTestCase {
 
     @Test
     public final void testHeaderonlyResponder() {
-        final ResponseWithHeaderonly responder = new ResponseWithHeaderonly(
-                new MatchRule(null, "/yourname/(\\w)*", null),
-                200, null, true);
+        final ResponseWithHeaderonly responder = new ResponseWithHeaderonly();
 
-        final InOut io = responder.react(null, new InOut() {
+        responder._matcher = new MatchRule();
+        responder._matcher.setPath("/yourname/(\\w)*");
+
+
+        final InOut io = responder.react(TestReactorUtil.nullctx(), new InOut() {
                 @Override
                 public Observable<FullMessage<HttpRequest>> inbound() {
                     return Observable.just(new FullMessage<HttpRequest>() {

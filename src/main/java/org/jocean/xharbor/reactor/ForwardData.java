@@ -2,6 +2,8 @@ package org.jocean.xharbor.reactor;
 
 import java.net.URI;
 
+import javax.inject.Inject;
+
 import org.jocean.http.Feature;
 import org.jocean.http.util.FeaturesBuilder;
 import org.jocean.idiom.BeanHolder;
@@ -16,10 +18,6 @@ import rx.functions.Func0;
 public class ForwardData implements BeanHolderAware {
 
     private static final Logger LOG = LoggerFactory.getLogger(ForwardData.class);
-
-    public ForwardData(final MatchRule matcher) {
-        this._matcher = matcher;
-    }
 
     MatchRule matcher() {
         return this._matcher;
@@ -60,7 +58,8 @@ public class ForwardData implements BeanHolderAware {
 
     private BeanHolder _beanHolder;
 
-    private final MatchRule _matcher;
+    @Inject
+    MatchRule _matcher;
 
     @Value("${forward.to}")
     public void setUri(final String uri) throws Exception {

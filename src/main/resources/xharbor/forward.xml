@@ -4,17 +4,11 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
 
+    <bean class="org.jocean.xharbor.reactor.MatchRule"/>
+    
     <bean factory-bean="forwards" factory-method="addForward" destroy-method="call">
         <constructor-arg>
-            <bean class="org.jocean.xharbor.reactor.ForwardData">
-                <constructor-arg>
-                    <bean class="org.jocean.xharbor.reactor.MatchRule">
-                        <constructor-arg value="${forward.method:}"/>
-                        <constructor-arg value="${forward.path:}"/>
-                        <constructor-arg value="${forward.headers:}"/>
-                    </bean>
-                </constructor-arg>
-            </bean>
+            <bean class="org.jocean.xharbor.reactor.ForwardData"/>
         </constructor-arg>
     </bean>
 

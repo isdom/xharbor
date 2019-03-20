@@ -7,6 +7,7 @@ import java.util.regex.Pattern;
 
 import org.jocean.idiom.Pair;
 import org.jocean.idiom.Regexs;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
@@ -18,34 +19,6 @@ public class MatchRule implements Comparable<MatchRule> {
 
     public String pathPattern() {
         return this._pathPatternAsString;
-    }
-
-    public MatchRule(
-            final String methodPattern,
-            final String pathPattern,
-            final String headersPattern
-            ) {
-        this._methodPatternAsString = methodPattern;
-        this._pathPatternAsString   = pathPattern;
-        this._headersPatternAsString = headersPattern;
-
-        this._methodPattern = Regexs.safeCompilePattern(this._methodPatternAsString);
-        this._pathPattern = Regexs.safeCompilePattern(this._pathPatternAsString);
-
-        if (null != headersPattern && !headersPattern.isEmpty()) {
-            final Iterator<String> iter = Splitter.on(',')
-                    .trimResults()
-                    .split(headersPattern)
-                    .iterator();
-
-            while (iter.hasNext()) {
-                final String name = iter.next();
-                if (!iter.hasNext()) {
-                    break;
-                }
-                this._headersPredicates.add(Pair.of(name, buildPredicate(iter.next())));
-            }
-        }
     }
 
     private Func1<String, Boolean> buildPredicate(final String expression) {
@@ -185,11 +158,41 @@ public class MatchRule implements Comparable<MatchRule> {
         return 0;
     }
 
-    private final String _methodPatternAsString;
-    private final String _pathPatternAsString;
-    private final String _headersPatternAsString;
+    @Value("${request.method}")
+    void setMethod(final String method) {
+        this._methodPatternAsString = method;
+        this._methodPattern = Regexs.safeCompilePattern(this._methodPatternAsString);
+    }
 
-    private final Pattern _methodPattern;
-    private final Pattern _pathPattern;
-    private final List<Pair<String,Func1<String, Boolean>>> _headersPredicates = Lists.newArrayList();
+    @Value("${request.path}")
+    void setPath(final String path) {
+        this._pathPatternAsString   = path;
+        this._pathPattern = Regexs.safeCompilePattern(this._pathPatternAsString);
+    }
+
+    @Value("${request.headers}")
+    void setHeaders(final String headers) {
+        this._headersPatternAsString = headers;
+        this._headersPredicates.clear();
+
+        if (null != headers && !headers.isEmpty()) {
+            final Iterator<String> iter = Splitter.on(',').trimResults().split(headers).iterator();
+
+            while (iter.hasNext()) {
+                final String name = iter.next();
+                if (!iter.hasNext()) {
+                    break;
+                }
+                this._headersPredicates.add(Pair.of(name, buildPredicate(iter.next())));
+            }
+        }
+    }
+
+    String _methodPatternAsString = "";
+    String _pathPatternAsString = "";
+    String _headersPatternAsString = "";
+
+    Pattern _methodPattern = null;
+    Pattern _pathPattern = null;
+    final List<Pair<String,Func1<String, Boolean>>> _headersPredicates = Lists.newArrayList();
 }

@@ -6,18 +6,11 @@
     
     <bean id="extraHeaders" class="java.util.concurrent.ConcurrentHashMap"/>
 
+    <bean class="org.jocean.xharbor.reactor.MatchRule"/>
+    
     <bean factory-bean="rules" factory-method="addReactor" destroy-method="call">
         <constructor-arg>
-            <bean class="org.jocean.xharbor.reactor.RewriteResponse">
-                <constructor-arg>
-                    <bean class="org.jocean.xharbor.reactor.MatchRule">
-                        <constructor-arg value="${rewrite.method:}"/>
-                        <constructor-arg value="${rewrite.path:}"/>
-                        <constructor-arg value="${rewrite.headers:}"/>
-                    </bean>
-                </constructor-arg>
-                <constructor-arg ref="extraHeaders"/>
-            </bean>
+            <bean class="org.jocean.xharbor.reactor.RewriteResponse"/>
         </constructor-arg>
     </bean>
 

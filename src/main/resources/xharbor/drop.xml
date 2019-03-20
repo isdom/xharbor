@@ -4,18 +4,11 @@
        xsi:schemaLocation="http://www.springframework.org/schema/beans
         http://www.springframework.org/schema/beans/spring-beans.xsd">
 
+    <bean class="org.jocean.xharbor.reactor.MatchRule"/>
+    
     <bean factory-bean="rules" factory-method="addReactor" destroy-method="call">
         <constructor-arg>
-            <bean class="org.jocean.xharbor.reactor.DropRequest">
-                <constructor-arg>
-                    <bean class="org.jocean.xharbor.reactor.MatchRule">
-                        <constructor-arg value="${request.method:}"/>
-                        <constructor-arg value="${request.path:}"/>
-                        <constructor-arg value="${request.headers:}"/>
-                    </bean>
-                </constructor-arg>
-                <constructor-arg value="${log:true}"/>
-            </bean>
+            <bean class="org.jocean.xharbor.reactor.DropRequest"/>
         </constructor-arg>
     </bean>
 

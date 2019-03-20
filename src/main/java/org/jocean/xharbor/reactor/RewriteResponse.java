@@ -4,6 +4,9 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
 
+import javax.inject.Inject;
+import javax.inject.Named;
+
 import org.jocean.http.FullMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,11 +18,6 @@ import rx.Single;
 
 public class RewriteResponse extends SingleReactor {
     private static final Logger LOG = LoggerFactory.getLogger(RewriteResponse.class);
-
-    public RewriteResponse(final MatchRule matcher, final Map<String, String> extraHeaders) {
-        this._matcher = matcher;
-        this._extraHeaders = extraHeaders;
-    }
 
     @Override
     public String toString() {
@@ -88,6 +86,10 @@ public class RewriteResponse extends SingleReactor {
         };
     }
 
-    private final MatchRule _matcher;
-    private final Map<String, String> _extraHeaders;
+    @Inject
+    MatchRule _matcher;
+
+    @Inject
+    @Named("extraHeaders")
+    Map<String, String> _extraHeaders;
 }

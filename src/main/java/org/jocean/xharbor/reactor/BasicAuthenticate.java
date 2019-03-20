@@ -1,11 +1,14 @@
 package org.jocean.xharbor.reactor;
 
+import javax.inject.Inject;
+
 import org.jocean.http.FullMessage;
 import org.jocean.http.MessageBody;
 import org.jocean.idiom.Pair;
 import org.jocean.idiom.StepableUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.google.common.base.Charsets;
 import com.google.common.io.BaseEncoding;
@@ -28,25 +31,14 @@ public class BasicAuthenticate extends SingleReactor {
         return builder.toString();
     }
 
-    public BasicAuthenticate(
-            final MatchRule matcher,
-            final String user,
-            final String password,
-            final String strWWWAuthenticate) {
-        this._matcher = matcher;
-        this._user = user;
-        this._password = password;
-        this._strWWWAuthenticate = strWWWAuthenticate;
-    }
-
     @Override
     public Single<Boolean> match(final ReactContext ctx, final InOut io) {
         if (null != io.outbound()) {
             return Single.just(false);
         }
         return io.inbound().first().map(fullreq -> {
-            if (_matcher.match(fullreq.message())) {
-                if (isAuthorizeSuccess(fullreq.message(), _user, _password)) {
+            if (this._matcher.match(fullreq.message())) {
+                if (isAuthorizeSuccess(fullreq.message(), this._user, this._password)) {
                     return false;
                 } else {
                     // response 401 Unauthorized
@@ -67,8 +59,8 @@ public class BasicAuthenticate extends SingleReactor {
             return Single.<InOut>just(null);
         }
         return io.inbound().first().map(fullreq -> {
-            if (_matcher.match(fullreq.message())) {
-                if (isAuthorizeSuccess(fullreq.message(), _user, _password)) {
+            if (this._matcher.match(fullreq.message())) {
+                if (isAuthorizeSuccess(fullreq.message(), this._user, this._password)) {
                     return null;
                 } else {
                     // response 401 Unauthorized
@@ -152,8 +144,15 @@ public class BasicAuthenticate extends SingleReactor {
         return fields.length == 2 ? Pair.of(fields[0], fields[1]) : null;
     }
 
-    private final MatchRule _matcher;
-    private final String _user;
-    private final String _password;
-    private final String _strWWWAuthenticate;
+    @Inject
+    MatchRule _matcher;
+
+    @Value("${auth.user}")
+    String _user;
+
+    @Value("${auth.password}")
+    String _password;
+
+    @Value("${auth.authenticate}")
+    String _strWWWAuthenticate = "jocean";
 }
