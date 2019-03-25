@@ -6,12 +6,7 @@
 
     <bean factory-bean="rules" factory-method="addReactor" destroy-method="call">
         <constructor-arg>
-            <bean class="org.jocean.xharbor.reactor.RewriteRequest">
-                <constructor-arg value="${rewrite.path}"/>
-                <constructor-arg value="${rewrite.to:}"/>
-                <constructor-arg value="${rewrite.header.name:}"/>
-                <constructor-arg value="${rewrite.header.value:}"/>
-            </bean>
+            <bean class="org.jocean.xharbor.reactor.RewriteRequest"/>
         </constructor-arg>
     </bean>
 

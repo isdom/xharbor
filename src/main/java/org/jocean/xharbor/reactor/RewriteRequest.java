@@ -8,6 +8,7 @@ import org.jocean.http.MessageBody;
 import org.jocean.idiom.Regexs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.google.common.collect.ImmutableMap;
 
@@ -19,18 +20,6 @@ import rx.Single;
 
 public class RewriteRequest extends SingleReactor {
     private static final Logger LOG = LoggerFactory.getLogger(RewriteRequest.class);
-
-    public RewriteRequest(
-            final String pathPattern,
-            final String replacePathTo,
-            final String replaceHeaderName,
-            final String replaceHeaderValue
-            ) {
-        this._pathPattern = Regexs.safeCompilePattern(pathPattern);
-        this._replacePathTo = replacePathTo;
-        this._replaceHeaderName = replaceHeaderName;
-        this._replaceHeaderValue = replaceHeaderValue;
-    }
 
     @Override
     public String toString() {
@@ -116,8 +105,19 @@ public class RewriteRequest extends SingleReactor {
         return newreq;
     }
 
-    private final Pattern _pathPattern;
-    private final String _replacePathTo;
-    private final String _replaceHeaderName;
-    private final String _replaceHeaderValue;
+    @Value("${request.path}")
+    void setPath(final String pattern) {
+        this._pathPattern = Regexs.safeCompilePattern(pattern);
+    }
+
+    Pattern _pathPattern;
+
+    @Value("${rewrite.header.name}")
+    String _replaceHeaderName;
+
+    @Value("${rewrite.header.value}")
+    String _replaceHeaderValue;
+
+    @Value("${rewrite.to}")
+    String _replacePathTo;
 }

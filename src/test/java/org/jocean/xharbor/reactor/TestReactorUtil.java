@@ -6,6 +6,8 @@ import org.jocean.xharbor.api.TradeReactor.ReactContext;
 
 import io.opentracing.Span;
 import io.opentracing.Tracer;
+import io.opentracing.noop.NoopSpan;
+import io.opentracing.noop.NoopTracerFactory;
 import rx.Scheduler;
 
 class TestReactorUtil {
@@ -24,12 +26,12 @@ class TestReactorUtil {
 
             @Override
             public Tracer tracer() {
-                return null;
+                return NoopTracerFactory.create();
             }
 
             @Override
             public Span span() {
-                return null;
+                return NoopSpan.INSTANCE;
             }
 
             @Override

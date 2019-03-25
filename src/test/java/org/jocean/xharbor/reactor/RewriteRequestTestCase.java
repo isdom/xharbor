@@ -14,7 +14,6 @@ import org.jocean.http.util.Nettys;
 import org.jocean.http.util.RxNettys;
 import org.jocean.idiom.DisposableWrapper;
 import org.jocean.idiom.DisposableWrapperUtil;
-import org.jocean.xharbor.api.TradeReactor;
 import org.jocean.xharbor.api.TradeReactor.InOut;
 import org.junit.Test;
 
@@ -35,12 +34,14 @@ public class RewriteRequestTestCase {
 
     @Test
     public final void testRewritePathSuccess() {
-        final TradeReactor reactor =
-                new RewriteRequest("/yjy_psm/fetchMetadata", "/yjy_common/fetchMetadata", null, null);
+        final RewriteRequest reactor = new RewriteRequest();
 
-        final HttpRequest orgreq = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/yjy_psm/fetchMetadata");
+        reactor.setPath("/demo_psm/fetchMetadata");
+        reactor._replacePathTo = "/demo_common/fetchMetadata";
 
-        final InOut io = reactor.react(null, new InOut() {
+        final HttpRequest orgreq = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/demo_psm/fetchMetadata");
+
+        final InOut io = reactor.react(TestReactorUtil.nullctx(), new InOut() {
                 @Override
                 public Observable<FullMessage<HttpRequest>> inbound() {
                     return Observable.just(new FullMessage<HttpRequest>() {
@@ -61,19 +62,20 @@ public class RewriteRequestTestCase {
 
         final HttpRequest rwreq = io.inbound().toBlocking().single().message();
 
-        assertEquals("/yjy_psm/fetchMetadata", orgreq.uri());
-        assertEquals("/yjy_common/fetchMetadata", rwreq.uri());
+        assertEquals("/demo_psm/fetchMetadata", orgreq.uri());
+        assertEquals("/demo_common/fetchMetadata", rwreq.uri());
     }
 
     @Test
     public final void testNoNeedRewritePath() {
-        final TradeReactor reactor =
-                new RewriteRequest("/yjy_psm/fetchMetadata", "/yjy_common/fetchMetadata", null, null);
+        final RewriteRequest reactor = new RewriteRequest();
+
+        reactor.setPath("/demo_psm/fetchMetadata");
+        reactor._replacePathTo = "/demo_common/fetchMetadata";
 
         final HttpRequest orgreq = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/noNeedRewrite");
 
-        final InOut io =
-            reactor.react(null, new InOut() {
+        final InOut io = reactor.react(TestReactorUtil.nullctx(), new InOut() {
                 @Override
                 public Observable<FullMessage<HttpRequest>> inbound() {
                     return Observable.just(new FullMessage<HttpRequest>() {
@@ -97,12 +99,14 @@ public class RewriteRequestTestCase {
 
     @Test
     public final void testRewritePathAndKeepRequestBody() throws IOException {
-        final TradeReactor reactor =
-                new RewriteRequest("/yjy_psm/fetchMetadata", "/yjy_common/fetchMetadata", null, null);
+        final RewriteRequest reactor = new RewriteRequest();
 
-        final HttpRequest orgreq = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/yjy_psm/fetchMetadata");
+        reactor.setPath("/demo_psm/fetchMetadata");
+        reactor._replacePathTo = "/demo_common/fetchMetadata";
 
-        final InOut io = reactor.react(null, new InOut() {
+        final HttpRequest orgreq = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/demo_psm/fetchMetadata");
+
+        final InOut io = reactor.react(TestReactorUtil.nullctx(), new InOut() {
                 @Override
                 public Observable<FullMessage<HttpRequest>> inbound() {
                     return Observable.just(new FullMessage<HttpRequest>() {
@@ -145,8 +149,8 @@ public class RewriteRequestTestCase {
 
         final FullHttpRequest rwreq = io.inbound().compose(RxNettys.fullmessage2dwq(null, true)).toBlocking().single().unwrap();
 
-        assertEquals("/yjy_psm/fetchMetadata", orgreq.uri());
-        assertEquals("/yjy_common/fetchMetadata", rwreq.uri());
+        assertEquals("/demo_psm/fetchMetadata", orgreq.uri());
+        assertEquals("/demo_common/fetchMetadata", rwreq.uri());
 
         assertTrue(Arrays.equals(Nettys.dumpByteBufAsBytes(rwreq.content()), CONTENT));
     }
