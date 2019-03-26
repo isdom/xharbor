@@ -30,7 +30,7 @@
 
     <bean id="req_schedulers" class="java.util.concurrent.ConcurrentHashMap"/>
 
-    <bean id="xharborExporter" class="org.springframework.jmx.export.MBeanExporter"
+    <bean class="org.springframework.jmx.export.MBeanExporter"
           lazy-init="false">
         <property name="beans">
             <map>
