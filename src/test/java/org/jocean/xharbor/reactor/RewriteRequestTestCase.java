@@ -20,7 +20,9 @@ import org.junit.Test;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultHttpRequest;
+import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -138,6 +140,11 @@ public class RewriteRequestTestCase {
                                             return Observable.just(DisposableWrapperUtil.wrap(Unpooled.wrappedBuffer(CONTENT), (Action1<ByteBuf>)null))
                                                     .toList().toBlocking().single();
                                         }});
+                                }
+
+                                @Override
+                                public HttpHeaders headers() {
+                                    return EmptyHttpHeaders.INSTANCE;
                                 }});
                         }});
                 }
