@@ -98,6 +98,11 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
     }
 
     @Override
+    public void setTracingEnabled(final boolean enabled) {
+        _tracingEnabled = enabled;
+    }
+
+    @Override
     public String[] getReactors() {
         final TradeReactor reactor = this._reactorRef.get();
         return null != reactor ? reactor.reactItems() : NullReactor.INSTANCE.reactItems();
@@ -245,9 +250,7 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
             final HttpTrade trade,
             final Scheduler scheduler,
             final int concurrent) {
-        return getTracer(request)
-                //.subscribeOn(scheduler)
-        .map(tracer -> {
+        return getTracer(request).map(tracer -> {
             final Span span = tracer.buildSpan("httpin")
             .withTag(Tags.COMPONENT.getKey(), "jocean-http")
             .withTag(Tags.SPAN_KIND.getKey(), Tags.SPAN_KIND_SERVER)

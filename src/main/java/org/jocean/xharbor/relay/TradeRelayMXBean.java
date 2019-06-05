@@ -8,5 +8,7 @@ public interface TradeRelayMXBean {
 
     public boolean isTracingEnabled();
 
+    public void setTracingEnabled(boolean enabled);
+
     public String[] getReactors();
 }
