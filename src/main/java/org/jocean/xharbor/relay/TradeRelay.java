@@ -47,9 +47,11 @@ import com.netflix.hystrix.HystrixCommandProperties.ExecutionIsolationStrategy;
 import com.netflix.hystrix.HystrixObservableCommand;
 
 import io.jaegertracing.internal.JaegerSpan;
+import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.binder.BaseUnits;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpRequest;
@@ -271,7 +273,9 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
                 span.finish();
                 if (span instanceof JaegerSpan) {
                     final String operation = ((JaegerSpan)span).getOperationName();
-                    getOrCreateTradeTimer("operation", operation).record(((JaegerSpan)span).getDuration(), TimeUnit.MICROSECONDS);;
+                    getOrCreateTradeTimer("operation", operation).record(((JaegerSpan)span).getDuration(), TimeUnit.MICROSECONDS);
+                    getOrCreateInboundSummary("operation", operation).record(trade.traffic().inboundBytes());
+                    getOrCreateOutboundSummary("operation", operation).record(trade.traffic().outboundBytes());
                 }
             });
 
@@ -455,6 +459,50 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
         return timer;
     }
 
+    private DistributionSummary getOrCreateInboundSummary(final String... tags) {
+        final StringTags keyOfTags = new StringTags(tags);
+
+        DistributionSummary summary = this._inboundSummarys.get(keyOfTags);
+
+        if (null == summary) {
+            summary = DistributionSummary.builder("jocean.xharbor.trade.inbound")
+                .tags(tags)
+                .description("The inbound size of jocean xharbor trade") // optional
+                .baseUnit(BaseUnits.BYTES)
+                .publishPercentileHistogram()
+                .maximumExpectedValue( 8 * 1024L)
+                .register(_meterRegistry);
+
+            final DistributionSummary old = this._inboundSummarys.putIfAbsent(keyOfTags, summary);
+            if (null != old) {
+                summary = old;
+            }
+        }
+        return summary;
+    }
+
+    private DistributionSummary getOrCreateOutboundSummary(final String... tags) {
+        final StringTags keyOfTags = new StringTags(tags);
+
+        DistributionSummary summary = this._outboundSummarys.get(keyOfTags);
+
+        if (null == summary) {
+            summary = DistributionSummary.builder("jocean.xharbor.trade.outbound")
+                .tags(tags)
+                .description("The outbound size of jocean xharbor trade") // optional
+                .baseUnit(BaseUnits.BYTES)
+                .publishPercentileHistogram()
+                .maximumExpectedValue( 8 * 1024L)
+                .register(_meterRegistry);
+
+            final DistributionSummary old = this._outboundSummarys.putIfAbsent(keyOfTags, summary);
+            if (null != old) {
+                summary = old;
+            }
+        }
+        return summary;
+    }
+
     private static volatile Tracer noopTracer = NoopTracerFactory.create();
 
     @Inject
@@ -492,6 +540,8 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
     private final int _retryIntervalBase = 2;
 
     private final ConcurrentMap<StringTags, Timer> _tradeTimers = new ConcurrentHashMap<>();
+    private final ConcurrentMap<StringTags, DistributionSummary> _inboundSummarys = new ConcurrentHashMap<>();
+    private final ConcurrentMap<StringTags, DistributionSummary> _outboundSummarys = new ConcurrentHashMap<>();
 
     @Inject
     MeterRegistry _meterRegistry = Metrics.globalRegistry;
