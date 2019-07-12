@@ -5,9 +5,13 @@ package org.jocean.xharbor.relay;
 
 import java.net.ConnectException;
 import java.nio.channels.ClosedChannelException;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.inject.Inject;
@@ -25,6 +29,7 @@ import org.jocean.idiom.jmx.MBeanRegister;
 import org.jocean.idiom.jmx.MBeanRegisterAware;
 import org.jocean.idiom.rx.RxObservables;
 import org.jocean.idiom.rx.RxObservables.RetryPolicy;
+import org.jocean.svr.StringTags;
 import org.jocean.svr.TradeScheduler;
 import org.jocean.svr.tracing.TraceUtil;
 import org.jocean.xharbor.api.TradeReactor;
@@ -41,6 +46,10 @@ import com.netflix.hystrix.HystrixCommandProperties;
 import com.netflix.hystrix.HystrixCommandProperties.ExecutionIsolationStrategy;
 import com.netflix.hystrix.HystrixObservableCommand;
 
+import io.jaegertracing.internal.JaegerSpan;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Timer;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpRequest;
@@ -258,7 +267,13 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
             .withTag(Tags.HTTP_METHOD.getKey(), request.method().name())
             .withTag(Tags.PEER_HOST_IPV4.getKey(), get1stIp(request.headers().get("x-forwarded-for", "none")))
             .start();
-            trade.doOnHalt(() -> span.finish());
+            trade.doOnHalt(() -> {
+                span.finish();
+                if (span instanceof JaegerSpan) {
+                    final String operation = ((JaegerSpan)span).getOperationName();
+                    getOrCreateTradeTimer("operation", operation).record(((JaegerSpan)span).getDuration(), TimeUnit.MICROSECONDS);;
+                }
+            });
 
             // try to add host
             TraceUtil.addTagNotNull(span, "http.host", request.headers().get(HttpHeaderNames.HOST));
@@ -419,6 +434,27 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
         .onErrorReturn(e -> NullReactor.INSTANCE);
     }
 
+    private Timer getOrCreateTradeTimer(final String... tags) {
+        final StringTags keyOfTags = new StringTags(tags);
+
+        Timer timer = this._tradeTimers.get(keyOfTags);
+
+        if (null == timer) {
+            timer = Timer.builder("jocean.xharbor.trade.duration")
+                .tags(tags)
+                .description("The duration of jocean xharbor trade")
+                .publishPercentileHistogram()
+                .maximumExpectedValue(Duration.ofSeconds(30))
+                .register(_meterRegistry);
+
+            final Timer old = this._tradeTimers.putIfAbsent(keyOfTags, timer);
+            if (null != old) {
+                timer = old;
+            }
+        }
+        return timer;
+    }
+
     private static volatile Tracer noopTracer = NoopTracerFactory.create();
 
     @Inject
@@ -454,4 +490,9 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
 
     private final int _maxRetryTimes = 3;
     private final int _retryIntervalBase = 2;
+
+    private final ConcurrentMap<StringTags, Timer> _tradeTimers = new ConcurrentHashMap<>();
+
+    @Inject
+    MeterRegistry _meterRegistry = Metrics.globalRegistry;
 }
