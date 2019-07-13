@@ -22,6 +22,8 @@ import org.springframework.beans.factory.annotation.Value;
 
 import com.google.common.collect.Maps;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Metrics;
 import io.netty.util.Timer;
 import rx.Single;
 import rx.functions.Action0;
@@ -92,7 +94,8 @@ public class CompositeForward implements TradeReactor, Ordered {
                             this._finder,
                             this._memoBuilder,
                             this._serviceMemo,
-                            this._timer);
+                            this._timer,
+                            this._meterRegistry);
                     matcher2reactor.put(fwdd.matcher(), fwdt);
                 }
                 fwdt.addTarget(fwdd.target());
@@ -156,4 +159,7 @@ public class CompositeForward implements TradeReactor, Ordered {
 
     @Value("${priority}")
     int _ordinal = 0;
+
+    @Inject
+    MeterRegistry _meterRegistry = Metrics.globalRegistry;
 }

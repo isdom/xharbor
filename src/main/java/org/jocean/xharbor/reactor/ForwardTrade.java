@@ -3,9 +3,12 @@ package org.jocean.xharbor.reactor;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -14,7 +17,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.jocean.http.Feature;
 import org.jocean.http.FullMessage;
 import org.jocean.http.MessageBody;
-import org.jocean.http.TrafficCounter;
 import org.jocean.http.TransportException;
 import org.jocean.http.WriteCtrl;
 import org.jocean.http.client.HttpClient;
@@ -25,6 +27,7 @@ import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxObservables;
+import org.jocean.svr.StringTags;
 import org.jocean.svr.tracing.TraceUtil;
 import org.jocean.xharbor.api.RelayMemo;
 import org.jocean.xharbor.api.RelayMemo.RESULT;
@@ -41,6 +44,11 @@ import com.netflix.hystrix.HystrixCommandProperties;
 import com.netflix.hystrix.HystrixCommandProperties.ExecutionIsolationStrategy;
 import com.netflix.hystrix.HystrixObservableCommand;
 
+import io.jaegertracing.internal.JaegerSpan;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.binder.BaseUnits;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
@@ -52,7 +60,6 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.QueryStringDecoder;
-import io.netty.util.Timer;
 import io.opentracing.Span;
 import io.opentracing.propagation.Format;
 import io.opentracing.tag.Tags;
@@ -75,13 +82,15 @@ public class ForwardTrade extends SingleReactor {
             final BeanFinder finder,
             final RelayMemo.Builder memoBuilder,
             final ServiceMemo serviceMemo,
-            final Timer timer ) {
+            final io.netty.util.Timer timer,
+            final MeterRegistry meterRegistry ) {
         this._serviceName = serviceName;
         this._matcher = matcher;
         this._finder = finder;
         this._memoBuilder = memoBuilder;
         this._serviceMemo = serviceMemo;
         this._timer = timer;
+        this._meterRegistry = meterRegistry;
     }
 
     @Override
@@ -247,7 +256,6 @@ public class ForwardTrade extends SingleReactor {
                     final AtomicReference<HttpRequest> refReq = new AtomicReference<>();
                     final AtomicReference<HttpResponse> refResp = new AtomicReference<>();
 
-                    final TrafficCounter upstreamTraffic = upstream.traffic();
                     trade.doOnHalt(() -> {
                             final long ttl = stopWatch.stopAndRestart();
                             final RelayMemo memo = _memoBuilder.build(target, buildRoutingInfo(refReq.get()));
@@ -262,8 +270,8 @@ public class ForwardTrade extends SingleReactor {
                                     trade.traffic().inboundBytes(),
                                     trade.traffic().outboundBytes(),
                                     upstream.transport(),
-                                    upstreamTraffic.outboundBytes(),
-                                    upstreamTraffic.inboundBytes(),
+                                    upstream.traffic().outboundBytes(),
+                                    upstream.traffic().inboundBytes(),
                                     refReq.get(),
                                     refResp.get()
                                     );
@@ -291,7 +299,15 @@ public class ForwardTrade extends SingleReactor {
                             span.setTag(Tags.ERROR.getKey(), true);
                             span.log(Collections.singletonMap("error.detail", ExceptionUtils.exception2detail(e)));
                         })
-                        .doOnTerminate(() -> span.finish());
+                        .doOnTerminate(() -> {
+                            span.finish();
+                            if (span instanceof JaegerSpan) {
+                                final String operation = ((JaegerSpan)span).getOperationName();
+                                getOrCreateInteractTimer("operation", operation).record(((JaegerSpan)span).getDuration(), TimeUnit.MICROSECONDS);
+                                getOrCreateInboundSummary("operation", operation).record(upstream.traffic().inboundBytes());
+                                getOrCreateOutboundSummary("operation", operation).record(upstream.traffic().outboundBytes());
+                            }
+                        });
                 });
     }
 
@@ -533,6 +549,71 @@ public class ForwardTrade extends SingleReactor {
         private final AtomicBoolean _down = new AtomicBoolean(false);
     }
 
+    private Timer getOrCreateInteractTimer(final String... tags) {
+        final StringTags keyOfTags = new StringTags(tags);
+
+        Timer timer = this._interactTimers.get(keyOfTags);
+
+        if (null == timer) {
+            timer = Timer.builder("jocean.xharbor.interact.duration")
+                .tags(tags)
+                .description("The duration of jocean xharbor interact")
+                .publishPercentileHistogram()
+                .maximumExpectedValue(Duration.ofSeconds(30))
+                .register(_meterRegistry);
+
+            final Timer old = this._interactTimers.putIfAbsent(keyOfTags, timer);
+            if (null != old) {
+                timer = old;
+            }
+        }
+        return timer;
+    }
+
+    private DistributionSummary getOrCreateInboundSummary(final String... tags) {
+        final StringTags keyOfTags = new StringTags(tags);
+
+        DistributionSummary summary = this._inboundSummarys.get(keyOfTags);
+
+        if (null == summary) {
+            summary = DistributionSummary.builder("jocean.xharbor.interact.inbound")
+                .tags(tags)
+                .description("The inbound size of jocean xharbor interact") // optional
+                .baseUnit(BaseUnits.BYTES)
+                .publishPercentileHistogram()
+                .maximumExpectedValue( 8 * 1024L)
+                .register(_meterRegistry);
+
+            final DistributionSummary old = this._inboundSummarys.putIfAbsent(keyOfTags, summary);
+            if (null != old) {
+                summary = old;
+            }
+        }
+        return summary;
+    }
+
+    private DistributionSummary getOrCreateOutboundSummary(final String... tags) {
+        final StringTags keyOfTags = new StringTags(tags);
+
+        DistributionSummary summary = this._outboundSummarys.get(keyOfTags);
+
+        if (null == summary) {
+            summary = DistributionSummary.builder("jocean.xharbor.interact.outbound")
+                .tags(tags)
+                .description("The outbound size of jocean xharbor interact") // optional
+                .baseUnit(BaseUnits.BYTES)
+                .publishPercentileHistogram()
+                .maximumExpectedValue( 8 * 1024L)
+                .register(_meterRegistry);
+
+            final DistributionSummary old = this._outboundSummarys.putIfAbsent(keyOfTags, summary);
+            if (null != old) {
+                summary = old;
+            }
+        }
+        return summary;
+    }
+
     private final MatchRule     _matcher;
     private final List<MarkableTargetImpl>  _targets = Lists.newCopyOnWriteArrayList();
 
@@ -540,5 +621,10 @@ public class ForwardTrade extends SingleReactor {
     private final BeanFinder    _finder;
     private final RelayMemo.Builder _memoBuilder;
     private final ServiceMemo   _serviceMemo;
-    private final Timer         _timer;
+    private final io.netty.util.Timer _timer;
+    private final MeterRegistry _meterRegistry;
+
+    private final ConcurrentMap<StringTags, Timer> _interactTimers = new ConcurrentHashMap<>();
+    private final ConcurrentMap<StringTags, DistributionSummary> _inboundSummarys = new ConcurrentHashMap<>();
+    private final ConcurrentMap<StringTags, DistributionSummary> _outboundSummarys = new ConcurrentHashMap<>();
 }
