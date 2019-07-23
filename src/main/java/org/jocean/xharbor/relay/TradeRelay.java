@@ -448,7 +448,12 @@ public class TradeRelay extends Subscriber<HttpTrade> implements TradeRelayMXBea
                 .tags(tags)
                 .description("The duration of jocean xharbor trade")
                 .publishPercentileHistogram()
+                .minimumExpectedValue(Duration.ofMillis(1))
                 .maximumExpectedValue(Duration.ofSeconds(30))
+                // 1ms -- 10ms -- 20ms -- 50ms -- 100ms -- 200ms -- 500ms -- 1s -- 5s -- 10s -- 30s
+                .sla(Duration.ofMillis(1), Duration.ofMillis(10), Duration.ofMillis(20), Duration.ofMillis(50),
+                        Duration.ofMillis(100), Duration.ofMillis(200), Duration.ofMillis(500), Duration.ofSeconds(1),
+                        Duration.ofSeconds(5), Duration.ofSeconds(10), Duration.ofSeconds(30))
                 .register(_meterRegistry);
 
             final Timer old = this._tradeTimers.putIfAbsent(keyOfTags, timer);
