@@ -45,9 +45,10 @@ import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.binder.BaseUnits;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufHolder;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpResponse;
-import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpRequest;
@@ -369,7 +370,14 @@ public class ForwardTrade extends SingleReactor {
 
     private int getReadableBytes(final Object sending) {
         final Object unwrap = DisposableWrapperUtil.unwrap(sending);
-        return unwrap instanceof HttpContent ? ((HttpContent) unwrap).content().readableBytes() : 0;
+        int readableBytes = 0;
+        if (unwrap instanceof ByteBuf) {
+            readableBytes = ((ByteBuf) unwrap).readableBytes();
+        } else if (unwrap instanceof ByteBufHolder) {
+            readableBytes = ((ByteBufHolder) unwrap).content().readableBytes();
+        }
+        LOG.info("{}'s getReadableBytes: {} ", unwrap, readableBytes);
+        return readableBytes;
     }
 
     private InetSocketAddress buildAddress(final URI uri) {
