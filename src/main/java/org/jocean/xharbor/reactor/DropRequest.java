@@ -20,7 +20,9 @@ public class DropRequest extends SingleReactor {
     @Override
     public String toString() {
         final StringBuilder builder = new StringBuilder();
-        builder.append("DropRequest [matcher=").append(_matcher).append("]");
+        builder.append("DropRequest [matcher=").append(_matcher)
+            .append(",blockip=").append(_peerip)
+            .append("]");
         return builder.toString();
     }
 
@@ -29,7 +31,21 @@ public class DropRequest extends SingleReactor {
         if (null != io.outbound()) {
             return Single.just(false);
         }
-        return io.inbound().first().map(fullreq -> _matcher.match(fullreq.message())).toSingle();
+        return io.inbound().first().map(fullreq -> isMatched(fullreq)).toSingle();
+    }
+
+    public static String get1stIp(final String peerips) {
+        return peerips.split(",")[0];
+    }
+
+    private boolean isMatched(final FullMessage<HttpRequest> fullreq) {
+        if (null != this._peerip) {
+            final String ips = fullreq.message().headers().get("x-forwarded-for");
+            if (null != ips && get1stIp(ips).equals(this._peerip)) {
+                return true;
+            }
+        }
+        return _matcher.match(fullreq.message());
     }
 
     @Override
@@ -41,7 +57,7 @@ public class DropRequest extends SingleReactor {
             return Single.<InOut>just(null);
         }
         return io.inbound().first().map(fullreq -> {
-            if (_matcher.match(fullreq.message())) {
+            if (isMatched(fullreq)) {
                 return io4drop(ctx, io, fullreq);
             } else {
                 // not handle this trade
@@ -70,6 +86,9 @@ public class DropRequest extends SingleReactor {
 
     @Inject
     MatchRule _matcher;
+
+    @Value("${block.ip}")
+    String _peerip = null;
 
     @Value("${log}")
     boolean _log = true;
