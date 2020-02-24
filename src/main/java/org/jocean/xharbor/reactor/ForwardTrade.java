@@ -23,6 +23,7 @@ import org.jocean.http.client.HttpClient;
 import org.jocean.http.client.HttpClient.HttpInitiator;
 import org.jocean.http.server.HttpServerBuilder.HttpTrade;
 import org.jocean.idiom.BeanFinder;
+import org.jocean.idiom.DisposableWrapper;
 import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
@@ -349,10 +350,11 @@ public class ForwardTrade extends SingleReactor {
         writeCtrl.sending().subscribe(sending -> sendingSize.addAndGet(getReadableBytes(sending)));
         writeCtrl.sended().subscribe(sended -> {
             if (sendingSize.get() > size) {
-                LOG.trace("sendingSize is {}, dispose sended {}", sendingSize.get(), sended);
+                LOG.info("sendingSize is {}, try dispose sended {}, which DisposableWrapper({})",
+                        sendingSize.get(), sended, (sended instanceof DisposableWrapper));
                 DisposableWrapperUtil.dispose(sended);
             } else {
-                LOG.trace("sendingSize is {}, SKIP sended {}", sendingSize.get(), sended);
+                LOG.info("sendingSize is {}, SKIP sended {}", sendingSize.get(), sended);
             }
         });
     }
