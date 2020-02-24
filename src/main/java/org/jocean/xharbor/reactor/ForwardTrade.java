@@ -38,11 +38,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Lists;
-import com.netflix.hystrix.HystrixCommandGroupKey;
-import com.netflix.hystrix.HystrixCommandKey;
-import com.netflix.hystrix.HystrixCommandProperties;
-import com.netflix.hystrix.HystrixCommandProperties.ExecutionIsolationStrategy;
-import com.netflix.hystrix.HystrixObservableCommand;
 
 import io.jaegertracing.internal.JaegerSpan;
 import io.micrometer.core.instrument.DistributionSummary;
@@ -151,23 +146,23 @@ public class ForwardTrade extends SingleReactor {
             final MarkableTargetImpl target,
             final String summary,
             final HttpRequest request) {
-        return new HystrixObservableCommand<InOut>(HystrixObservableCommand.Setter
-                        .withGroupKey(HystrixCommandGroupKey.Factory.asKey("forward"))
-                        .andCommandKey(HystrixCommandKey.Factory.asKey(summary + "-request"))
-                        .andCommandPropertiesDefaults(HystrixCommandProperties.Setter()
-                                .withExecutionIsolationStrategy(ExecutionIsolationStrategy.SEMAPHORE)
-//                                .withExecutionTimeoutEnabled(false)
-                                .withExecutionTimeoutInMilliseconds(30 * 1000)
-                                .withExecutionIsolationSemaphoreMaxConcurrentRequests(1000)
-                                .withFallbackIsolationSemaphoreMaxConcurrentRequests(2000)
-                                )
-                        ) {
-                    @Override
-                    protected Observable<InOut> construct() {
+//        return new HystrixObservableCommand<InOut>(HystrixObservableCommand.Setter
+//                        .withGroupKey(HystrixCommandGroupKey.Factory.asKey("forward"))
+//                        .andCommandKey(HystrixCommandKey.Factory.asKey(summary + "-request"))
+//                        .andCommandPropertiesDefaults(HystrixCommandProperties.Setter()
+//                                .withExecutionIsolationStrategy(ExecutionIsolationStrategy.SEMAPHORE)
+////                                .withExecutionTimeoutEnabled(false)
+//                                .withExecutionTimeoutInMilliseconds(30 * 1000)
+//                                .withExecutionIsolationSemaphoreMaxConcurrentRequests(1000)
+//                                .withFallbackIsolationSemaphoreMaxConcurrentRequests(2000)
+//                                )
+//                        ) {
+//                    @Override
+//                    protected Observable<InOut> construct() {
                         return buildOutbound(ctx, orgio.inbound(), target, request)
                             .doOnError(onCommunicationError(target)).compose(makeupio(orgio, target, ctx, summary)).first();
-                    }
-                }.toObservable();
+//                    }
+//                }.toObservable();
     }
 
     private Transformer<FullMessage<HttpResponse>, InOut> makeupio(

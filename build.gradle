@@ -12,6 +12,8 @@ configurations {
     all*.exclude group: 'log4j', module: 'log4j'
     all*.exclude group: 'commons-logging', module: 'commons-logging'
     all { resolutionStrategy.cacheChangingModulesFor 1, 'minutes' }
+    
+    // all*.exclude group: 'com.netflix.hystrix', module: 'hystrix-core'
 }
 
 dependencies {
