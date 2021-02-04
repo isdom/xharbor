@@ -305,7 +305,9 @@ public class ForwardTrade extends SingleReactor {
                             span.log(Collections.singletonMap("error.detail", ExceptionUtils.exception2detail(e)));
                         })
                         .doOnTerminate(() -> {
-                            ctx.span().log(Collections.singletonMap("trade.req.body", bodysb.toString()));
+                            if (bodysb.length() > 0) {
+                                ctx.span().log(Collections.singletonMap("trade.req.body", bodysb.toString()));
+                            }
 
                             span.finish();
                             if (span instanceof JaegerSpan) {
