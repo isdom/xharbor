@@ -28,6 +28,8 @@ dependencies {
     compile 'io.jaegertracing:jaeger-client:0.32.0'
     
     compile "com.google.guava:guava:${guavaVersion}"
+    compile 'com.netflix.hystrix:hystrix-core:1.5.12'
+    compile 'com.netflix.hystrix:hystrix-serialization:1.5.12'
     
     /* Log */
     runtime 'org.slf4j:jcl-over-slf4j:1.7.26'
