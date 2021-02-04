@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.jocean.http.ByteBufSlice;
 import org.jocean.http.Feature;
 import org.jocean.http.FullMessage;
 import org.jocean.http.MessageBody;
@@ -28,6 +29,7 @@ import org.jocean.idiom.DisposableWrapperUtil;
 import org.jocean.idiom.ExceptionUtils;
 import org.jocean.idiom.StopWatch;
 import org.jocean.idiom.rx.RxObservables;
+import org.jocean.netty.util.BufsInputStream;
 import org.jocean.svr.StringTags;
 import org.jocean.svr.tracing.TraceUtil;
 import org.jocean.xharbor.api.RelayMemo;
@@ -38,7 +40,9 @@ import org.jocean.xharbor.api.Target;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
+import com.google.common.io.ByteStreams;
 
 import io.jaegertracing.internal.JaegerSpan;
 import io.micrometer.core.instrument.DistributionSummary;
@@ -278,6 +282,8 @@ public class ForwardTrade extends SingleReactor {
                     final Span span = ctx2span(ctx, target, request);
                     TraceUtil.addTagNotNull(span, "http.host", request.headers().get(HttpHeaderNames.HOST));
 
+                    TraceUtil.logoutmsg(upstream.writeCtrl(), span, "upstream.req", 160);
+
                     upstream.writeCtrl().sending().subscribe(obj -> {
                         if (obj instanceof HttpRequest) {
                             final HttpRequest req = (HttpRequest)obj;
@@ -285,10 +291,12 @@ public class ForwardTrade extends SingleReactor {
                         }
                     });
 
+                    final StringBuilder bodysb = new StringBuilder();
+
                     return isDBS().doOnNext(configDBS(trade))
                         .flatMap(any -> upstream.defineInteraction(
                             inbound.map(addKeepAliveIfNeeded(refReq, isKeepAliveFromClient))
-                            .compose(fullreq2objs())))
+                            .compose(fullreq2objs(sniffTo(bodysb, 160)))))
 //                        .observeOn(ctx.scheduler())  TODO : disable
                         .map(removeKeepAliveIfNeeded(refResp, isKeepAliveFromClient))
                         .doOnNext(TraceUtil.hookhttpresp(span))
@@ -297,6 +305,8 @@ public class ForwardTrade extends SingleReactor {
                             span.log(Collections.singletonMap("error.detail", ExceptionUtils.exception2detail(e)));
                         })
                         .doOnTerminate(() -> {
+                            ctx.span().log(Collections.singletonMap("trade.req.body", bodysb.toString()));
+
                             span.finish();
                             if (span instanceof JaegerSpan) {
                                 final String operation = ((JaegerSpan)span).getOperationName();
@@ -323,9 +333,32 @@ public class ForwardTrade extends SingleReactor {
             .start();
     }
 
-    private Transformer<FullMessage<HttpRequest>, Object> fullreq2objs() {
-        return getfullreq -> getfullreq.flatMap(fullreq -> Observable.<Object>just(fullreq.message()).concatWith(fullreq.body().concatMap(body -> body.content()))
+    private Transformer<FullMessage<HttpRequest>, Object> fullreq2objs(final Action1<ByteBufSlice> hook) {
+        return getfullreq -> getfullreq.flatMap(fullreq -> Observable.<Object>just(fullreq.message())
+                .concatWith(fullreq.body().concatMap(body -> body.content()).doOnNext(hook))
                 .concatWith(Observable.just(LastHttpContent.EMPTY_LAST_CONTENT)));
+    }
+
+    private Action1<ByteBufSlice> sniffTo(final StringBuilder sb, final int maxSize) {
+        final AtomicInteger snifiedSize = new AtomicInteger(0);
+        final BufsInputStream<ByteBuf> bufsin = new BufsInputStream<>(buf -> buf, buf -> {});
+        bufsin.markEOS();
+
+        return bbs -> {
+            for (final DisposableWrapper<? extends ByteBuf> dwb : bbs.element()) {
+                final ByteBuf buf = dwb.unwrap();
+                if (snifiedSize.get() < maxSize && buf.readableBytes() > 0) {
+                    final int size = Math.min(maxSize - snifiedSize.get(), buf.readableBytes());
+                    bufsin.appendBuf(buf.slice(0, size));
+                    snifiedSize.addAndGet(size);
+                }
+            }
+            if (bufsin.available() > 0) {
+                try {
+                    sb.append(new String(ByteStreams.toByteArray(bufsin), Charsets.UTF_8));
+                } catch (final Exception e) {}
+            }
+        };
     }
 
     private Action1<? super Boolean> configDBS(final HttpTrade trade) {
