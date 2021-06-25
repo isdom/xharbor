@@ -10,6 +10,7 @@ import javax.inject.Named;
 import org.jocean.http.FullMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
@@ -19,12 +20,14 @@ import rx.Single;
 public class RewriteResponse extends SingleReactor {
     private static final Logger LOG = LoggerFactory.getLogger(RewriteResponse.class);
 
+
     @Override
     public String toString() {
         final int maxLen = 10;
         final StringBuilder builder = new StringBuilder();
-        builder.append("RewriteResponse [matcher=").append(_matcher).append(", extraHeaders=")
-                .append(_extraHeaders != null ? toString(_extraHeaders.entrySet(), maxLen) : null).append("]");
+        builder.append("RewriteResponse [_matcher=").append(_matcher).append(", _extraHeaders=")
+                .append(_extraHeaders != null ? toString(_extraHeaders.entrySet(), maxLen) : null)
+                .append(", _removeHeaderName=").append(_removeHeaderName).append("]");
         return builder.toString();
     }
 
@@ -78,8 +81,13 @@ public class RewriteResponse extends SingleReactor {
             public Observable<FullMessage<HttpResponse>> outbound() {
                 return orgio.outbound().doOnNext(fullresp -> {
                         final HttpResponse response = (HttpResponse) fullresp.message();
-                        for (final Map.Entry<String, String> entry : _extraHeaders.entrySet()) {
-                            response.headers().set(entry.getKey(), entry.getValue());
+                        if (null != _extraHeaders) {
+                            for (final Map.Entry<String, String> entry : _extraHeaders.entrySet()) {
+                                response.headers().set(entry.getKey(), entry.getValue());
+                            }
+                        }
+                        if (null != _removeHeaderName) {
+                            response.headers().remove(_removeHeaderName);
                         }
                 });
             }
@@ -92,4 +100,7 @@ public class RewriteResponse extends SingleReactor {
     @Inject
     @Named("extraHeaders")
     Map<String, String> _extraHeaders;
+
+    @Value("${remove.header.name}")
+    String _removeHeaderName;
 }
