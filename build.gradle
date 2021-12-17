@@ -37,7 +37,7 @@ dependencies {
     runtime 'ch.qos.logback:logback-classic:1.2.7'
     /* compile('org.logback-extensions:logback-ext-spring:0.1.2') { transitive = false } */
 
-    testCompile 'junit:junit:4.12'
+    testCompile 'junit:junit:4.13.2'
     testCompile 'org.jmockit:jmockit:1.49'
     testCompile 'org.jmock:jmock:2.12.0'
 }
